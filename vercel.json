@@ -1,0 +1,23 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "redirects": [
+    {
+      "source": "/mis",
+      "destination": "https://agilereporting.live/login",
+      "permanent": false
+    },
+    {
+      "source": "/mis/:path*",
+      "destination": "https://agilereporting.live/:path*",
+      "permanent": false
+    },
+    {
+      "source": "/crm",
+      "destination": "https://tinyurl.com/CRM-AGILE",
+      "permanent": false
+    }
+  ],
+  "rewrites": [{ "source": "/((?!api).*)", "destination": "/index.html" }]
+}
