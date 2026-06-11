@@ -98,6 +98,17 @@ async function deletePin(email: string) {
   devStore().delete(key)
 }
 
+export function pinStorageStatus() {
+  const url = process.env.UPSTASH_REDIS_REST_URL?.trim()
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
+  if (url && token) return { ok: true as const }
+  if (process.env.NODE_ENV !== 'production') return { ok: true as const, dev: true as const }
+  const missing: string[] = []
+  if (!url) missing.push('UPSTASH_REDIS_REST_URL')
+  if (!token) missing.push('UPSTASH_REDIS_REST_TOKEN')
+  return { ok: false as const, missing }
+}
+
 export function hasPinStorage() {
-  return Boolean(process.env.UPSTASH_REDIS_REST_URL) || process.env.NODE_ENV !== 'production'
+  return pinStorageStatus().ok
 }

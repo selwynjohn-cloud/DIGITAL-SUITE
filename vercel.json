@@ -5,12 +5,12 @@
   "redirects": [
     {
       "source": "/mis",
-      "destination": "https://agilereporting.live/login",
+      "destination": "https://script.google.com/macros/s/AKfycbxZ5teJVOw61Nf7j5HcVw0Mu-8mrzWtQg7PpeaewvkC8EGSbMQNiI8MMl9k7CVe0qBm/exec",
       "permanent": false
     },
     {
       "source": "/mis/:path*",
-      "destination": "https://agilereporting.live/:path*",
+      "destination": "https://script.google.com/macros/s/AKfycbxZ5teJVOw61Nf7j5HcVw0Mu-8mrzWtQg7PpeaewvkC8EGSbMQNiI8MMl9k7CVe0qBm/exec",
       "permanent": false
     },
     {

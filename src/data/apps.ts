@@ -13,7 +13,7 @@ export type SuiteApp = {
   requiresAuth?: boolean
   /** Redirects to a separate built app after login (e.g. Training) */
   hasBuiltInPortal?: boolean
-  /** Live app with its own login — opens directly (e.g. MIS on agilereporting.live) */
+  /** Live app with its own login — opens directly (e.g. MIS on Google Apps Script) */
   usesOwnAuth?: boolean
 }
 
@@ -23,13 +23,22 @@ export type SuiteApp = {
  * Exceptions: Facebook & LinkedIn open externally without login.
  * Agile Mobile, CRM, MIS & Reviews use their own login on external URLs.
  */
-const TRAINING = import.meta.env.VITE_TRAINING_URL ?? '/training/'
-/** Suite paths redirect to live apps via vercel.json */
-const MIS = import.meta.env.VITE_MIS_URL ?? '/mis'
+/** Trainee LMS — PSARA online modules for guards */
+const TRAINING_LMS =
+  import.meta.env.VITE_TRAINING_URL ?? 'https://training.agilegroup-digital.co.in/'
+/** App 02 HOD/Management — Google Apps Script (OTP login, same Users sheet) */
+const TRAINING_ACADEMY = import.meta.env.VITE_TRAINING_ACADEMY_URL ?? ''
+const MIS_EXEC =
+  'https://script.google.com/macros/s/AKfycbxZ5teJVOw61Nf7j5HcVw0Mu-8mrzWtQg7PpeaewvkC8EGSbMQNiI8MMl9k7CVe0qBm/exec'
+/** New Agile MIS on Google Apps Script; /mis on Vercel redirects here too */
+const MIS = import.meta.env.VITE_MIS_URL ?? MIS_EXEC
 const CRM =
   import.meta.env.VITE_CRM_URL ?? 'https://tinyurl.com/CRM-AGILE'
 const REVIEWS =
   import.meta.env.VITE_REVIEWS_URL ?? 'https://tinyurl.com/AGILE-REVIEW-2627'
+const PULSE_EXEC =
+  'https://script.google.com/macros/s/AKfycbzGqyQNdyvBy2Bw1p7N84rdB-8VobOGVT8g4gZcghtN27SI6guihHdaNXLTNfIOYKQ/exec'
+const PULSE = import.meta.env.VITE_PULSE_URL ?? PULSE_EXEC
 const MOBILE =
   import.meta.env.VITE_MOBILE_URL ?? 'https://agilegroup-work360.aititude.in/'
 
@@ -53,12 +62,13 @@ export const suiteApps: SuiteApp[] = [
     id: 'training',
     number: '02',
     title: 'Agile Training',
-    tagline: 'Where Learning Meets Performance',
+    tagline: 'Security Workforce Competency Validation — 1 week certificate (existing guards)',
     color: '#0f766e',
     buttonDark: '#115e59',
-    staffUrl: `${TRAINING}?portal=trainee`,
-    managementUrl: `${TRAINING}?portal=admin`,
+    staffUrl: TRAINING_ACADEMY || `${TRAINING_LMS}?portal=trainee`,
+    managementUrl: TRAINING_ACADEMY || `${TRAINING_LMS}?portal=admin`,
     status: 'live',
+    usesOwnAuth: true,
     hasBuiltInPortal: true,
   },
   {
@@ -162,9 +172,11 @@ export const suiteApps: SuiteApp[] = [
     tagline: 'Connecting Security Community — A World Full of Opportunity',
     color: '#14532d',
     buttonDark: '#166534',
-    staffUrl: appPath('pulse', 'staff'),
-    managementUrl: appPath('pulse', 'management'),
+    staffUrl: PULSE,
+    managementUrl: PULSE,
     status: 'live',
+    usesOwnAuth: true,
+    hasBuiltInPortal: true,
   },
   {
     id: 'fleets',

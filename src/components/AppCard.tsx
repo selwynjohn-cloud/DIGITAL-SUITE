@@ -48,6 +48,11 @@ export function AppCard({ app }: Props) {
               Live CRM
             </span>
           )}
+          {app.usesOwnAuth && app.id === 'training' && (
+            <span className="shrink-0 rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
+              Academy
+            </span>
+          )}
         </div>
         <p className="mt-2 text-sm leading-relaxed text-white/90">{app.tagline}</p>
       </div>

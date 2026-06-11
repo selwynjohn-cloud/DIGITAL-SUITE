@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { isValidAgileEmail, normaliseEmail } from '../_lib/auth.js'
 import { sendPinEmail } from '../_lib/email.js'
-import { hasPinStorage, savePin } from '../_lib/pin-store.js'
+import { hasPinStorage, pinStorageStatus, savePin } from '../_lib/pin-store.js'
 
 function generatePin() {
   return String(Math.floor(100000 + Math.random() * 900000))
@@ -13,8 +13,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (!hasPinStorage()) {
+    const st = pinStorageStatus()
+    const missing = 'missing' in st ? st.missing.join(', ') : 'Upstash Redis'
     return res.status(503).json({
-      error: 'PIN storage is not configured. Add Upstash Redis in Vercel project settings.',
+      error:
+        'PIN storage is not configured. In Vercel → Settings → Environment Variables, add Upstash Redis (both Staff and Management use the same store). Missing: ' +
+        missing,
     })
   }
 

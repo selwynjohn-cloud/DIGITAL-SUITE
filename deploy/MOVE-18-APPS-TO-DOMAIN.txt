@@ -1,0 +1,74 @@
+ACTIVE COMMAND CENTRE URL (18 apps — use this now)
+--------------------------------------------------
+https://agilegroup-digital.vercel.app
+
+Bookmark and share this with HODs and Management until
+agilegroup-digital.co.in is fully switched (domain renewed on GoDaddy).
+
+MOVE FULL 18-APP COMMAND CENTRE → https://agilegroup-digital.co.in
+================================================================
+
+WHY YOU SEE 12 APPS IN SAFARI
+-----------------------------
+The custom domain is still serving an OLD Production deployment (12 apps).
+Your Vercel "Visit" link opens the NEW deployment (18 apps).
+Same domain name — two different deployments. We fix that below.
+
+CORRECT VERCEL PROJECT
+----------------------
+Project name:  agilgroup-digital
+(NOT a separate Codewords project — the old build is just still on the domain.)
+
+STEP 1 — DOMAINS (most important)
+---------------------------------
+1. vercel.com → open project  agilgroup-digital
+2. Settings → Domains
+3. Click  Add  → type:  agilegroup-digital.co.in  → Add
+4. Also add:  www.agilegroup-digital.co.in
+5. If Vercel says domain is used by another project:
+   - Open THAT other project → Settings → Domains → Remove the domain
+   - Return to agilgroup-digital → Add domain again
+6. Wait until both show green tick (Valid Configuration)
+
+STEP 2 — DEPLOY LATEST 18-APP BUILD
+-------------------------------------
+Option A — From Mac (if Vercel CLI installed):
+  cd ~/agilgroup-digital
+  npx vercel --prod
+
+Option B — From Vercel website:
+  Deployments tab → latest deployment with 18 apps
+  → ⋯ menu → Promote to Production
+
+Option C — Connect GitHub and push:
+  Push main branch → Vercel auto-deploys Production
+
+STEP 3 — CONFIRM PRODUCTION
+---------------------------
+Deployments → top row must say  Production  (not only Preview).
+Custom domains ALWAYS use Production.
+
+STEP 4 — TEST (after 2–5 minutes)
+---------------------------------
+1. Safari → Private Window
+2. Open:  https://agilegroup-digital.co.in
+3. Under "Integrated Application Suite" you should see:
+     18 live · 18 applications
+4. Scroll down — cards 13–18: Fleets, Assets, Facilities, Licenses,
+   Facebook, LinkedIn, Mobile
+
+STEP 5 — CLEAR SAFARI CACHE (if still 12)
+-----------------------------------------
+Develop → Empty Caches for All Devices
+Or use Private Window first.
+
+OPTIONAL — ENV VARS (for PIN login on hub)
+------------------------------------------
+See:  deploy/VERCEL-UPSTASH-SETUP.md
+Apps with own login (no hub PIN): Pulse, Reviews, MIS, CRM, Mobile.
+
+DIRECT LINKS (work even before domain fix)
+------------------------------------------
+Pulse:    https://script.google.com/macros/s/AKfycbzGqyQNdyvBy2Bw1p7N84rdB-8VobOGVT8g4gZcghtN27SI6guihHdaNXLTNfIOYKQ/exec
+Reviews:  https://tinyurl.com/AGILE-REVIEW-2627
+Training: your Training Academy GAS /exec URL

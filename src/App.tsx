@@ -1,13 +1,11 @@
 import { AgileLogo } from './components/AgileLogo'
 import { AppCard } from './components/AppCard'
-import { AppPortal } from './components/AppPortal'
+import { AppPortalLanding } from './components/AppPortalLanding'
 import { DisclaimerFooter } from './components/DisclaimerFooter'
-import { LoginModal } from './components/LoginModal'
-import { useAuth } from './contexts/AuthContext'
 import { companyBadges, suiteApps } from './data/apps'
+import { getDeepLinkPortal } from './lib/portal-link'
 
 function CommandCentreHub() {
-  const { session, logout } = useAuth()
   const liveCount = suiteApps.filter((a) => a.status !== 'coming-soon').length
 
   return (
@@ -28,20 +26,9 @@ function CommandCentreHub() {
         </h1>
 
         <p className="mx-auto mt-4 max-w-xl text-sm text-slate-400">
-          Select your application — sign in with your{' '}
-          <strong className="text-slate-300">@agilegroup.co.in</strong> email. A PIN
-          will be sent to your inbox.
+          Select your application — each app opens directly. Live apps use their own
+          secure login where required.
         </p>
-
-        {session && (
-          <p className="mx-auto mt-3 max-w-xl text-xs text-emerald-400">
-            Signed in as {session.email} ({session.role === 'staff' ? 'HODs / Staff' : 'Management'})
-            {' · '}
-            <button type="button" onClick={logout} className="underline hover:text-emerald-300">
-              Sign out
-            </button>
-          </p>
-        )}
 
         <div className="mx-auto mt-6 flex max-w-3xl flex-wrap justify-center gap-2">
           {companyBadges.map((badge) => (
@@ -83,12 +70,10 @@ function CommandCentreHub() {
 }
 
 export default function App() {
-  const { activePortal } = useAuth()
+  const deepLink = getDeepLinkPortal()
+  if (deepLink) {
+    return <AppPortalLanding app={deepLink.app} role={deepLink.role} />
+  }
 
-  return (
-    <>
-      <LoginModal />
-      {activePortal ? <AppPortal /> : <CommandCentreHub />}
-    </>
-  )
+  return <CommandCentreHub />
 }
