@@ -4,6 +4,16 @@ export type SendPinEmailResult =
   | { ok: true; devMode: boolean }
   | { ok: false; error: string }
 
+function resendErrorMessage(error: { message?: string; name?: string }) {
+  const msg = error.message ?? 'Could not send email'
+  if (/domain|verify|not verified|403/i.test(msg)) {
+    return (
+      'Email domain is not verified in Resend yet. In resend.com → Domains, add agilegroup.co.in and the DNS records at GoDaddy. Until then, OTP email cannot reach @agilegroup.co.in addresses.'
+    )
+  }
+  return `Email could not be sent: ${msg.slice(0, 160)}`
+}
+
 export async function sendPinEmail(
   email: string,
   pin: string,
@@ -40,10 +50,17 @@ export async function sendPinEmail(
 
   try {
     const resend = new Resend(apiKey)
-    await resend.emails.send({ from, to: email, subject, html })
+    const result = await resend.emails.send({ from, to: email, subject, html })
+    if (result.error) {
+      console.error('Resend error', result.error)
+      return { ok: false, error: resendErrorMessage(result.error) }
+    }
+    if (!result.data?.id) {
+      return { ok: false, error: 'Email service did not confirm delivery. Check Resend domain setup.' }
+    }
     return { ok: true, devMode: false }
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Could not send email'
-    return { ok: false, error: `Email could not be sent: ${msg.slice(0, 120)}` }
+    return { ok: false, error: `Email could not be sent: ${msg.slice(0, 160)}` }
   }
 }
