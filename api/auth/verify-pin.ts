@@ -26,9 +26,10 @@ function sessionEmail(identifier: string) {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' })
-  }
+  try {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' })
+    }
 
   const body = (req.body ?? {}) as Record<string, unknown>
   const pin = String(body.pin ?? '').trim()
@@ -76,4 +77,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       appId: record.appId,
     },
   })
+  } catch (err) {
+    console.error('verify-pin error', err)
+    return res.status(500).json({
+      error: err instanceof Error ? err.message : 'Could not verify OTP. Please try again.',
+    })
+  }
 }

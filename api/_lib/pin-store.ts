@@ -29,18 +29,25 @@ export function normalizeMobile(mobile: string) {
   return ''
 }
 
-async function redisFetch(path: string, init?: RequestInit) {
-  const url = process.env.UPSTASH_REDIS_REST_URL
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN
+async function redisCommand(command: unknown[]) {
+  const url = process.env.UPSTASH_REDIS_REST_URL?.trim()
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
   if (!url || !token) return null
-  const res = await fetch(`${url}${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${token}`,
-      ...(init?.headers ?? {}),
-    },
-  })
-  return res
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(command),
+    })
+    if (!res.ok) return null
+    return (await res.json()) as { result?: unknown }
+  } catch {
+    return null
+  }
 }
 
 export async function savePin(
@@ -52,13 +59,10 @@ export async function savePin(
   const hash = await bcrypt.hash(pin, 10)
   const record: PinRecord = { hash, role, appId, attempts: 0 }
   const key = pinKey(identifier)
+  const payload = JSON.stringify(record)
 
-  const res = await redisFetch(`/set/${encodeURIComponent(key)}/${TTL_SECONDS}`, {
-    method: 'POST',
-    body: JSON.stringify(record),
-  })
-
-  if (res?.ok) return
+  const result = await redisCommand(['SET', key, payload, 'EX', TTL_SECONDS])
+  if (result?.result === 'OK') return
 
   const store = devStore()
   store.set(key, { ...record, exp: Date.now() + TTL_SECONDS * 1000 })
@@ -68,10 +72,9 @@ export async function verifyPin(identifier: string, pin: string): Promise<PinRec
   const key = pinKey(identifier)
   let record: PinRecord | null = null
 
-  const res = await redisFetch(`/get/${encodeURIComponent(key)}`)
-  if (res?.ok) {
-    const data = (await res.json()) as { result?: string | null }
-    if (data.result) record = JSON.parse(data.result) as PinRecord
+  const data = await redisCommand(['GET', key])
+  if (data?.result && typeof data.result === 'string') {
+    record = JSON.parse(data.result) as PinRecord
   } else {
     const entry = devStore().get(key)
     if (entry && entry.exp > Date.now()) {
@@ -86,11 +89,8 @@ export async function verifyPin(identifier: string, pin: string): Promise<PinRec
     record.attempts += 1
     if (record.attempts >= MAX_ATTEMPTS) {
       await deletePin(identifier)
-    } else if (process.env.UPSTASH_REDIS_REST_URL) {
-      await redisFetch(`/set/${encodeURIComponent(key)}/${TTL_SECONDS}`, {
-        method: 'POST',
-        body: JSON.stringify(record),
-      })
+    } else {
+      await redisCommand(['SET', key, JSON.stringify(record), 'EX', TTL_SECONDS])
     }
     return null
   }
@@ -101,7 +101,7 @@ export async function verifyPin(identifier: string, pin: string): Promise<PinRec
 
 async function deletePin(identifier: string) {
   const key = pinKey(identifier)
-  await redisFetch(`/del/${encodeURIComponent(key)}`, { method: 'POST' })
+  await redisCommand(['DEL', key])
   devStore().delete(key)
 }
 

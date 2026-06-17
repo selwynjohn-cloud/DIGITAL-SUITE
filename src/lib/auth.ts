@@ -43,6 +43,16 @@ export function isValidMobile(mobile: string) {
   return normalizeMobile(mobile).length === 10
 }
 
+async function readApiError(res: Response) {
+  const text = await res.text()
+  try {
+    const data = JSON.parse(text) as { error?: string }
+    return data.error ?? text.slice(0, 200)
+  } catch {
+    return text.slice(0, 200) || 'Something went wrong. Please try again.'
+  }
+}
+
 export async function requestPin(
   channel: 'email' | 'sms',
   value: string,
@@ -60,15 +70,15 @@ export async function requestPin(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error ?? 'Could not send OTP')
-  return data as {
+  if (!res.ok) throw new Error(await readApiError(res))
+  const data = (await res.json()) as {
     ok: boolean
     channel: 'email' | 'sms'
     identifier: string
     message: string
     devPin?: string
   }
+  return data
 }
 
 export async function verifyPin(identifier: string, pin: string) {
@@ -77,13 +87,13 @@ export async function verifyPin(identifier: string, pin: string) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ identifier, pin }),
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error ?? 'Invalid OTP')
-  return data as {
+  if (!res.ok) throw new Error(await readApiError(res))
+  const data = (await res.json()) as {
     ok: boolean
     token: string
     session: { email: string; role: AuthRole; appId: string }
   }
+  return data
 }
 
 export function formatLoginLabel(identifier: string) {

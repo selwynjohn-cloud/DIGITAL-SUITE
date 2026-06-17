@@ -1,7 +1,16 @@
 import { Resend } from 'resend'
 
-export async function sendPinEmail(email: string, pin: string, appTitle: string, role: string) {
-  const apiKey = process.env.RESEND_API_KEY
+export type SendPinEmailResult =
+  | { ok: true; devMode: boolean }
+  | { ok: false; error: string }
+
+export async function sendPinEmail(
+  email: string,
+  pin: string,
+  appTitle: string,
+  role: string,
+): Promise<SendPinEmailResult> {
+  const apiKey = process.env.RESEND_API_KEY?.trim()
   const from = process.env.EMAIL_FROM ?? 'Agile Command Centre <onboarding@resend.dev>'
 
   const subject = `Your login PIN — ${appTitle}`
@@ -19,13 +28,22 @@ export async function sendPinEmail(email: string, pin: string, appTitle: string,
 
   if (!apiKey) {
     if (process.env.NODE_ENV === 'production') {
-      throw new Error('RESEND_API_KEY is not configured')
+      return {
+        ok: false,
+        error:
+          'Email OTP is not set up yet. Ask IT to add RESEND_API_KEY on Vercel (or use SMS OTP if configured).',
+      }
     }
     console.log(`[DEV] PIN for ${email}: ${pin}`)
-    return { devMode: true }
+    return { ok: true, devMode: true }
   }
 
-  const resend = new Resend(apiKey)
-  await resend.emails.send({ from, to: email, subject, html })
-  return { devMode: false }
+  try {
+    const resend = new Resend(apiKey)
+    await resend.emails.send({ from, to: email, subject, html })
+    return { ok: true, devMode: false }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Could not send email'
+    return { ok: false, error: `Email could not be sent: ${msg.slice(0, 120)}` }
+  }
 }
