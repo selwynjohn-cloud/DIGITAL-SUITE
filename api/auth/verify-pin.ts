@@ -1,56 +1,56 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { createSessionToken, isValidAgileEmail, normaliseEmail } from '../_lib/auth.js'
-import { verifyPin } from '../_lib/pin-store.js'
+import { normalizeMobile, verifyPin } from '../_lib/pin-store.js'
 
 const COOKIE_MAX_AGE = 8 * 60 * 60
+
+function resolveIdentifier(body: Record<string, unknown>) {
+  const rawIdentifier = String(body.identifier ?? '').trim()
+  if (rawIdentifier.startsWith('m:')) {
+    const mobile10 = normalizeMobile(rawIdentifier.slice(2))
+    return mobile10 ? `m:${mobile10}` : ''
+  }
+
+  const email = normaliseEmail(String(body.email ?? rawIdentifier))
+  if (email && isValidAgileEmail(email)) return email
+
+  const mobile10 = normalizeMobile(String(body.mobile ?? ''))
+  if (mobile10) return `m:${mobile10}`
+
+  return ''
+}
+
+function sessionEmail(identifier: string) {
+  if (identifier.startsWith('m:')) return `+91${identifier.slice(2)}`
+  return identifier
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { email, pin, role, appId } = req.body ?? {}
-  if (!email || !pin) {
-    return res.status(400).json({ error: 'Missing email or PIN' })
+  const body = (req.body ?? {}) as Record<string, unknown>
+  const pin = String(body.pin ?? '').trim()
+  if (!pin) {
+    return res.status(400).json({ error: 'Missing OTP' })
   }
 
-  const normalised = normaliseEmail(String(email))
-  if (!isValidAgileEmail(normalised)) {
-    return res.status(400).json({ error: 'Invalid email domain' })
+  const identifier = resolveIdentifier(body)
+  if (!identifier) {
+    return res.status(400).json({ error: 'Invalid email or mobile number' })
   }
 
-  const pinStr = String(pin).trim()
-  const superPin = process.env.SUPER_ADMIN_PIN?.trim()
-  const superEmails = (process.env.SUPER_ADMIN_EMAILS ?? 'director@agilegroup.co.in')
-    .split(',')
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean)
-
-  let sessionRole: 'staff' | 'management' | null = null
-  let sessionAppId: string | null = null
-
-  if (superPin && superPin.length >= 6 && superEmails.includes(normalised) && pinStr === superPin) {
-    if (role !== 'staff' && role !== 'management') {
-      return res.status(400).json({ error: 'Missing role for super admin login' })
-    }
-    if (!appId) {
-      return res.status(400).json({ error: 'Missing app for super admin login' })
-    }
-    sessionRole = role
-    sessionAppId = String(appId)
-  } else {
-    const record = await verifyPin(normalised, pinStr)
-    if (!record) {
-      return res.status(401).json({ error: 'Invalid or expired PIN' })
-    }
-    sessionRole = record.role
-    sessionAppId = record.appId
+  const record = await verifyPin(identifier, pin)
+  if (!record) {
+    return res.status(401).json({ error: 'Invalid or expired OTP' })
   }
 
+  const email = sessionEmail(identifier)
   const token = await createSessionToken({
-    email: normalised,
-    role: sessionRole,
-    appId: sessionAppId,
+    email,
+    role: record.role,
+    appId: record.appId,
   })
 
   const cookieDomain = process.env.AUTH_COOKIE_DOMAIN
@@ -71,9 +71,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ok: true,
     token,
     session: {
-      email: normalised,
-      role: sessionRole,
-      appId: sessionAppId,
+      email,
+      role: record.role,
+      appId: record.appId,
     },
   })
 }

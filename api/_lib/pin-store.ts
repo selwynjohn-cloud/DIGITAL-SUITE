@@ -18,8 +18,15 @@ const devStore = () => {
   return g.__agilPinStore
 }
 
-function pinKey(email: string) {
-  return `agil:pin:${email.toLowerCase()}`
+function pinKey(identifier: string) {
+  return `agil:pin:${identifier.toLowerCase()}`
+}
+
+export function normalizeMobile(mobile: string) {
+  const d = String(mobile || '').replace(/\D/g, '')
+  if (d.length === 10) return d
+  if (d.length === 12 && d.startsWith('91')) return d.slice(2)
+  return ''
 }
 
 async function redisFetch(path: string, init?: RequestInit) {
@@ -37,14 +44,14 @@ async function redisFetch(path: string, init?: RequestInit) {
 }
 
 export async function savePin(
-  email: string,
+  identifier: string,
   pin: string,
   role: 'staff' | 'management',
   appId: string,
 ) {
   const hash = await bcrypt.hash(pin, 10)
   const record: PinRecord = { hash, role, appId, attempts: 0 }
-  const key = pinKey(email)
+  const key = pinKey(identifier)
 
   const res = await redisFetch(`/set/${encodeURIComponent(key)}/${TTL_SECONDS}`, {
     method: 'POST',
@@ -57,8 +64,8 @@ export async function savePin(
   store.set(key, { ...record, exp: Date.now() + TTL_SECONDS * 1000 })
 }
 
-export async function verifyPin(email: string, pin: string): Promise<PinRecord | null> {
-  const key = pinKey(email)
+export async function verifyPin(identifier: string, pin: string): Promise<PinRecord | null> {
+  const key = pinKey(identifier)
   let record: PinRecord | null = null
 
   const res = await redisFetch(`/get/${encodeURIComponent(key)}`)
@@ -78,7 +85,7 @@ export async function verifyPin(email: string, pin: string): Promise<PinRecord |
   if (!valid) {
     record.attempts += 1
     if (record.attempts >= MAX_ATTEMPTS) {
-      await deletePin(email)
+      await deletePin(identifier)
     } else if (process.env.UPSTASH_REDIS_REST_URL) {
       await redisFetch(`/set/${encodeURIComponent(key)}/${TTL_SECONDS}`, {
         method: 'POST',
@@ -88,12 +95,12 @@ export async function verifyPin(email: string, pin: string): Promise<PinRecord |
     return null
   }
 
-  await deletePin(email)
+  await deletePin(identifier)
   return record
 }
 
-async function deletePin(email: string) {
-  const key = pinKey(email)
+async function deletePin(identifier: string) {
+  const key = pinKey(identifier)
   await redisFetch(`/del/${encodeURIComponent(key)}`, { method: 'POST' })
   devStore().delete(key)
 }

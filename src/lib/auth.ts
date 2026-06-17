@@ -32,37 +32,61 @@ export function isAgileEmail(email: string) {
   return new RegExp(`^[a-z0-9._%+-]+@${domain.replace('.', '\\.')}$`, 'i').test(email.trim())
 }
 
+export function normalizeMobile(mobile: string) {
+  const d = String(mobile || '').replace(/\D/g, '')
+  if (d.length === 10) return d
+  if (d.length === 12 && d.startsWith('91')) return d.slice(2)
+  return ''
+}
+
+export function isValidMobile(mobile: string) {
+  return normalizeMobile(mobile).length === 10
+}
+
 export async function requestPin(
-  email: string,
+  channel: 'email' | 'sms',
+  value: string,
   role: AuthRole,
   appId: string,
   appTitle: string,
 ) {
+  const body =
+    channel === 'email'
+      ? { channel, email: value.trim(), role, appId, appTitle }
+      : { channel: 'sms', mobile: value.trim(), role, appId, appTitle }
+
   const res = await fetch('/api/auth/send-pin', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, role, appId, appTitle }),
+    body: JSON.stringify(body),
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.error ?? 'Could not send PIN')
-  return data as { ok: boolean; message: string; devPin?: string }
+  if (!res.ok) throw new Error(data.error ?? 'Could not send OTP')
+  return data as {
+    ok: boolean
+    channel: 'email' | 'sms'
+    identifier: string
+    message: string
+    devPin?: string
+  }
 }
 
-export async function verifyPin(
-  email: string,
-  pin: string,
-  opts?: { role?: AuthRole; appId?: string },
-) {
+export async function verifyPin(identifier: string, pin: string) {
   const res = await fetch('/api/auth/verify-pin', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, pin, role: opts?.role, appId: opts?.appId }),
+    body: JSON.stringify({ identifier, pin }),
   })
   const data = await res.json()
-  if (!res.ok) throw new Error(data.error ?? 'Invalid PIN')
+  if (!res.ok) throw new Error(data.error ?? 'Invalid OTP')
   return data as {
     ok: boolean
     token: string
     session: { email: string; role: AuthRole; appId: string }
   }
+}
+
+export function formatLoginLabel(identifier: string) {
+  if (identifier.startsWith('m:')) return `+91 ${identifier.slice(2)}`
+  return identifier
 }

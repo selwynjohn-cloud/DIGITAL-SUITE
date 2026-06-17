@@ -1,3 +1,4 @@
+import { useCallback, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import type { SuiteApp } from '../data/apps'
 
@@ -5,12 +6,27 @@ type Props = {
   app: SuiteApp
 }
 
+const btnLight =
+  'app-tap-btn w-full rounded-lg bg-white px-3 py-2.5 text-xs font-semibold text-slate-900 shadow-sm hover:bg-white/90 sm:text-sm'
+const btnLightFlex =
+  'app-tap-btn flex-1 rounded-lg bg-white/90 px-3 py-2.5 text-xs font-semibold text-slate-900 shadow-sm hover:bg-white sm:text-sm'
+const btnDark =
+  'app-tap-btn app-tap-btn--dark flex-1 rounded-lg px-3 py-2.5 text-xs font-semibold text-white shadow-sm hover:brightness-110 sm:text-sm'
+
 export function AppCard({ app }: Props) {
   const { requestAccess } = useAuth()
+  const [pressedKey, setPressedKey] = useState<string | null>(null)
 
-  const open = (url: string, role: 'staff' | 'management') => {
-    requestAccess(app, role, url)
-  }
+  const open = useCallback(
+    (url: string, role: 'staff' | 'management', key: string) => {
+      setPressedKey(key)
+      window.setTimeout(() => setPressedKey(null), 180)
+      requestAccess(app, role, url)
+    },
+    [app, requestAccess],
+  )
+
+  const pressed = (key: string) => (pressedKey === key ? 'app-tap-btn--pressed' : '')
 
   return (
     <article
@@ -38,39 +54,57 @@ export function AppCard({ app }: Props) {
               External
             </span>
           )}
-          {app.usesOwnAuth && app.id === 'mis' && (
-            <span className="shrink-0 rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
-              Live MIS
-            </span>
-          )}
-          {app.usesOwnAuth && app.id === 'crm' && (
-            <span className="shrink-0 rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
-              Live CRM
-            </span>
-          )}
-          {app.usesOwnAuth && app.id === 'training' && (
-            <span className="shrink-0 rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
-              Academy
-            </span>
-          )}
         </div>
         <p className="mt-2 text-sm leading-relaxed text-white/90">{app.tagline}</p>
       </div>
 
-      <div className="relative z-10 mt-5 flex gap-2">
-        <button
-          onClick={() => open(app.staffUrl, 'staff')}
-          className="flex-1 rounded-lg bg-white px-3 py-2.5 text-xs font-semibold text-slate-900 transition hover:bg-white/90 sm:text-sm"
-        >
-          HODs / Staff
-        </button>
-        <button
-          onClick={() => open(app.managementUrl, 'management')}
-          className="flex-1 rounded-lg px-3 py-2.5 text-xs font-semibold text-white transition hover:brightness-110 sm:text-sm"
-          style={{ backgroundColor: app.buttonDark }}
-        >
-          Management
-        </button>
+      <div className="relative z-10 mt-5 flex flex-col gap-2">
+        {app.id === 'training' && app.traineeUrl ? (
+          <>
+            <button
+              type="button"
+              onClick={() => open(app.traineeUrl!, 'staff', `${app.id}-trainee`)}
+              className={`${btnLight} ${pressed(`${app.id}-trainee`)}`}
+            >
+              Trainees
+            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => open(app.staffUrl, 'staff', `${app.id}-staff`)}
+                className={`${btnLightFlex} ${pressed(`${app.id}-staff`)}`}
+              >
+                Staff / Lecturer
+              </button>
+              <button
+                type="button"
+                onClick={() => open(app.managementUrl, 'management', `${app.id}-mgmt`)}
+                className={`${btnDark} ${pressed(`${app.id}-mgmt`)}`}
+                style={{ backgroundColor: app.buttonDark }}
+              >
+                Management
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => open(app.staffUrl, 'staff', `${app.id}-staff`)}
+              className={`${btnLightFlex} ${pressed(`${app.id}-staff`)}`}
+            >
+              HODs / Staff
+            </button>
+            <button
+              type="button"
+              onClick={() => open(app.managementUrl, 'management', `${app.id}-mgmt`)}
+              className={`${btnDark} ${pressed(`${app.id}-mgmt`)}`}
+              style={{ backgroundColor: app.buttonDark }}
+            >
+              Management
+            </button>
+          </div>
+        )}
       </div>
     </article>
   )

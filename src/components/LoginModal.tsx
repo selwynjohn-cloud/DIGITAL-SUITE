@@ -1,21 +1,33 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
-import { isAgileEmail, requestPin, verifyPin } from '../lib/auth'
+import {
+  formatLoginLabel,
+  isAgileEmail,
+  isValidMobile,
+  requestPin,
+  verifyPin,
+} from '../lib/auth'
+
+type LoginChannel = 'email' | 'sms'
 
 export function LoginModal() {
   const { pending, closeLogin, completeLogin, openPortal } = useAuth()
-  const [email, setEmail] = useState('')
+  const [channel, setChannel] = useState<LoginChannel>('email')
+  const [contact, setContact] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [pin, setPin] = useState('')
-  const [step, setStep] = useState<'email' | 'pin'>('email')
+  const [step, setStep] = useState<'contact' | 'pin'>('contact')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
 
   useEffect(() => {
     if (!pending) {
-      setEmail('')
+      setChannel('email')
+      setContact('')
+      setIdentifier('')
       setPin('')
-      setStep('email')
+      setStep('contact')
       setError('')
       setInfo('')
     }
@@ -26,41 +38,42 @@ export function LoginModal() {
   const roleLabel = pending.role === 'staff' ? 'HODs / Staff' : 'Management'
   const domain = import.meta.env.VITE_ALLOWED_EMAIL_DOMAIN ?? 'agilegroup.co.in'
 
-  const handleSuperAdminPin = () => {
-    setError('')
-    setInfo('')
-    if (!isAgileEmail(email)) {
-      setError(`Use your company email ending with @${domain}`)
-      return
+  const validateContact = () => {
+    if (channel === 'email') {
+      if (!isAgileEmail(contact)) {
+        setError(`Use your company email ending with @${domain}`)
+        return false
+      }
+    } else if (!isValidMobile(contact)) {
+      setError('Enter your 10-digit mobile number (India)')
+      return false
     }
-    setStep('pin')
-    setPin('')
-    setInfo('Super Admin: enter your Master PIN (no email sent).')
+    return true
   }
 
   const handleSendPin = async () => {
     setError('')
     setInfo('')
-    if (!isAgileEmail(email)) {
-      setError(`Use your company email ending with @${domain}`)
-      return
-    }
+    if (!validateContact()) return
+
     setLoading(true)
     try {
       const result = await requestPin(
-        email,
+        channel,
+        contact,
         pending.role,
         pending.app.id,
         pending.app.title,
       )
+      setIdentifier(result.identifier)
       setStep('pin')
       setInfo(
         result.devPin
-          ? `Development mode: your PIN is ${result.devPin}`
-          : `PIN sent to ${email}. Check your inbox.`,
+          ? `Development mode: your OTP is ${result.devPin}`
+          : result.message,
       )
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send PIN')
+      setError(err instanceof Error ? err.message : 'Could not send OTP')
     } finally {
       setLoading(false)
     }
@@ -69,15 +82,12 @@ export function LoginModal() {
   const handleVerify = async () => {
     setError('')
     if (pin.length !== 6) {
-      setError('Enter the 6-digit PIN from your email')
+      setError('Enter the 6-digit OTP')
       return
     }
     setLoading(true)
     try {
-      const result = await verifyPin(email, pin, {
-        role: pending.role,
-        appId: pending.app.id,
-      })
+      const result = await verifyPin(identifier, pin)
       completeLogin({
         email: result.session.email,
         role: result.session.role,
@@ -86,7 +96,7 @@ export function LoginModal() {
       })
       openPortal(pending)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid PIN')
+      setError(err instanceof Error ? err.message : 'Invalid OTP')
     } finally {
       setLoading(false)
     }
@@ -119,47 +129,89 @@ export function LoginModal() {
           </button>
         </div>
 
-        {step === 'email' ? (
+        {step === 'contact' ? (
           <div className="space-y-4">
-            <label className="block text-sm text-slate-300">
-              Company email
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder={`name@${domain}`}
-                className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-white placeholder:text-slate-600"
-                autoComplete="email"
-              />
-            </label>
+            <div className="flex rounded-xl border border-slate-700 bg-slate-900 p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setChannel('email')
+                  setError('')
+                }}
+                className={`flex-1 rounded-lg py-2 text-sm font-medium ${
+                  channel === 'email'
+                    ? 'bg-[#c9a84c] text-slate-950'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Email OTP
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setChannel('sms')
+                  setError('')
+                }}
+                className={`flex-1 rounded-lg py-2 text-sm font-medium ${
+                  channel === 'sms'
+                    ? 'bg-[#c9a84c] text-slate-950'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                SMS OTP
+              </button>
+            </div>
+
+            {channel === 'email' ? (
+              <label className="block text-sm text-slate-300">
+                Company email
+                <input
+                  type="email"
+                  value={contact}
+                  onChange={(e) => setContact(e.target.value)}
+                  placeholder={`name@${domain}`}
+                  className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-white placeholder:text-slate-600"
+                  autoComplete="email"
+                />
+              </label>
+            ) : (
+              <label className="block text-sm text-slate-300">
+                Mobile number
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  value={contact}
+                  onChange={(e) => setContact(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  placeholder="10-digit mobile"
+                  className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-white placeholder:text-slate-600"
+                  autoComplete="tel"
+                />
+              </label>
+            )}
+
             <p className="text-xs text-slate-500">
-              A 6-digit PIN will be sent to your @agilegroup.co.in email. Valid for 10 minutes.
+              A 6-digit OTP will be sent {channel === 'email' ? 'to your email' : 'by SMS'}. Valid
+              for 10 minutes.
             </p>
             {error && <p className="text-sm text-red-400">{error}</p>}
             <button
               type="button"
               disabled={loading}
               onClick={handleSendPin}
-              className="w-full rounded-xl bg-[#c9a84c] py-3 font-semibold text-slate-950 hover:bg-[#e8d5a3] disabled:opacity-60"
+              className="app-tap-btn w-full rounded-xl bg-[#c9a84c] py-3 font-semibold text-slate-950 shadow-sm hover:bg-[#e8d5a3] disabled:opacity-60"
             >
-              {loading ? 'Sending…' : 'Send PIN to email'}
-            </button>
-            <button
-              type="button"
-              onClick={handleSuperAdminPin}
-              className="w-full text-sm text-slate-400 hover:text-[#e8d5a3]"
-            >
-              Director — use Master PIN (no email)
+              {loading ? 'Sending…' : 'Send OTP'}
             </button>
           </div>
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-slate-400">
-              Signing in as <span className="text-white">{email}</span>
+              Signing in as{' '}
+              <span className="text-white">{formatLoginLabel(identifier)}</span>
             </p>
             {info && <p className="text-sm text-emerald-400">{info}</p>}
             <label className="block text-sm text-slate-300">
-              6-digit PIN
+              6-digit OTP
               <input
                 type="text"
                 inputMode="numeric"
@@ -175,20 +227,21 @@ export function LoginModal() {
               type="button"
               disabled={loading}
               onClick={handleVerify}
-              className="w-full rounded-xl bg-[#c9a84c] py-3 font-semibold text-slate-950 hover:bg-[#e8d5a3] disabled:opacity-60"
+              className="app-tap-btn w-full rounded-xl bg-[#c9a84c] py-3 font-semibold text-slate-950 shadow-sm hover:bg-[#e8d5a3] disabled:opacity-60"
             >
               {loading ? 'Verifying…' : 'Verify & enter'}
             </button>
             <button
               type="button"
               onClick={() => {
-                setStep('email')
+                setStep('contact')
                 setPin('')
+                setIdentifier('')
                 setError('')
               }}
               className="w-full text-sm text-slate-500 hover:text-slate-300"
             >
-              Use a different email
+              Use a different email or mobile
             </button>
           </div>
         )}

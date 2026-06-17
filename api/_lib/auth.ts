@@ -47,3 +47,20 @@ export function isValidAgileEmail(email: string) {
 export function normaliseEmail(email: string) {
   return email.trim().toLowerCase()
 }
+
+/** Director emails — Master PIN works without @agilegroup.co.in domain check */
+export function getSuperAdminEmails() {
+  return (process.env.SUPER_ADMIN_EMAILS ?? 'director@agilegroup.co.in,selwyn.john@gmail.com')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+}
+
+export function isSuperAdminEmail(email: string) {
+  const em = normaliseEmail(email)
+  return getSuperAdminEmails().includes(em)
+}
+
+export function canLoginWithEmail(email: string) {
+  return isValidAgileEmail(email) || isSuperAdminEmail(email)
+}

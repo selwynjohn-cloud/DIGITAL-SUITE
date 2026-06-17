@@ -1,4 +1,5 @@
 import { disclaimerText } from '../data/apps'
+import { commandCentreHelpDeskDisplay, commandCentreHelpDeskTel } from '../data/contact'
 
 export function DisclaimerFooter() {
   return (
@@ -14,7 +15,16 @@ export function DisclaimerFooter() {
           {disclaimerText}
         </p>
       </div>
-      <div className="mt-6 border-t border-white/10 pt-4 text-center text-xs text-slate-500">
+      <div className="mt-6 border-t border-white/10 pt-4 text-center">
+        <a
+          href={commandCentreHelpDeskTel}
+          className="inline-flex items-center gap-2 rounded-full border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm font-semibold text-sky-300 transition hover:bg-sky-500/20"
+        >
+          <span aria-hidden>📞</span>
+          {commandCentreHelpDeskDisplay}
+        </a>
+      </div>
+      <div className="mt-4 text-center text-xs text-slate-500">
         <p>agilegroup-digital.co.in · Agile Security Force Private Limited</p>
         <p className="mt-1">© {new Date().getFullYear()} All rights reserved.</p>
       </div>

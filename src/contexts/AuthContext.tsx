@@ -40,13 +40,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [activePortal, setActivePortal] = useState<PendingAccess | null>(null)
 
   const requestAccess = useCallback(
-    (app: SuiteApp, _role: AuthRole, targetUrl: string) => {
-      if (app.external || app.requiresAuth === false) {
+    (app: SuiteApp, role: AuthRole, targetUrl: string) => {
+      if (app.external) {
         window.open(targetUrl, '_blank', 'noopener,noreferrer')
         return
       }
 
-      window.location.href = targetUrl
+      if (app.opensDirectly) {
+        window.location.href = targetUrl
+        return
+      }
+
+      setPending({ app, role, targetUrl })
     },
     [],
   )
@@ -58,11 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const openPortal = useCallback((access: PendingAccess) => {
     setPending(null)
-    if (access.app.hasBuiltInPortal) {
-      window.location.href = access.targetUrl
-      return
-    }
-    setActivePortal(access)
+    setActivePortal(null)
+    window.location.href = access.targetUrl
   }, [])
 
   const closeLogin = useCallback(() => setPending(null), [])

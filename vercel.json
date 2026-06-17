@@ -5,17 +5,67 @@
   "redirects": [
     {
       "source": "/mis",
-      "destination": "https://script.google.com/macros/s/AKfycbxZ5teJVOw61Nf7j5HcVw0Mu-8mrzWtQg7PpeaewvkC8EGSbMQNiI8MMl9k7CVe0qBm/exec",
+      "destination": "https://script.google.com/macros/s/AKfycbw90uwhaBIcnRnBsEd-Gx2oR2wmxqC3nULNn_jkvDhp9oHZQFeHnnltxJleiQBc2Upu/exec",
       "permanent": false
     },
     {
       "source": "/mis/:path*",
-      "destination": "https://script.google.com/macros/s/AKfycbxZ5teJVOw61Nf7j5HcVw0Mu-8mrzWtQg7PpeaewvkC8EGSbMQNiI8MMl9k7CVe0qBm/exec",
+      "destination": "https://script.google.com/macros/s/AKfycbw90uwhaBIcnRnBsEd-Gx2oR2wmxqC3nULNn_jkvDhp9oHZQFeHnnltxJleiQBc2Upu/exec",
       "permanent": false
     },
     {
       "source": "/crm",
-      "destination": "https://tinyurl.com/CRM-AGILE",
+      "destination": "https://script.google.com/macros/s/AKfycbz_UyonvAFhyxtI1dLfUKCOxzUjW7fhFOjeyB5xThIQPsIo_vjoaAzOGVs9CNMwWcA/exec",
+      "permanent": false
+    },
+    {
+      "source": "/crm/:path*",
+      "destination": "https://script.google.com/macros/s/AKfycbz_UyonvAFhyxtI1dLfUKCOxzUjW7fhFOjeyB5xThIQPsIo_vjoaAzOGVs9CNMwWcA/exec",
+      "permanent": false
+    },
+    {
+      "source": "/reviews",
+      "destination": "https://script.google.com/macros/s/AKfycby0MYZkRDiXONTxUi2h-a9CEZYRIuN1h4Sw_7ENTPX_1s7vmrs62pWsD0RCMV-lRvDp/exec",
+      "permanent": false
+    },
+    {
+      "source": "/reviews/:path*",
+      "destination": "https://script.google.com/macros/s/AKfycby0MYZkRDiXONTxUi2h-a9CEZYRIuN1h4Sw_7ENTPX_1s7vmrs62pWsD0RCMV-lRvDp/exec",
+      "permanent": false
+    },
+    {
+      "source": "/pulse",
+      "destination": "https://script.google.com/macros/s/AKfycbzGqyQNdyvBy2Bw1p7N84rdB-8VobOGVT8g4gZcghtN27SI6guihHdaNXLTNfIOYKQ/exec",
+      "permanent": false
+    },
+    {
+      "source": "/pulse/:path*",
+      "destination": "https://script.google.com/macros/s/AKfycbzGqyQNdyvBy2Bw1p7N84rdB-8VobOGVT8g4gZcghtN27SI6guihHdaNXLTNfIOYKQ/exec",
+      "permanent": false
+    },
+    {
+      "source": "/mobile",
+      "destination": "https://agilegroup-work360.aititude.in/",
+      "permanent": false
+    },
+    {
+      "source": "/mobile/:path*",
+      "destination": "https://agilegroup-work360.aititude.in/:path*",
+      "permanent": false
+    },
+    {
+      "source": "/training",
+      "destination": "https://guard-training-app.vercel.app/",
+      "permanent": false
+    },
+    {
+      "source": "/training/",
+      "destination": "https://guard-training-app.vercel.app/",
+      "permanent": false
+    },
+    {
+      "source": "/training/:path*",
+      "destination": "https://guard-training-app.vercel.app/:path*",
       "permanent": false
     }
   ],
