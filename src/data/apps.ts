@@ -20,14 +20,23 @@ export type SuiteApp = {
  * Landing hub for www.agilegroup-digital.co.in
  * Internal apps require email/SMS OTP on Command Centre before redirect (see vercel.json).
  */
-const TRAINING_LMS = import.meta.env.VITE_TRAINING_URL ?? '/training/'
+const TRAINING_LMS =
+  import.meta.env.VITE_TRAINING_URL ?? 'https://guard-training-app.vercel.app/'
 const TRAINING_ACADEMY = import.meta.env.VITE_TRAINING_ACADEMY_URL ?? ''
-const MIS = import.meta.env.VITE_MIS_URL ?? '/mis'
-const CRM = import.meta.env.VITE_CRM_URL ?? '/crm'
-const REVIEWS = import.meta.env.VITE_REVIEWS_URL ?? '/reviews'
-const PULSE = import.meta.env.VITE_PULSE_URL ?? '/pulse'
+const MIS =
+  import.meta.env.VITE_MIS_URL ??
+  'https://script.google.com/macros/s/AKfycbw90uwhaBIcnRnBsEd-Gx2oR2wmxqC3nULNn_jkvDhp9oHZQFeHnnltxJleiQBc2Upu/exec'
+const CRM =
+  import.meta.env.VITE_CRM_URL ??
+  'https://script.google.com/macros/s/AKfycbz_UyonvAFhyxtI1dLfUKCOxzUjW7fhFOjeyB5xThIQPsIo_vjoaAzOGVs9CNMwWcA/exec'
+const REVIEWS =
+  import.meta.env.VITE_REVIEWS_URL ??
+  'https://script.google.com/macros/s/AKfycby0MYZkRDiXONTxUi2h-a9CEZYRIuN1h4Sw_7ENTPX_1s7vmrs62pWsD0RCMV-lRvDp/exec'
+const PULSE =
+  import.meta.env.VITE_PULSE_URL ??
+  'https://script.google.com/macros/s/AKfycbzGqyQNdyvBy2Bw1p7N84rdB-8VobOGVT8g4gZcghtN27SI6guihHdaNXLTNfIOYKQ/exec'
 const GUARDS = import.meta.env.VITE_GUARDS_URL ?? '/guards'
-const MOBILE = import.meta.env.VITE_MOBILE_URL ?? '/mobile'
+const MOBILE = import.meta.env.VITE_MOBILE_URL ?? 'https://agilegroup-work360.aititude.in/'
 
 function appPath(slug: string, portal: 'staff' | 'management') {
   return `/${slug}/?portal=${portal}`
