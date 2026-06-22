@@ -29,7 +29,7 @@ const TRAINING_ACADEMY = import.meta.env.VITE_TRAINING_ACADEMY_URL ?? ''
 const MOBILE = import.meta.env.VITE_MOBILE_URL ?? 'https://agilegroup-work360.aititude.in/'
 const MIS_EXEC =
   import.meta.env.VITE_MIS_URL ??
-  'https://agilereporting.live'
+  'https://script.google.com/macros/s/AKfycbzw8XOjIplL8AEHHIk75KayFLx2HipbJFlwEcfPi2RiHXN-xWYNVENiJM5XlO1N1io/exec'
 const CRM_EXEC =
   import.meta.env.VITE_CRM_URL ??
   'https://script.google.com/macros/s/AKfycbz_UyonvAFhyxtI1dLfUKCOxzUjW7fhFOjeyB5xThIQPsIo_vjoaAzOGVs9CNMwWcA/exec'
