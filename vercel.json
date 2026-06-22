@@ -15,12 +15,12 @@
     },
     {
       "source": "/mis",
-      "destination": "https://script.google.com/macros/s/AKfycbzw8XOjIplL8AEHHIk75KayFLx2HipbJFlwEcfPi2RiHXN-xWYNVENiJM5XlO1N1io/exec",
+      "destination": "https://agilereporting.live",
       "permanent": false
     },
     {
       "source": "/mis/:path*",
-      "destination": "https://script.google.com/macros/s/AKfycbzw8XOjIplL8AEHHIk75KayFLx2HipbJFlwEcfPi2RiHXN-xWYNVENiJM5XlO1N1io/exec",
+      "destination": "https://agilereporting.live",
       "permanent": false
     },
     {
