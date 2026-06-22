@@ -12,9 +12,12 @@ export type SuiteApp = {
   status: 'live' | 'coming-soon' | 'external'
   /** Opens in a new tab without Command Centre login (Facebook, LinkedIn only) */
   external?: boolean
-  /** Opens in the same window without Command Centre login (e.g. Work360 with its own login) */
+  /** Opens in the same window without Command Centre login (own Google/training login or welcome page) */
   opensDirectly?: boolean
 }
+
+/** Apps with their own login screen — skip Command Centre OTP (one login only). */
+const DIRECT = { opensDirectly: true as const }
 
 /**
  * Landing hub for www.agilegroup-digital.co.in
@@ -23,20 +26,17 @@ export type SuiteApp = {
 const TRAINING_LMS =
   import.meta.env.VITE_TRAINING_URL ?? 'https://guard-training-app.vercel.app/'
 const TRAINING_ACADEMY = import.meta.env.VITE_TRAINING_ACADEMY_URL ?? ''
-const MIS =
+const MOBILE = import.meta.env.VITE_MOBILE_URL ?? 'https://agilegroup-work360.aititude.in/'
+const MIS_EXEC =
   import.meta.env.VITE_MIS_URL ??
-  'https://script.google.com/macros/s/AKfycbw90uwhaBIcnRnBsEd-Gx2oR2wmxqC3nULNn_jkvDhp9oHZQFeHnnltxJleiQBc2Upu/exec'
-const CRM =
+  'https://script.google.com/macros/s/AKfycbzw8XOjIplL8AEHHIk75KayFLx2HipbJFlwEcfPi2RiHXN-xWYNVENiJM5XlO1N1io/exec'
+const CRM_EXEC =
   import.meta.env.VITE_CRM_URL ??
   'https://script.google.com/macros/s/AKfycbz_UyonvAFhyxtI1dLfUKCOxzUjW7fhFOjeyB5xThIQPsIo_vjoaAzOGVs9CNMwWcA/exec'
-const REVIEWS =
-  import.meta.env.VITE_REVIEWS_URL ??
-  'https://script.google.com/macros/s/AKfycby0MYZkRDiXONTxUi2h-a9CEZYRIuN1h4Sw_7ENTPX_1s7vmrs62pWsD0RCMV-lRvDp/exec'
-const PULSE =
-  import.meta.env.VITE_PULSE_URL ??
-  'https://script.google.com/macros/s/AKfycbzGqyQNdyvBy2Bw1p7N84rdB-8VobOGVT8g4gZcghtN27SI6guihHdaNXLTNfIOYKQ/exec'
-const GUARDS = import.meta.env.VITE_GUARDS_URL ?? '/guards'
-const MOBILE = import.meta.env.VITE_MOBILE_URL ?? 'https://agilegroup-work360.aititude.in/'
+const FACEBOOK = import.meta.env.VITE_FACEBOOK_URL ?? 'https://www.facebook.com/agilegroup2#'
+const LINKEDIN =
+  import.meta.env.VITE_LINKEDIN_URL ??
+  'https://www.linkedin.com/company/13703487/admin/dashboard/'
 
 function appPath(slug: string, portal: 'staff' | 'management') {
   return `/${slug}/?portal=${portal}`
@@ -50,9 +50,10 @@ export const suiteApps: SuiteApp[] = [
     tagline: 'Building Teams That Win',
     color: '#7c3aed',
     buttonDark: '#5b21b6',
-    staffUrl: appPath('recruitment', 'staff'),
-    managementUrl: appPath('recruitment', 'management'),
+    staffUrl: '/recruitment',
+    managementUrl: '/recruitment',
     status: 'live',
+    ...DIRECT,
   },
   {
     id: 'training',
@@ -65,6 +66,7 @@ export const suiteApps: SuiteApp[] = [
     managementUrl: TRAINING_ACADEMY || `${TRAINING_LMS}?portal=management`,
     traineeUrl: `${TRAINING_LMS}?portal=trainee`,
     status: 'live',
+    ...DIRECT,
   },
   {
     id: 'crm',
@@ -73,9 +75,10 @@ export const suiteApps: SuiteApp[] = [
     tagline: 'Driving Growth Through Every Lead',
     color: '#c2410c',
     buttonDark: '#9a3412',
-    staffUrl: CRM,
-    managementUrl: CRM,
+    staffUrl: CRM_EXEC,
+    managementUrl: CRM_EXEC,
     status: 'live',
+    ...DIRECT,
   },
   {
     id: 'deployment',
@@ -84,9 +87,10 @@ export const suiteApps: SuiteApp[] = [
     tagline: 'Seamless Starts, Strong Results',
     color: '#9333ea',
     buttonDark: '#7e22ce',
-    staffUrl: appPath('deployment', 'staff'),
-    managementUrl: appPath('deployment', 'management'),
+    staffUrl: '/deployment',
+    managementUrl: '/deployment',
     status: 'live',
+    ...DIRECT,
   },
   {
     id: 'mis',
@@ -95,9 +99,10 @@ export const suiteApps: SuiteApp[] = [
     tagline: 'Measuring Performance, Driving Excellence',
     color: '#2563eb',
     buttonDark: '#1d4ed8',
-    staffUrl: MIS,
-    managementUrl: MIS,
+    staffUrl: MIS_EXEC,
+    managementUrl: MIS_EXEC,
     status: 'live',
+    ...DIRECT,
   },
   {
     id: 'control',
@@ -109,6 +114,7 @@ export const suiteApps: SuiteApp[] = [
     staffUrl: appPath('control', 'staff'),
     managementUrl: appPath('control', 'management'),
     status: 'live',
+    ...DIRECT,
   },
   {
     id: 'guards',
@@ -117,9 +123,10 @@ export const suiteApps: SuiteApp[] = [
     tagline: 'Caring for Those Who Protect',
     color: '#dc2626',
     buttonDark: '#b91c1c',
-    staffUrl: GUARDS,
-    managementUrl: GUARDS,
+    staffUrl: '/guards',
+    managementUrl: '/guards',
     status: 'live',
+    ...DIRECT,
   },
   {
     id: 'quality',
@@ -131,6 +138,7 @@ export const suiteApps: SuiteApp[] = [
     staffUrl: appPath('quality', 'staff'),
     managementUrl: appPath('quality', 'management'),
     status: 'live',
+    ...DIRECT,
   },
   {
     id: 'meetings',
@@ -142,6 +150,7 @@ export const suiteApps: SuiteApp[] = [
     staffUrl: appPath('meetings', 'staff'),
     managementUrl: appPath('meetings', 'management'),
     status: 'live',
+    ...DIRECT,
   },
   {
     id: 'reviews',
@@ -150,9 +159,10 @@ export const suiteApps: SuiteApp[] = [
     tagline: 'Knowing Where We Stand',
     color: '#db2777',
     buttonDark: '#be185d',
-    staffUrl: REVIEWS,
-    managementUrl: REVIEWS,
+    staffUrl: '/reviews',
+    managementUrl: '/reviews',
     status: 'live',
+    ...DIRECT,
   },
   {
     id: 'pulse',
@@ -161,9 +171,10 @@ export const suiteApps: SuiteApp[] = [
     tagline: 'Connecting the Security Community',
     color: '#14532d',
     buttonDark: '#166534',
-    staffUrl: PULSE,
-    managementUrl: PULSE,
+    staffUrl: '/pulse',
+    managementUrl: '/pulse',
     status: 'live',
+    ...DIRECT,
   },
   {
     id: 'fleets',
@@ -172,9 +183,10 @@ export const suiteApps: SuiteApp[] = [
     tagline: 'Moving Forward with Confidence',
     color: '#0d9488',
     buttonDark: '#0f766e',
-    staffUrl: appPath('fleets', 'staff'),
-    managementUrl: appPath('fleets', 'management'),
+    staffUrl: '/fleets',
+    managementUrl: '/fleets',
     status: 'live',
+    ...DIRECT,
   },
   {
     id: 'assets',
@@ -186,6 +198,7 @@ export const suiteApps: SuiteApp[] = [
     staffUrl: appPath('assets', 'staff'),
     managementUrl: appPath('assets', 'management'),
     status: 'live',
+    ...DIRECT,
   },
   {
     id: 'facilities',
@@ -197,6 +210,7 @@ export const suiteApps: SuiteApp[] = [
     staffUrl: appPath('facilities', 'staff'),
     managementUrl: appPath('facilities', 'management'),
     status: 'live',
+    ...DIRECT,
   },
   {
     id: 'licences',
@@ -208,6 +222,7 @@ export const suiteApps: SuiteApp[] = [
     staffUrl: appPath('licences', 'staff'),
     managementUrl: appPath('licences', 'management'),
     status: 'live',
+    ...DIRECT,
   },
   {
     id: 'facebook',
@@ -216,8 +231,8 @@ export const suiteApps: SuiteApp[] = [
     tagline: 'Showcasing Our Journey',
     color: '#1877f2',
     buttonDark: '#0d65d9',
-    staffUrl: import.meta.env.VITE_FACEBOOK_URL ?? 'https://facebook.com',
-    managementUrl: import.meta.env.VITE_FACEBOOK_ADMIN_URL ?? 'https://facebook.com',
+    staffUrl: FACEBOOK,
+    managementUrl: FACEBOOK,
     status: 'external',
     external: true,
   },
@@ -228,8 +243,8 @@ export const suiteApps: SuiteApp[] = [
     tagline: 'Connecting Professionals, Creating Opportunities',
     color: '#0a66c2',
     buttonDark: '#004182',
-    staffUrl: import.meta.env.VITE_LINKEDIN_URL ?? 'https://linkedin.com',
-    managementUrl: import.meta.env.VITE_LINKEDIN_ADMIN_URL ?? 'https://linkedin.com',
+    staffUrl: LINKEDIN,
+    managementUrl: LINKEDIN,
     status: 'external',
     external: true,
   },
@@ -243,7 +258,7 @@ export const suiteApps: SuiteApp[] = [
     staffUrl: MOBILE,
     managementUrl: MOBILE,
     status: 'live',
-    opensDirectly: true,
+    ...DIRECT,
   },
 ]
 

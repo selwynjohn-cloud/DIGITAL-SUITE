@@ -4,16 +4,6 @@
   "framework": "vite",
   "redirects": [
     {
-      "source": "/mis",
-      "destination": "https://script.google.com/macros/s/AKfycbw90uwhaBIcnRnBsEd-Gx2oR2wmxqC3nULNn_jkvDhp9oHZQFeHnnltxJleiQBc2Upu/exec",
-      "permanent": false
-    },
-    {
-      "source": "/mis/:path*",
-      "destination": "https://script.google.com/macros/s/AKfycbw90uwhaBIcnRnBsEd-Gx2oR2wmxqC3nULNn_jkvDhp9oHZQFeHnnltxJleiQBc2Upu/exec",
-      "permanent": false
-    },
-    {
       "source": "/crm",
       "destination": "https://script.google.com/macros/s/AKfycbz_UyonvAFhyxtI1dLfUKCOxzUjW7fhFOjeyB5xThIQPsIo_vjoaAzOGVs9CNMwWcA/exec",
       "permanent": false
@@ -21,6 +11,16 @@
     {
       "source": "/crm/:path*",
       "destination": "https://script.google.com/macros/s/AKfycbz_UyonvAFhyxtI1dLfUKCOxzUjW7fhFOjeyB5xThIQPsIo_vjoaAzOGVs9CNMwWcA/exec",
+      "permanent": false
+    },
+    {
+      "source": "/mis",
+      "destination": "https://script.google.com/macros/s/AKfycbzw8XOjIplL8AEHHIk75KayFLx2HipbJFlwEcfPi2RiHXN-xWYNVENiJM5XlO1N1io/exec",
+      "permanent": false
+    },
+    {
+      "source": "/mis/:path*",
+      "destination": "https://script.google.com/macros/s/AKfycbzw8XOjIplL8AEHHIk75KayFLx2HipbJFlwEcfPi2RiHXN-xWYNVENiJM5XlO1N1io/exec",
       "permanent": false
     },
     {
@@ -41,6 +41,31 @@
     {
       "source": "/pulse/:path*",
       "destination": "https://script.google.com/macros/s/AKfycbzGqyQNdyvBy2Bw1p7N84rdB-8VobOGVT8g4gZcghtN27SI6guihHdaNXLTNfIOYKQ/exec",
+      "permanent": false
+    },
+    {
+      "source": "/recruitment",
+      "destination": "https://script.google.com/macros/s/AKfycbyeL3oJ423nSoqFwc_Yhjfw0o4H16fCNMiAvQ--b00yBcdZ9iK7eaj5OwkQmbDoZWs/exec",
+      "permanent": false
+    },
+    {
+      "source": "/recruitment/:path*",
+      "destination": "https://script.google.com/macros/s/AKfycbyeL3oJ423nSoqFwc_Yhjfw0o4H16fCNMiAvQ--b00yBcdZ9iK7eaj5OwkQmbDoZWs/exec",
+      "permanent": false
+    },
+    {
+      "source": "/apply",
+      "destination": "https://agile-recruitment.codewords.run/",
+      "permanent": false
+    },
+    {
+      "source": "/guards",
+      "destination": "https://script.google.com/macros/s/AKfycbwVpnp26Rge5nzToy6vVDISLi4z3K7sbtD5s6-6r9wjJye-_6t-G85puxIYimglJWI/exec",
+      "permanent": false
+    },
+    {
+      "source": "/guards/:path*",
+      "destination": "https://script.google.com/macros/s/AKfycbwVpnp26Rge5nzToy6vVDISLi4z3K7sbtD5s6-6r9wjJye-_6t-G85puxIYimglJWI/exec",
       "permanent": false
     },
     {
@@ -66,6 +91,26 @@
     {
       "source": "/training/:path*",
       "destination": "https://guard-training-app.vercel.app/:path*",
+      "permanent": false
+    },
+    {
+      "source": "/fleets",
+      "destination": "https://script.google.com/macros/s/AKfycbwY9D16RZlRkVOxmQfrsNMRk4ofjK0B6uW7C-_bUZArrztZXv-nBuFTIGqukOEvlrgo/exec",
+      "permanent": false
+    },
+    {
+      "source": "/fleets/:path*",
+      "destination": "https://script.google.com/macros/s/AKfycbwY9D16RZlRkVOxmQfrsNMRk4ofjK0B6uW7C-_bUZArrztZXv-nBuFTIGqukOEvlrgo/exec",
+      "permanent": false
+    },
+    {
+      "source": "/deployment",
+      "destination": "https://script.google.com/macros/s/AKfycbyZYSEmhioAAM4UYaF0bRFIfn04rNst_yaShc9Iqf6_oZ7Ce69QCu5-awfS5fdwdOk/exec",
+      "permanent": false
+    },
+    {
+      "source": "/deployment/:path*",
+      "destination": "https://script.google.com/macros/s/AKfycbyZYSEmhioAAM4UYaF0bRFIfn04rNst_yaShc9Iqf6_oZ7Ce69QCu5-awfS5fdwdOk/exec",
       "permanent": false
     }
   ],
