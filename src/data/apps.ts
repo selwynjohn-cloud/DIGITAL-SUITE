@@ -113,7 +113,7 @@ export const suiteApps: SuiteApp[] = [
     buttonDark: '#854d0e',
     staffUrl: appPath('control', 'staff'),
     managementUrl: appPath('control', 'management'),
-    status: 'live',
+    status: 'coming-soon',
     ...DIRECT,
   },
   {
@@ -137,7 +137,7 @@ export const suiteApps: SuiteApp[] = [
     buttonDark: '#047857',
     staffUrl: appPath('quality', 'staff'),
     managementUrl: appPath('quality', 'management'),
-    status: 'live',
+    status: 'coming-soon',
     ...DIRECT,
   },
   {
@@ -149,7 +149,7 @@ export const suiteApps: SuiteApp[] = [
     buttonDark: '#6d28d9',
     staffUrl: appPath('meetings', 'staff'),
     managementUrl: appPath('meetings', 'management'),
-    status: 'live',
+    status: 'coming-soon',
     ...DIRECT,
   },
   {
@@ -197,7 +197,7 @@ export const suiteApps: SuiteApp[] = [
     buttonDark: '#a16207',
     staffUrl: appPath('assets', 'staff'),
     managementUrl: appPath('assets', 'management'),
-    status: 'live',
+    status: 'coming-soon',
     ...DIRECT,
   },
   {
@@ -209,7 +209,7 @@ export const suiteApps: SuiteApp[] = [
     buttonDark: '#0e7490',
     staffUrl: appPath('facilities', 'staff'),
     managementUrl: appPath('facilities', 'management'),
-    status: 'live',
+    status: 'coming-soon',
     ...DIRECT,
   },
   {
@@ -221,7 +221,7 @@ export const suiteApps: SuiteApp[] = [
     buttonDark: '#4f46e5',
     staffUrl: appPath('licences', 'staff'),
     managementUrl: appPath('licences', 'management'),
-    status: 'live',
+    status: 'coming-soon',
     ...DIRECT,
   },
   {

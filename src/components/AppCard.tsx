@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import type { SuiteApp } from '../data/apps'
+import { withSuiteEntry } from '../lib/suite-entry-url'
 
 type Props = {
   app: SuiteApp
@@ -21,7 +22,24 @@ export function AppCard({ app }: Props) {
     (url: string, role: 'staff' | 'management', key: string) => {
       setPressedKey(key)
       window.setTimeout(() => setPressedKey(null), 180)
-      requestAccess(app, role, url)
+      const targetUrl = withSuiteEntry(url, role)
+      // Google apps + training: one login inside the app only (no Command Centre OTP)
+      const skipHubLogin =
+        app.external ||
+        app.opensDirectly ||
+        targetUrl.includes('script.google.com') ||
+        targetUrl.includes('guard-training-app.vercel.app') ||
+        targetUrl.includes('agilegroup-work360') ||
+        ['mis', 'reviews', 'pulse', 'training', 'mobile', 'guards', 'recruitment', 'fleets', 'crm'].includes(app.id)
+      if (app.external) {
+        window.open(targetUrl, '_blank', 'noopener,noreferrer')
+        return
+      }
+      if (skipHubLogin) {
+        window.location.href = targetUrl
+        return
+      }
+      requestAccess(app, role, targetUrl)
     },
     [app, requestAccess],
   )
@@ -49,6 +67,11 @@ export function AppCard({ app }: Props) {
               Live
             </span>
           )}
+          {app.status === 'coming-soon' && (
+            <span className="shrink-0 rounded-full bg-black/30 px-2 py-0.5 text-[10px] font-bold uppercase text-white/80">
+              Coming Soon
+            </span>
+          )}
           {app.external && (
             <span className="shrink-0 rounded-full bg-white/25 px-2 py-0.5 text-[10px] font-bold uppercase text-white">
               External
@@ -59,7 +82,16 @@ export function AppCard({ app }: Props) {
       </div>
 
       <div className="relative z-10 mt-5 flex flex-col gap-2">
-        {app.id === 'training' && app.traineeUrl ? (
+        {app.status === 'coming-soon' ? (
+          <button
+            type="button"
+            disabled
+            aria-disabled="true"
+            className="app-tap-btn w-full cursor-not-allowed rounded-lg bg-white/20 px-3 py-2.5 text-xs font-semibold text-white/70 sm:text-sm"
+          >
+            Coming Soon
+          </button>
+        ) : app.id === 'training' && app.traineeUrl ? (
           <>
             <button
               type="button"
