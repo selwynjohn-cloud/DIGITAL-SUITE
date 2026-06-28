@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import {
+  canUseEmailLogin,
   formatLoginLabel,
-  isAgileEmail,
   isValidMobile,
   requestPin,
   verifyPin,
@@ -40,8 +40,8 @@ export function LoginModal() {
 
   const validateContact = () => {
     if (channel === 'email') {
-      if (!isAgileEmail(contact)) {
-        setError(`Use your company email ending with @${domain}`)
+      if (!canUseEmailLogin(contact)) {
+        setError(`Use your company email ending with @${domain}, or your registered Director email`)
         return false
       }
     } else if (!isValidMobile(contact)) {
@@ -67,11 +67,7 @@ export function LoginModal() {
       )
       setIdentifier(result.identifier)
       setStep('pin')
-      setInfo(
-        result.devPin
-          ? `Development mode: your OTP is ${result.devPin}`
-          : result.message,
-      )
+      setInfo(result.message)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not send OTP')
     } finally {
@@ -87,7 +83,7 @@ export function LoginModal() {
     }
     setLoading(true)
     try {
-      const result = await verifyPin(identifier, pin)
+      const result = await verifyPin(identifier, pin, pending.role, pending.app.id)
       completeLogin({
         email: result.session.email,
         role: result.session.role,
@@ -164,7 +160,7 @@ export function LoginModal() {
 
             {channel === 'email' ? (
               <label className="block text-sm text-slate-300">
-                Company email
+                Email address
                 <input
                   type="email"
                   value={contact}
@@ -191,7 +187,7 @@ export function LoginModal() {
 
             <p className="text-xs text-slate-500">
               A 6-digit OTP will be sent {channel === 'email' ? 'to your email' : 'by SMS'}. Valid
-              for 10 minutes.
+              for 10 minutes. Same for Director, Management, and Staff.
             </p>
             {error && <p className="text-sm text-red-400">{error}</p>}
             <button
@@ -238,6 +234,7 @@ export function LoginModal() {
                 setPin('')
                 setIdentifier('')
                 setError('')
+                setInfo('')
               }}
               className="w-full text-sm text-slate-500 hover:text-slate-300"
             >

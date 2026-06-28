@@ -32,6 +32,22 @@ export function isAgileEmail(email: string) {
   return new RegExp(`^[a-z0-9._%+-]+@${domain.replace('.', '\\.')}$`, 'i').test(email.trim())
 }
 
+const DIRECTOR_EMAILS = (
+  import.meta.env.VITE_SUPER_ADMIN_EMAILS ??
+  'director@agilegroup.co.in,selwyn.john@gmail.com'
+)
+  .split(',')
+  .map((e: string) => e.trim().toLowerCase())
+  .filter(Boolean)
+
+export function isDirectorEmail(email: string) {
+  return DIRECTOR_EMAILS.includes(email.trim().toLowerCase())
+}
+
+export function canUseEmailLogin(email: string) {
+  return isAgileEmail(email) || isDirectorEmail(email)
+}
+
 export function normalizeMobile(mobile: string) {
   const d = String(mobile || '').replace(/\D/g, '')
   if (d.length === 10) return d
@@ -81,11 +97,16 @@ export async function requestPin(
   return data
 }
 
-export async function verifyPin(identifier: string, pin: string) {
+export async function verifyPin(
+  identifier: string,
+  pin: string,
+  role: AuthRole,
+  appId: string,
+) {
   const res = await fetch('/api/auth/verify-pin', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ identifier, pin }),
+    body: JSON.stringify({ identifier, pin, role, appId }),
   })
   if (!res.ok) throw new Error(await readApiError(res))
   const data = (await res.json()) as {

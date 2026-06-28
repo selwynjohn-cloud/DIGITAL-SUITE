@@ -2,8 +2,8 @@ import { AgileLogo } from './components/AgileLogo'
 import { AppCard } from './components/AppCard'
 import { AppPortalLanding } from './components/AppPortalLanding'
 import { DisclaimerFooter } from './components/DisclaimerFooter'
-import { LoginModal } from './components/LoginModal'
 import { suiteApps } from './data/apps'
+import { companyWebsiteDisplay, companyWebsiteTagline, companyWebsiteUrl } from './data/contact'
 import { getDeepLinkPortal } from './lib/portal-link'
 
 function CommandCentreHub() {
@@ -30,6 +30,18 @@ function CommandCentreHub() {
           <br />
           Unauthorised access is strictly prohibited.
         </p>
+
+        <p className="mx-auto mt-5 max-w-3xl text-center text-base text-slate-300 sm:text-lg">
+          {companyWebsiteTagline}{' '}
+          <a
+            href={companyWebsiteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-bold text-[#c9a84c] underline decoration-[#c9a84c]/50 underline-offset-4 hover:text-[#e2c97e]"
+          >
+            {companyWebsiteDisplay}
+          </a>
+        </p>
       </header>
 
       <main className="mx-auto max-w-6xl px-6 pb-16 pt-8">
@@ -55,18 +67,12 @@ function CommandCentreHub() {
 export default function App() {
   const deepLink = getDeepLinkPortal()
   if (deepLink) {
-    return (
-      <>
-        <AppPortalLanding app={deepLink.app} role={deepLink.role} />
-        <LoginModal />
-      </>
-    )
+    return <AppPortalLanding app={deepLink.app} role={deepLink.role} />
   }
 
   return (
     <>
       <CommandCentreHub />
-      <LoginModal />
     </>
   )
 }

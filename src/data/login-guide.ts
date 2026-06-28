@@ -11,7 +11,8 @@ export const suiteLoginGuide: LoginGuideEntry[] = [
     number: '01',
     title: 'Agile Recruitment',
     howToOpen: 'www.agilegroup-digital.co.in → App 01 → HODs/Staff or Management',
-    loginSteps: 'Command Centre OTP first, then the portal welcome page opens.',
+    loginSteps:
+      'Staff portal login — email OTP to your inbox. Manage applicants, camps, Recruited Today. Public apply link for WhatsApp: agile-recruitment.codewords.run',
   },
   {
     number: '02',
@@ -25,7 +26,7 @@ export const suiteLoginGuide: LoginGuideEntry[] = [
     title: 'Agile CRM',
     howToOpen: 'www.agilegroup-digital.co.in → App 03 → HODs/Staff or Management',
     loginSteps:
-      'Command Centre OTP first, then CRM opens. Sign in again inside CRM with @agilegroup.co.in email OTP if asked.',
+      'Opens Agile CRM directly — one login only. Email OTP sent to your inbox.',
   },
   {
     number: '04',
@@ -38,7 +39,7 @@ export const suiteLoginGuide: LoginGuideEntry[] = [
     title: 'Agile MIS',
     howToOpen: 'www.agilegroup-digital.co.in → App 05',
     loginSteps:
-      'Command Centre OTP first, then MIS opens. Sign in again inside MIS with email OTP if asked.',
+      'Opens MIS directly. Sign in with your email — OTP is sent to your inbox (Director, Management, and Staff).',
   },
   {
     number: '06',

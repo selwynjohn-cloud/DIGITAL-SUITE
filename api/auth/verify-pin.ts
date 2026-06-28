@@ -1,5 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { createSessionToken, isValidAgileEmail, normaliseEmail } from '../_lib/auth.js'
+import {
+  createSessionToken,
+  canLoginWithEmail,
+  normaliseEmail,
+} from '../_lib/auth.js'
+import { applyTrainingCors, handleTrainingCorsPreflight } from '../_lib/cors.js'
 import { normalizeMobile, verifyPin } from '../_lib/pin-store.js'
 
 const COOKIE_MAX_AGE = 8 * 60 * 60
@@ -12,7 +17,7 @@ function resolveIdentifier(body: Record<string, unknown>) {
   }
 
   const email = normaliseEmail(String(body.email ?? rawIdentifier))
-  if (email && isValidAgileEmail(email)) return email
+  if (email && canLoginWithEmail(email)) return email
 
   const mobile10 = normalizeMobile(String(body.mobile ?? ''))
   if (mobile10) return `m:${mobile10}`
@@ -27,6 +32,9 @@ function sessionEmail(identifier: string) {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
+    if (handleTrainingCorsPreflight(req, res)) return
+    applyTrainingCors(req, res)
+
     if (req.method !== 'POST') {
       return res.status(405).json({ error: 'Method not allowed' })
     }
@@ -37,17 +45,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Missing OTP' })
   }
 
+  const role = body.role === 'management' ? 'management' : body.role === 'staff' ? 'staff' : null
+  const appId = String(body.appId ?? '').trim()
+
   const identifier = resolveIdentifier(body)
   if (!identifier) {
     return res.status(400).json({ error: 'Invalid email or mobile number' })
   }
 
+  const email = sessionEmail(identifier)
   const record = await verifyPin(identifier, pin)
+
   if (!record) {
     return res.status(401).json({ error: 'Invalid or expired OTP' })
   }
-
-  const email = sessionEmail(identifier)
   const token = await createSessionToken({
     email,
     role: record.role,

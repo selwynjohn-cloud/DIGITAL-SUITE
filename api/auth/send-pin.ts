@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { isValidAgileEmail, normaliseEmail } from '../_lib/auth.js'
+import { normaliseEmail, canLoginWithEmail } from '../_lib/auth.js'
+import { applyTrainingCors, handleTrainingCorsPreflight } from '../_lib/cors.js'
 import { sendPinEmail } from '../_lib/email.js'
 import { hasPinStorage, normalizeMobile, pinStorageStatus, savePin } from '../_lib/pin-store.js'
 import { sendPinSms } from '../_lib/sms.js'
@@ -14,6 +15,9 @@ function mobileIdentifier(mobile10: string) {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
+    if (handleTrainingCorsPreflight(req, res)) return
+    applyTrainingCors(req, res)
+
     if (req.method !== 'POST') {
       return res.status(405).json({ error: 'Method not allowed' })
     }
@@ -57,12 +61,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         channel: 'sms',
         identifier,
         message: `OTP sent to +91 ${mobile10}`,
-        devPin: smsResult.devMode ? pin : undefined,
       })
     }
 
     const normalised = normaliseEmail(String(email ?? ''))
-    if (!isValidAgileEmail(normalised)) {
+    if (!canLoginWithEmail(normalised)) {
       return res.status(400).json({
         error: `Only @${process.env.ALLOWED_EMAIL_DOMAIN ?? 'agilegroup.co.in'} email addresses are allowed`,
       })
@@ -80,7 +83,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       channel: 'email',
       identifier: normalised,
       message: `OTP sent to ${normalised}`,
-      devPin: mailResult.devMode ? pin : undefined,
     })
   } catch (err) {
     console.error('send-pin error', err)

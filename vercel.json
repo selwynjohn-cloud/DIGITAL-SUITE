@@ -15,12 +15,12 @@
     },
     {
       "source": "/mis",
-      "destination": "https://agilereporting.live",
+      "destination": "https://mis-app-production-ac50.up.railway.app/login",
       "permanent": false
     },
     {
       "source": "/mis/:path*",
-      "destination": "https://agilereporting.live",
+      "destination": "https://mis-app-production-ac50.up.railway.app/:path*",
       "permanent": false
     },
     {

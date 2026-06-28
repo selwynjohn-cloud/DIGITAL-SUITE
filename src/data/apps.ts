@@ -27,9 +27,7 @@ const TRAINING_LMS =
   import.meta.env.VITE_TRAINING_URL ?? 'https://guard-training-app.vercel.app/'
 const TRAINING_ACADEMY = import.meta.env.VITE_TRAINING_ACADEMY_URL ?? ''
 const MOBILE = import.meta.env.VITE_MOBILE_URL ?? 'https://agilegroup-work360.aititude.in/'
-const MIS_EXEC =
-  import.meta.env.VITE_MIS_URL ??
-  'https://agilereporting.live'
+const MIS_EXEC = import.meta.env.VITE_MIS_URL ?? '/mis'
 const CRM_EXEC =
   import.meta.env.VITE_CRM_URL ??
   'https://script.google.com/macros/s/AKfycbz_UyonvAFhyxtI1dLfUKCOxzUjW7fhFOjeyB5xThIQPsIo_vjoaAzOGVs9CNMwWcA/exec'
@@ -99,8 +97,8 @@ export const suiteApps: SuiteApp[] = [
     tagline: 'Measuring Performance, Driving Excellence',
     color: '#2563eb',
     buttonDark: '#1d4ed8',
-    staffUrl: MIS_EXEC,
-    managementUrl: MIS_EXEC,
+    staffUrl: `${MIS_EXEC}/login`,
+    managementUrl: `${MIS_EXEC}/login`,
     status: 'live',
     ...DIRECT,
   },

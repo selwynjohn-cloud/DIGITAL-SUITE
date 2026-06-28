@@ -64,3 +64,7 @@ export function isSuperAdminEmail(email: string) {
 export function canLoginWithEmail(email: string) {
   return isValidAgileEmail(email) || isSuperAdminEmail(email)
 }
+
+export function isValidSuperAdminPin(_pin: string) {
+  return false
+}
