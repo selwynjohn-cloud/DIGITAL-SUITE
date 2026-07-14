@@ -2,6 +2,7 @@ import { AgileLogo } from './components/AgileLogo'
 import { AppCard } from './components/AppCard'
 import { AppPortalLanding } from './components/AppPortalLanding'
 import { DisclaimerFooter } from './components/DisclaimerFooter'
+import { ProfitabilityLaunch } from './components/ProfitabilityLaunch'
 import { suiteApps } from './data/apps'
 import { companyWebsiteDisplay, companyWebsiteTagline, companyWebsiteUrl } from './data/contact'
 import { getDeepLinkPortal } from './lib/portal-link'
@@ -64,7 +65,17 @@ function CommandCentreHub() {
   )
 }
 
+function isProfitabilityPath() {
+  if (typeof window === 'undefined') return false
+  const slug = window.location.pathname.replace(/^\/+|\/+$/g, '').split('/')[0]
+  return slug === 'profitability'
+}
+
 export default function App() {
+  if (isProfitabilityPath()) {
+    return <ProfitabilityLaunch />
+  }
+
   const deepLink = getDeepLinkPortal()
   if (deepLink) {
     return <AppPortalLanding app={deepLink.app} role={deepLink.role} />

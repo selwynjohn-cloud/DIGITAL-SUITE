@@ -122,10 +122,18 @@ export const suiteLoginGuide: LoginGuideEntry[] = [
     loginSteps:
       'Opens Work360 directly — no Command Centre OTP. Sign in inside the app with the details HR/IT gave you.',
   },
+  {
+    number: '19',
+    title: 'Client & Branch Profitability',
+    howToOpen: 'www.agilegroup-digital.co.in → App 19 → HODs/Staff (Accounts) or Management',
+    loginSteps:
+      'Opens Profitability directly (no Command Centre OTP). Accounts: accounts@agilegroup.in / accounts123. Management: management@agilegroup.in / management123. MD/Director can switch portals with PIN.',
+    demoNote: 'Separate finance app linked from Command Centre via /profitability',
+  },
 ]
 
 export const suiteHomeUrl = 'https://www.agilegroup-digital.co.in/'
 
 /** User-facing note: every internal app requires OTP on the Command Centre first. */
 export const suiteAccessNote =
-  'Open www.agilegroup-digital.co.in. Click any app — most apps ask for a 6-digit OTP (email or mobile) before they open. Agile Mobile (Work360), Facebook, and LinkedIn open directly without Command Centre login.'
+  'Open www.agilegroup-digital.co.in. Click any app — most apps ask for a 6-digit OTP (email or mobile) before they open. Agile Mobile (Work360), Facebook, LinkedIn, and Client & Branch Profitability (App 19) open directly without Command Centre login.'

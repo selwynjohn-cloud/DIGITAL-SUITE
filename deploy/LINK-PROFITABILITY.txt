@@ -1,0 +1,28 @@
+# Link Client & Branch Profitability → agilegroup-digital.co.in
+
+## What was added
+
+1. **Command Centre App 19** — `Client & Branch Profitability` tile on
+   https://www.agilegroup-digital.co.in
+2. **Bridge route** — `/profitability/?portal=staff|management` opens Accounts or Management login
+3. **Back-link** — Profitability app top bar + home page link to Command Centre
+
+## Go live steps
+
+1. Deploy the Profitability app (Vite UI + API) to your host (Vercel / Railway / etc.).
+2. In **Command Centre** Vercel → Environment Variables, set:
+
+   `VITE_PROFITABILITY_URL=https://YOUR-PROFITABILITY-HOST`
+
+   (no trailing slash)
+3. Redeploy Command Centre.
+4. Open https://www.agilegroup-digital.co.in → App **19** → HODs/Staff or Management.
+
+## Local test
+
+- Profitability: `http://localhost:5175`
+- Command Centre on localhost: bridge auto-uses `http://localhost:5175` when `VITE_PROFITABILITY_URL` is unset.
+
+## Optional Profitability env
+
+`VITE_COMMAND_CENTRE_URL=https://www.agilegroup-digital.co.in`

@@ -30,7 +30,7 @@ export function AppCard({ app }: Props) {
         targetUrl.includes('script.google.com') ||
         targetUrl.includes('guard-training-app.vercel.app') ||
         targetUrl.includes('agilegroup-work360') ||
-        ['mis', 'reviews', 'pulse', 'training', 'mobile', 'guards', 'recruitment', 'fleets', 'crm'].includes(app.id)
+        ['mis', 'reviews', 'pulse', 'training', 'mobile', 'guards', 'recruitment', 'fleets', 'crm', 'profitability'].includes(app.id)
       if (app.external) {
         window.open(targetUrl, '_blank', 'noopener,noreferrer')
         return
@@ -125,7 +125,7 @@ export function AppCard({ app }: Props) {
               onClick={() => open(app.staffUrl, 'staff', `${app.id}-staff`)}
               className={`${btnLightFlex} ${pressed(`${app.id}-staff`)}`}
             >
-              HODs / Staff
+              {app.id === 'profitability' ? 'Accounts' : 'HODs / Staff'}
             </button>
             <button
               type="button"

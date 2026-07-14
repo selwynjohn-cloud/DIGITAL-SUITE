@@ -35,6 +35,8 @@ const FACEBOOK = import.meta.env.VITE_FACEBOOK_URL ?? 'https://www.facebook.com/
 const LINKEDIN =
   import.meta.env.VITE_LINKEDIN_URL ??
   'https://www.linkedin.com/company/13703487/admin/dashboard/'
+/** Client & Branch Profitability — bridge on Command Centre, then app login */
+const PROFITABILITY_BRIDGE = '/profitability'
 
 function appPath(slug: string, portal: 'staff' | 'management') {
   return `/${slug}/?portal=${portal}`
@@ -255,6 +257,18 @@ export const suiteApps: SuiteApp[] = [
     buttonDark: '#0284c7',
     staffUrl: MOBILE,
     managementUrl: MOBILE,
+    status: 'live',
+    ...DIRECT,
+  },
+  {
+    id: 'profitability',
+    number: '19',
+    title: 'Client & Branch Profitability',
+    tagline: 'PBITDA, Collection & Outstanding by Branch',
+    color: '#0b3d6e',
+    buttonDark: '#082a4a',
+    staffUrl: `${PROFITABILITY_BRIDGE}/?portal=staff`,
+    managementUrl: `${PROFITABILITY_BRIDGE}/?portal=management`,
     status: 'live',
     ...DIRECT,
   },
