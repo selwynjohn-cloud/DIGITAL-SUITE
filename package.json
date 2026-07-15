@@ -12,9 +12,12 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "jose": "^6.2.3",
+    "mammoth": "^1.12.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "resend": "^6.12.4"
+    "resend": "^6.12.4",
+    "unpdf": "^1.6.2",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

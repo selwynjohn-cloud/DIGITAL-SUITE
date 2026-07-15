@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agile Recruitment — Hitech City</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: #0a1628;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px;
+      color: #fff;
+    }
+    .card {
+      max-width: 420px;
+      width: 100%;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,.45);
+      border: 2px solid #c9a84c;
+    }
+    .poster img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .apply-strip {
+      background: linear-gradient(135deg, #1e3a5f 0%, #0f2744 100%);
+      border-top: 4px solid #c9a84c;
+      padding: 18px 16px 20px;
+      text-align: center;
+    }
+    .apply-strip h2 {
+      font-size: 1.05rem;
+      color: #c9a84c;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .apply-strip p {
+      font-size: .9rem;
+      color: #cbd5e1;
+      margin-bottom: 14px;
+      line-height: 1.45;
+    }
+    .qr-row {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+    .qr-box {
+      background: #fff;
+      padding: 10px;
+      border-radius: 12px;
+      line-height: 0;
+    }
+    .qr-box img { width: 120px; height: 120px; }
+    .link-box {
+      text-align: center;
+      width: 100%;
+      max-width: 100%;
+      padding: 0 4px;
+    }
+    .link-box .lbl {
+      font-size: .7rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: #94a3b8;
+      margin-bottom: 6px;
+    }
+    .link-box a {
+      color: #7dd3fc;
+      font-size: .68rem;
+      white-space: nowrap;
+      text-decoration: none;
+      font-weight: 600;
+      display: inline-block;
+      letter-spacing: -.01em;
+    }
+    .btn-row {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .btn {
+      display: block;
+      text-decoration: none;
+      text-align: center;
+      padding: 14px 18px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 1rem;
+    }
+    .btn-wa {
+      background: #25D366;
+      color: #fff;
+    }
+    .btn-apply {
+      background: linear-gradient(135deg, #7c3aed, #5b21b6);
+      color: #fff;
+    }
+    .hint {
+      max-width: 420px;
+      margin-top: 16px;
+      padding: 14px;
+      background: rgba(255,255,255,.06);
+      border-radius: 12px;
+      font-size: .85rem;
+      line-height: 1.55;
+      color: #94a3b8;
+      text-align: center;
+    }
+    .hint strong { color: #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="poster">
+      <img src="recruitment-hitech-poster.png" alt="Agile Security Force — Urgent need Security Guards — Hitech City">
+    </div>
+    <div class="apply-strip">
+      <h2>Apply in 1 minute</h2>
+      <p>Scan QR or tap the link — no login needed.<br>Applications save to Agile Recruitment.</p>
+      <div class="qr-row">
+        <div class="qr-box">
+          <img src="https://api.qrserver.com/v1/create-qr-code/?size=240x240&amp;data=https%3A%2F%2Fagile-recruitment.codewords.run%2F" width="120" height="120" alt="QR code — apply online">
+        </div>
+        <div class="link-box">
+          <div class="lbl">Registration link</div>
+          <a href="https://agile-recruitment.codewords.run/">agile-recruitment.codewords.run</a>
+        </div>
+      </div>
+      <div class="btn-row">
+        <a class="btn btn-apply" href="https://agile-recruitment.codewords.run/">Register Your Interest</a>
+        <a class="btn btn-wa" id="wa-share" href="#">Share on WhatsApp</a>
+      </div>
+    </div>
+  </div>
+  <p class="hint">
+    Screenshot this whole purple screen — poster + QR + link in one picture for WhatsApp.
+  </p>
+  <script>
+    var msg =
+      '🛡️ *URGENT — Agile Security Force*\n' +
+      '*Hitech City · Hyderabad*\n\n' +
+      '👮 Security Guard / Lady Guard — ₹20,000\n' +
+      '👔 Supervisor — ₹24,000\n' +
+      '8 hrs · 30 days · Wages on 7th\n' +
+      '✅ CL · PL · Bonus · ESI · PF\n\n' +
+      '📝 *Apply here:*\n' +
+      'https://agile-recruitment.codewords.run/\n\n' +
+      '📞 18005995500 | 9248707070\n' +
+      '📧 recruitment@agilegroup.co.in';
+    document.getElementById('wa-share').href =
+      'https://wa.me/?text=' + encodeURIComponent(msg);
+  </script>
+</body>
+</html>

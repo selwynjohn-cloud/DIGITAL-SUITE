@@ -1,0 +1,30 @@
+WHY MANAGEMENT OPENS OLD "CLIENT REVIEW FORMAT" DIRECTLY
+=======================================================
+
+Command Centre App 10 → /reviews → TinyURL AGILE-REVIEW-2627
+That TinyURL still points to an OLD Codewords HTML file (static form).
+It does NOT open your new Google "Agile Reviews" project (login + 6 menus).
+
+Your pasted Code.gs + index ARE fine — the wrong link is used from the hub.
+
+FIX (pick one)
+--------------
+
+A) Update TinyURL (easiest for Selwyn)
+   1. Google → Agile Reviews → Deploy → Manage deployments
+   2. Copy Web app URL (ends with /exec)
+   3. tinyurl.com → edit AGILE-REVIEW-2627 → paste that /exec URL → Save
+
+B) Update Command Centre on Vercel (we do this in code)
+   1. Same /exec URL from Google Deploy
+   2. Put it in vercel.json under /reviews redirect (like /pulse)
+   3. Redeploy agilgroup-digital on Vercel
+
+TEST AFTER FIX
+--------------
+1. Open www.agilegroup-digital.co.in → App 10 → Management
+2. You should see: Agile Reviews LOGIN (email + OTP)
+3. After login: 6 headings on the left (Management portal)
+
+Direct test (bypass Command Centre):
+   Paste your Google /exec URL in Chrome — should show Agile Reviews login.

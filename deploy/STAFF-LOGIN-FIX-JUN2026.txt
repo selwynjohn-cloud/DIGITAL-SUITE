@@ -1,0 +1,49 @@
+STAFF LOGIN FIX — June 2026
+============================
+
+WHAT STAFF WERE SEEING
+----------------------
+1. Click app on Command Centre
+2. Enter PIN on main website
+3. Old-looking page opens
+4. Ask for OTP again
+5. Sometimes app still does not open
+
+WHY
+---
+Each app (CRM, MIS, Training, etc.) has its OWN login.
+The main website was asking for PIN first — then the app asked again.
+That felt like "double login" and "old site".
+
+WHAT WE FIXED IN SOFTWARE
+-------------------------
+✓ CRM, MIS, Reviews, News, Training, Mobile → open DIRECTLY (one login only)
+✓ Placeholder apps (Recruitment, Fleet, etc.) → open welcome page directly
+✓ Removed old TinyURL links from config (were pointing to old forms)
+✓ Director Master PIN works on website (when Vercel env is set)
+
+YOU MUST DO ON VERCEL (one time)
+--------------------------------
+1. Open vercel.com → project agilgroup-digital
+2. Settings → Environment Variables → check these are NOT tinyurl:
+
+   VITE_CRM_URL     = script.google.com/.../AKfycbz_Uyonv...
+   VITE_REVIEWS_URL = script.google.com/.../AKfycby0MYZ...
+   VITE_MIS_URL     = script.google.com/.../AKfycbw90uwh...
+   VITE_PULSE_URL   = script.google.com/.../AKfycbzGqyQ...
+   VITE_TRAINING_URL = https://www.agilegroup-digital.co.in/training/
+
+3. Deployments → latest → Promote to Production
+
+4. Tell staff: close browser fully, open fresh, go to www.agilegroup-digital.co.in
+
+STAFF — HOW TO USE NOW
+----------------------
+• CRM / MIS / Reviews / News / Training → click app → ONE login inside that app
+• No PIN on the main website first
+• HOD/Staff: use company email OTP inside the app
+• Director: use Master PIN 170658 inside each Google app
+
+GUARDS (App 07) — still needs your Google /exec URL
+---------------------------------------------------
+Send your Guards Deploy URL to Cursor → we add VITE_GUARDS_URL on Vercel.

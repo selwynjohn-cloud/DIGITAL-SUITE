@@ -1,0 +1,51 @@
+FIX — GUARDS, MIS, CRM LOGIN (Director)
+========================================
+
+Your Universal Master PIN: 170658 (same for all three when saved in Google)
+
+Use DIRECT Google links (bookmark these):
+
+  MIS:   https://script.google.com/macros/s/AKfycbw90uwhaBIcnRnBsEd-Gx2oR2wmxqC3nULNn_jkvDhp9oHZQFeHnnltxJleiQBc2Upu/exec
+
+  CRM:   https://script.google.com/macros/s/AKfycbz_UyonvAFhyxtI1dLfUKCOxzUjW7fhFOjeyB5xThIQPsIo_vjoaAzOGVs9CNMwWcA/exec
+
+  Guards: (your Deploy → Web app → copy /exec URL from Agile Guards project)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+GUARDS — "Invalid or expired PIN"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Do NOT use Command Centre PIN for Guards. Use Google link only.
+
+1. script.google.com → Agile Guards project
+2. Run → setupDirectorMasterPin → Allow
+   Must see: OK — Universal Master PIN saved
+3. Deploy → Manage deployments → New version → Deploy
+4. Login: director@agilegroup.co.in OR selwyn.john@gmail.com
+   → Director — Master PIN → 170658
+
+If OTP needed first: Send OTP → then OR use Master PIN link.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MIS — "Not responding" / blank screen
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. script.google.com → Agile MIS project
+2. Run → forceLinkMasterSheet → Allow
+   Must see: FORCE LINKED OK
+3. Run → setupDirectorMasterPin → Allow
+4. Deploy → New version
+5. Open MIS link above
+   → director@agilegroup.co.in → Master PIN → 170658
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+CRM — "Not working"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. Open CRM link above (not old TinyURL)
+2. director@agilegroup.co.in → Send OTP → check email/spam
+3. Enter 6-digit OTP
+
+If no email: script.google.com → Agile CRM → Run testEmailOTP → Allow
+
+CRM uses email OTP (no Master PIN unless added later).

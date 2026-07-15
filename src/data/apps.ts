@@ -21,23 +21,32 @@ const DIRECT = { opensDirectly: true as const }
 
 /**
  * Landing hub for www.agilegroup-digital.co.in
- * Internal apps require email/SMS OTP on Command Centre before redirect (see vercel.json).
+ * Internal apps use uniform email PIN gate before opening (see vercel.json).
  */
-const TRAINING_LMS =
-  import.meta.env.VITE_TRAINING_URL ?? 'https://guard-training-app.vercel.app/'
-const TRAINING_ACADEMY = import.meta.env.VITE_TRAINING_ACADEMY_URL ?? ''
 const MOBILE = import.meta.env.VITE_MOBILE_URL ?? 'https://agilegroup-work360.aititude.in/'
-const MIS_EXEC = import.meta.env.VITE_MIS_URL ?? '/mis'
-const CRM_EXEC =
-  import.meta.env.VITE_CRM_URL ??
-  'https://script.google.com/macros/s/AKfycbz_UyonvAFhyxtI1dLfUKCOxzUjW7fhFOjeyB5xThIQPsIo_vjoaAzOGVs9CNMwWcA/exec'
 const FACEBOOK = import.meta.env.VITE_FACEBOOK_URL ?? 'https://www.facebook.com/agilegroup2#'
 const LINKEDIN =
   import.meta.env.VITE_LINKEDIN_URL ??
   'https://www.linkedin.com/company/13703487/admin/dashboard/'
 
+
+const DEPLOYMENT_URL =
+  'https://script.google.com/macros/s/AKfycbyZYSEmhioAAM4UYaF0bRFIfn04rNst_yaShc9Iqf6_oZ7Ce69QCu5-awfS5fdwdOk/exec'
+
+const REVIEWS_URL =
+  'https://script.google.com/macros/s/AKfycby0MYZkRDiXONTxUi2h-a9CEZYRIuN1h4Sw_7ENTPX_1s7vmrs62pWsD0RCMV-lRvDp/exec'
+
+const TRAINING_LMS =
+  import.meta.env.VITE_TRAINING_URL?.trim() ||
+  'https://guard-training-app.vercel.app/'
+
 function appPath(slug: string, portal: 'staff' | 'management') {
   return `/${slug}/?portal=${portal}`
+}
+
+function trainingPortal(portal: 'trainee' | 'lecturer' | 'management') {
+  const base = TRAINING_LMS.replace(/\/?$/, '/')
+  return `${base}?portal=${portal}`
 }
 
 export const suiteApps: SuiteApp[] = [
@@ -48,8 +57,8 @@ export const suiteApps: SuiteApp[] = [
     tagline: 'Building Teams That Win',
     color: '#7c3aed',
     buttonDark: '#5b21b6',
-    staffUrl: '/recruitment',
-    managementUrl: '/recruitment',
+    staffUrl: appPath('recruitment', 'staff'),
+    managementUrl: appPath('recruitment', 'management'),
     status: 'live',
     ...DIRECT,
   },
@@ -60,9 +69,9 @@ export const suiteApps: SuiteApp[] = [
     tagline: "Investing in Tomorrow's Talent",
     color: '#0f766e',
     buttonDark: '#115e59',
-    staffUrl: TRAINING_ACADEMY || `${TRAINING_LMS}?portal=lecturer`,
-    managementUrl: TRAINING_ACADEMY || `${TRAINING_LMS}?portal=management`,
-    traineeUrl: `${TRAINING_LMS}?portal=trainee`,
+    staffUrl: trainingPortal('lecturer'),
+    managementUrl: trainingPortal('management'),
+    traineeUrl: trainingPortal('trainee'),
     status: 'live',
     ...DIRECT,
   },
@@ -73,8 +82,8 @@ export const suiteApps: SuiteApp[] = [
     tagline: 'Driving Growth Through Every Lead',
     color: '#c2410c',
     buttonDark: '#9a3412',
-    staffUrl: CRM_EXEC,
-    managementUrl: CRM_EXEC,
+    staffUrl: '/crm?portal=staff',
+    managementUrl: '/crm?portal=management',
     status: 'live',
     ...DIRECT,
   },
@@ -85,8 +94,8 @@ export const suiteApps: SuiteApp[] = [
     tagline: 'Seamless Starts, Strong Results',
     color: '#9333ea',
     buttonDark: '#7e22ce',
-    staffUrl: '/deployment',
-    managementUrl: '/deployment',
+    staffUrl: DEPLOYMENT_URL,
+    managementUrl: DEPLOYMENT_URL,
     status: 'live',
     ...DIRECT,
   },
@@ -94,11 +103,11 @@ export const suiteApps: SuiteApp[] = [
     id: 'mis',
     number: '05',
     title: 'Agile MIS',
-    tagline: 'Measuring Performance, Driving Excellence',
+    tagline: 'Official MIS — old Manus system closed',
     color: '#2563eb',
     buttonDark: '#1d4ed8',
-    staffUrl: `${MIS_EXEC}/login`,
-    managementUrl: `${MIS_EXEC}/login`,
+    staffUrl: '/mis-staff',
+    managementUrl: '/mis-dashboard',
     status: 'live',
     ...DIRECT,
   },
@@ -119,10 +128,10 @@ export const suiteApps: SuiteApp[] = [
     number: '07',
     title: 'Agile Guards',
     tagline: 'Caring for Those Who Protect',
-    color: '#dc2626',
-    buttonDark: '#b91c1c',
+    color: '#2563eb',
+    buttonDark: '#1d4ed8',
     staffUrl: '/guards',
-    managementUrl: '/guards',
+    managementUrl: '/guards?portal=management',
     status: 'live',
     ...DIRECT,
   },
@@ -157,8 +166,8 @@ export const suiteApps: SuiteApp[] = [
     tagline: 'Knowing Where We Stand',
     color: '#db2777',
     buttonDark: '#be185d',
-    staffUrl: '/reviews',
-    managementUrl: '/reviews',
+    staffUrl: REVIEWS_URL,
+    managementUrl: REVIEWS_URL,
     status: 'live',
     ...DIRECT,
   },
@@ -181,8 +190,8 @@ export const suiteApps: SuiteApp[] = [
     tagline: 'Moving Forward with Confidence',
     color: '#0d9488',
     buttonDark: '#0f766e',
-    staffUrl: '/fleets',
-    managementUrl: '/fleets',
+    staffUrl: '/fleets?portal=staff',
+    managementUrl: '/fleets?portal=management',
     status: 'live',
     ...DIRECT,
   },

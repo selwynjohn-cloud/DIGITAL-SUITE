@@ -1,0 +1,60 @@
+UNIVERSAL MASTER PIN — ONE PIN FOR ALL 18 APPS
+==============================================
+
+Pick ONE 6-digit PIN (example: your existing MIS PIN). Use the SAME number everywhere below.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART A — COMMAND CENTRE WEBSITE (Apps 01, 04, 06–09, 12–15)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Vercel → agilgroup-digital → Settings → Environment Variables → Add:
+
+  SUPER_ADMIN_PIN          = your 6-digit PIN
+  SUPER_ADMIN_EMAILS       = director@agilegroup.co.in,selwyn.john@gmail.com
+  AUTH_SECRET              = any long random text (32+ characters)
+  UPSTASH_REDIS_REST_URL   = (from Upstash)
+  UPSTASH_REDIS_REST_TOKEN = (from Upstash)
+
+Then: Deployments → Redeploy.
+
+Login on website:
+  1. Your email (director@ or selwyn.john@gmail.com)
+  2. Click "Director — use Master PIN"
+  3. Enter your Universal PIN
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PART B — GOOGLE APPS (each has its own Google project)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Run setupDirectorMasterPin ONCE in each project (same YOUR_PIN in each):
+
+  App 07  Agile Guards     → Google project "Agile Guards"
+  App 10  Agile Reviews    → Google project "Agile Reviews"
+  App 11  Agile News       → Google project "The Pulse"
+  App 02  Agile Training    → Google project "Training"
+  App 05  Agile MIS        → (if it has setupDirectorMasterPin)
+
+In each Code.gs:
+  1. Find setupDirectorMasterPin
+  2. Change:  var YOUR_PIN = 'YOUR_6_DIGITS';
+  3. Run setupDirectorMasterPin → Allow
+  4. Deploy → New version
+
+Apps that open directly (no Command Centre PIN):
+  03 CRM, 05 MIS, 07 Guards, 10 Reviews, 11 News, 18 Mobile
+
+Apps 16–17 Facebook/LinkedIn — no login.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+QUICK REFERENCE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+| Where you log in              | What to use                    |
+|-------------------------------|--------------------------------|
+| Command Centre website        | Director Master PIN (Vercel)   |
+| Agile Guards (Google)         | Same PIN — Director Master PIN |
+| Agile Reviews (Google)        | Same PIN                       |
+| Agile News / Pulse (Google)   | Same PIN                       |
+| HOD / Staff (any app)         | Email OTP (not Master PIN)     |
+
+HOD and staff do NOT use the Universal PIN — only Director.

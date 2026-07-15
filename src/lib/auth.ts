@@ -32,31 +32,14 @@ export function isAgileEmail(email: string) {
   return new RegExp(`^[a-z0-9._%+-]+@${domain.replace('.', '\\.')}$`, 'i').test(email.trim())
 }
 
-const DIRECTOR_EMAILS = (
-  import.meta.env.VITE_SUPER_ADMIN_EMAILS ??
-  'director@agilegroup.co.in,selwyn.john@gmail.com'
-)
-  .split(',')
-  .map((e: string) => e.trim().toLowerCase())
-  .filter(Boolean)
-
-export function isDirectorEmail(email: string) {
-  return DIRECTOR_EMAILS.includes(email.trim().toLowerCase())
-}
-
 export function canUseEmailLogin(email: string) {
-  return isAgileEmail(email) || isDirectorEmail(email)
-}
-
-export function normalizeMobile(mobile: string) {
-  const d = String(mobile || '').replace(/\D/g, '')
-  if (d.length === 10) return d
-  if (d.length === 12 && d.startsWith('91')) return d.slice(2)
-  return ''
-}
-
-export function isValidMobile(mobile: string) {
-  return normalizeMobile(mobile).length === 10
+  const em = email.trim().toLowerCase()
+  if (isAgileEmail(em)) return true
+  const extras = (import.meta.env.VITE_SUPER_ADMIN_EMAILS ?? 'director@agilegroup.co.in,selwyn.john@gmail.com,md@agilegroup.co.in')
+    .split(',')
+    .map((e: string) => e.trim().toLowerCase())
+    .filter(Boolean)
+  return extras.includes(em)
 }
 
 async function readApiError(res: Response) {
@@ -70,29 +53,22 @@ async function readApiError(res: Response) {
 }
 
 export async function requestPin(
-  channel: 'email' | 'sms',
-  value: string,
+  email: string,
   role: AuthRole,
   appId: string,
   appTitle: string,
 ) {
-  const body =
-    channel === 'email'
-      ? { channel, email: value.trim(), role, appId, appTitle }
-      : { channel: 'sms', mobile: value.trim(), role, appId, appTitle }
-
   const res = await fetch('/api/auth/send-pin', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ email: email.trim(), role, appId, appTitle }),
   })
   if (!res.ok) throw new Error(await readApiError(res))
   const data = (await res.json()) as {
     ok: boolean
-    channel: 'email' | 'sms'
+    channel: 'email'
     identifier: string
     message: string
-    devPin?: string
   }
   return data
 }
@@ -118,6 +94,5 @@ export async function verifyPin(
 }
 
 export function formatLoginLabel(identifier: string) {
-  if (identifier.startsWith('m:')) return `+91 ${identifier.slice(2)}`
   return identifier
 }

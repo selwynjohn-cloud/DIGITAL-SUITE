@@ -1,0 +1,17 @@
+MIS OTP EMAIL — ONE-TIME SETUP ON RAILWAY
+==========================================
+
+MIS cannot send OTP until Railway has the same email key as the Command Centre.
+
+In Railway → project tender-reprieve → service mis-app → Variables → Add:
+
+  RESEND_API_KEY   = copy from Vercel → agilgroup-digital → Settings → Environment Variables → RESEND_API_KEY
+  EMAIL_FROM       = copy from Vercel → EMAIL_FROM (e.g. Agile Command Centre <noreply@agilegroup.co.in>)
+
+Then click Redeploy on mis-app (or wait for next deploy).
+
+Director emails that work after this:
+  director@agilegroup.co.in
+  selwyn.john@gmail.com
+
+Staff must be added in MIS → User Management first.
