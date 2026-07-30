@@ -1,0 +1,14 @@
+ANUBHAV BANK — REGISTRATION EMAIL (Command Centre API)
+======================================================
+
+New API: /api/anubhav/registration
+
+Sends every Anubhav Bank registration to selwyn.john@gmail.com using existing RESEND_API_KEY.
+
+VERCEL — add these Environment Variables on agilgroup-digital:
+  ANUBHAV_REGISTRATION_SECRET   = abk-reg-2026-xK9mP2vQ7nRw4
+  ADMIN_NOTIFY_EMAIL            = selwyn.john@gmail.com
+
+Then redeploy agilgroup-digital.
+
+Anubhav Bank website uses the same secret in ANUBHAV_REGISTRATION_SECRET to call this API.

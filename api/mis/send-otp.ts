@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { sendSuiteEmail } from '../_lib/suite-mail.js'
 import { Resend } from 'resend'
 
 function secretOk(req: VercelRequest) {
@@ -57,7 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     </div>`
 
   try {
-    const result = await resend.emails.send({
+    const result = await sendSuiteEmail(resend, {
       from,
       to,
       subject: `Your Agile MIS Login OTP — ${code}`,

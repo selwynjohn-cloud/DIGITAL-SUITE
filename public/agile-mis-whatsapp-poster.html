@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agile MIS WhatsApp Poster</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #111;
+    font-family: 'Segoe UI', Arial, sans-serif;
+  }
+  .poster {
+    width: 1080px;
+    height: 1920px;
+    background: linear-gradient(165deg, #0b1220 0%, #14224f 38%, #1e3a8a 72%, #0f172a 100%);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 56px 48px 64px;
+    position: relative;
+    overflow: hidden;
+  }
+  .poster::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 50% 18%, rgba(201,168,76,.18), transparent 42%);
+    pointer-events: none;
+  }
+  .gold-bar {
+    width: 100%;
+    height: 8px;
+    background: linear-gradient(90deg, #92700c, #c9a84c, #fde68a, #c9a84c, #92700c);
+    border-radius: 999px;
+    margin-bottom: 36px;
+    flex-shrink: 0;
+  }
+  .logo-wrap {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin-bottom: 28px;
+    flex-shrink: 0;
+  }
+  .logo {
+    width: 820px;
+    max-width: 100%;
+    height: auto;
+    filter: drop-shadow(0 12px 28px rgba(0,0,0,.45));
+  }
+  h1 {
+    font-size: 58px;
+    line-height: 1.1;
+    color: #fde68a;
+    font-weight: 900;
+    letter-spacing: .02em;
+    margin-bottom: 14px;
+    text-shadow: 0 4px 16px rgba(0,0,0,.35);
+  }
+  .sub {
+    font-size: 34px;
+    color: #e2e8f0;
+    font-weight: 700;
+    margin-bottom: 36px;
+  }
+  .bullets {
+    width: 100%;
+    display: grid;
+    gap: 18px;
+    margin-bottom: 40px;
+  }
+  .bullet {
+    background: rgba(255,255,255,.08);
+    border: 2px solid rgba(201,168,76,.45);
+    border-radius: 20px;
+    padding: 22px 28px;
+    font-size: 30px;
+    font-weight: 800;
+    color: #f8fafc;
+    text-align: left;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .bullet .ic { font-size: 38px; flex-shrink: 0; }
+  .link-box {
+    width: 100%;
+    background: #fff;
+    color: #14224f;
+    border-radius: 24px;
+    padding: 34px 28px;
+    margin-bottom: 36px;
+    box-shadow: 0 16px 40px rgba(0,0,0,.35);
+  }
+  .link-box .lbl {
+    font-size: 24px;
+    font-weight: 800;
+    color: #64748b;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+  }
+  .link-box .url {
+    font-size: 34px;
+    font-weight: 900;
+    color: #1d4ed8;
+    line-height: 1.25;
+    word-break: break-word;
+  }
+  .complaint {
+    width: 100%;
+    background: rgba(34,197,94,.16);
+    border: 2px solid #22c55e;
+    border-radius: 20px;
+    padding: 22px 28px;
+    font-size: 28px;
+    font-weight: 800;
+    color: #bbf7d0;
+    margin-bottom: 34px;
+    line-height: 1.35;
+  }
+  .toll {
+    font-size: 42px;
+    font-weight: 900;
+    color: #fde68a;
+    margin-bottom: 16px;
+  }
+  .quote {
+    font-size: 24px;
+    color: #cbd5e1;
+    font-style: italic;
+    line-height: 1.45;
+    max-width: 900px;
+  }
+  .footer {
+    margin-top: auto;
+    padding-top: 28px;
+    font-size: 26px;
+    font-weight: 800;
+    color: #c9a84c;
+  }
+</style>
+</head>
+<body>
+  <div class="poster" id="poster">
+    <div class="gold-bar"></div>
+    <div class="logo-wrap">
+      <img class="logo" src="/agile-group-logo.png" alt="Agile Group">
+    </div>
+    <h1>AGILE MIS<br>USER MANUAL</h1>
+    <div class="sub">Team Agile — Please Read Today</div>
+    <div class="bullets">
+      <div class="bullet"><span class="ic">🕑</span> Branch HODs — daily report by 2:00 PM</div>
+      <div class="bullet"><span class="ic">📝</span> Register every complaint — no exceptions</div>
+      <div class="bullet"><span class="ic">📊</span> Dashboard, visits &amp; compliance guide inside</div>
+    </div>
+    <div class="link-box">
+      <div class="lbl">Open User Manual</div>
+      <div class="url">www.agilegroup-digital.co.in/mis-manual</div>
+    </div>
+    <div class="complaint">📝 Complaint link:<br>www.agilegroup-digital.co.in/register-complaint</div>
+    <div class="toll">www.agilegroup.co.in</div>
+    <div class="footer">Agile Security Force Pvt. Ltd.</div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,20 @@
+MYCARPOOL.CO.IN — Hide readable source maps (when project is on Vercel)
+======================================================================
+
+When the MyCarpool site is built, use the same rules as the other Agile sites:
+
+1. Vite project — in vite.config.ts add:
+   build: { sourcemap: false, minify: 'esbuild' }
+
+2. Next.js project — in next.config.ts add:
+   productionBrowserSourceMaps: false
+
+3. vercel.json — block .map files (copy from agilegroup-digital or anubhavbank):
+   - Redirect /*.map → 404
+   - Headers: Cache-Control no-store on .map files
+
+4. Never put API keys or passwords in frontend code — server only.
+
+Note: Browsers must still download JavaScript to run the app; this only stops
+the extra "source map" files that make minified code easy to read back to
+original TypeScript/React.

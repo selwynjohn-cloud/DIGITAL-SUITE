@@ -1,0 +1,60 @@
+18-APP SUITE — LOGIN STATUS & FIX
+=================================
+
+WHAT YOU REPORTED
+-----------------
+Working:  Training (02), CRM (03), Reviews (10), News (11)
+Not working: Recruitment, Deployment, Control, Guards, Quality, War Room, Fleet, Assets, Facilities, Licenses
+MIS: opens but OTP email not working
+
+WHY
+---
+Two types of apps:
+
+A) GOOGLE APPS (own login — CRM, MIS, Reviews, News, Guards, Training)
+   → Should open Google directly — NO “PIN storage” message
+
+B) WEBSITE PLACEHOLDER APPS (Recruitment, Deployment, Control, etc.)
+   → Were waiting for Upstash Redis on Vercel
+
+WHAT WE FIXED IN CODE (needs Vercel redeploy)
+---------------------------------------------
+1. Apps 01, 04, 06, 08, 09, 12–15 → open WITHOUT login (welcome page)
+2. MIS, CRM, Reviews, News → open Google link directly from suite page
+3. Guards → needs your Google /exec URL in vercel.json (send to Cursor)
+
+VERCEL SETTINGS (one-time — for staff email PIN on website apps later)
+----------------------------------------------------------------------
+Vercel → agilgroup-digital → Settings → Environment Variables:
+
+  UPSTASH_REDIS_REST_URL    = https://accurate-gnu-97563.upstash.io
+  UPSTASH_REDIS_REST_TOKEN  = (your token from Upstash — keep private)
+  AUTH_SECRET               = AgileGroupCommandCentre2026Secret
+  SUPER_ADMIN_PIN           = 170658
+  SUPER_ADMIN_EMAILS        = director@agilegroup.co.in,selwyn.john@gmail.com
+
+Then: Deployments → Redeploy (required after any env change)
+
+DIRECTOR LOGIN ON WEBSITE (after redeploy + env vars)
+-----------------------------------------------------
+  Email → Director — use Master PIN → 170658
+  (Works without Upstash for Director only)
+
+MIS OTP NOT WORKING (Google — not Vercel)
+-----------------------------------------
+1. script.google.com → Agile MIS
+2. Run: forceLinkMasterSheet → Allow
+3. Run: setupDirectorMasterPin → Allow
+4. Deploy → New version
+5. Open MIS → director@agilegroup.co.in → Master PIN 170658
+   OR Send OTP → check spam
+
+GUARDS (send your /exec URL to wire App 07)
+-------------------------------------------
+Until wired: use your Guards Google link directly (bookmark it).
+Run setupGuardsEmailLogin once in Google for email OTP.
+
+BOOKMARK THESE (work today)
+---------------------------
+MIS:  https://script.google.com/macros/s/AKfycbw90uwhaBIcnRnBsEd-Gx2oR2wmxqC3nULNn_jkvDhp9oHZQFeHnnltxJleiQBc2Upu/exec
+CRM:  https://script.google.com/macros/s/AKfycbz_UyonvAFhyxtI1dLfUKCOxzUjW7fhFOjeyB5xThIQPsIo_vjoaAzOGVs9CNMwWcA/exec

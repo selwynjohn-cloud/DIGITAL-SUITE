@@ -1,0 +1,52 @@
+AGILE PULSE / AGILE NEWS (APP 11) — GO LIVE
+===========================================
+
+WHAT IT IS
+----------
+  An automatic news bulletin. Every time someone opens it, it pulls fresh
+  India flash news (Crime & Law/Order, Road & Accidents, Weather/IMD alerts),
+  live city temperatures, and shows the Agile events, job posting, guards
+  appreciation and the Security Quiz — in English + Hindi. It rebuilds the
+  same bulletin design you already had, but on our own reliable system
+  (Vercel) instead of codewords, so it stops failing.
+
+ONE LINK FOR EVERYONE
+---------------------
+  Website shortcut:  /pulse   (Command Centre App 11 — Agile News tile)
+  Full page served by: /api/pulse/bulletin
+  Share the /pulse link on WhatsApp groups.
+
+HOW IT IS BUILT (files)
+-----------------------
+  api/pulse/bulletin.ts        the page that assembles + serves the bulletin
+  api/_lib/pulse/news.ts       pulls flash news (NewsData -> Mediastack)
+  api/_lib/pulse/weather.ts    city temperatures (Open-Meteo) + IMD alert
+  api/_lib/pulse/template.ts   the bulletin design (HTML)
+  api/_lib/pulse/config.ts     EDIT HERE: events, job posting, guards, quiz, cities
+  api/_lib/pulse/types.ts      shared data shapes
+
+  Preview locally any time:  npx tsx scripts/pulse-preview.ts  (writes an HTML file)
+
+API KEYS NEEDED (set on Vercel -> Project -> Settings -> Environment Variables)
+------------------------------------------------------------------------------
+  NEWSDATA_API_KEY     your paid NewsData.io key   (main news source)
+  MEDIASTACK_API_KEY   your paid Mediastack key    (backup news source)
+  PERPLEXITY_API_KEY   optional — writes the IMD weather-alert sentence
+
+  If a key is missing, that part is skipped gracefully and the bulletin still
+  loads (temperatures work with no key at all).
+
+TO CHANGE THE EDITORIAL PARTS (events / job / guards / quiz)
+-----------------------------------------------------------
+  Edit api/_lib/pulse/config.ts (the EDITORIAL section) and redeploy.
+  (Next phase can move this to a Google Sheet so no code editing is needed.)
+
+WHAT STILL TO DO LATER (phase 2)
+--------------------------------
+  - Auto-send the bulletin to WhatsApp / Slack / email on a schedule.
+  - Edit editorial content from a Google Sheet instead of the config file.
+  - Add the news thumbnail images (currently a coloured source badge).
+
+HELPLINE
+--------
+  Help desk — 1800 599 5599

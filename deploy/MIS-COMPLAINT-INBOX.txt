@@ -1,0 +1,61 @@
+MIS — Complaints (director@agilegroup.co.in ONLY)
+==================================================
+
+IMPORTANT: Do NOT sync from selwyn.john@gmail.com or any personal Gmail.
+Only mail to director@agilegroup.co.in / @agilegroup.co.in is imported.
+
+1. Vercel env (Project → Settings → Environment Variables):
+   MIS_COMPLAINT_INGEST_SECRET = (long random password)
+   MIS_COMPLAINT_INBOX_EMAIL   = director@agilegroup.co.in
+
+2. Google Apps Script — run as director@agilegroup.co.in account
+   Trigger: every 30 minutes
+   Script property MIS_INGEST_SECRET = same as MIS_COMPLAINT_INGEST_SECRET
+
+3. Public complaint form (anyone — Phone / Mail / WhatsApp):
+   https://www.agilegroup-digital.co.in/operations-complaints
+   QR code is shown on that page. Each submission gets a code e.g. AGM-OPS-2026-00042
+
+4. HOD MIS menu → "Register Complaints" (same public form)
+   HOD MIS → Complaints → branch entry for Phone/Mail/WhatsApp
+
+5. Apps Script — search ONLY director inbox:
+
+function syncComplaintsToMis() {
+  var secret = PropertiesService.getScriptProperties().getProperty('MIS_INGEST_SECRET');
+  var q = 'to:director@agilegroup.co.in newer_than:14d (complaint OR incident OR grievance OR escalation OR feedback OR issue)';
+  var threads = GmailApp.search(q, 0, 30);
+  var emails = [];
+  threads.forEach(function(t) {
+    var msgs = t.getMessages();
+    msgs.forEach(function(m) {
+      emails.push({
+        emailId: m.getId(),
+        from: m.getFrom(),
+        to: m.getTo(),
+        subject: m.getSubject(),
+        body: m.getPlainBody().slice(0, 2000),
+        date: m.getDate().toISOString()
+      });
+    });
+  });
+  if (!emails.length) return;
+  var url = 'https://www.agilegroup-digital.co.in/api/mis/complaint-ingest';
+  var res = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: { 'X-MIS-Ingest-Secret': secret },
+    payload: JSON.stringify({ emails: emails }),
+    muteHttpExceptions: true
+  });
+  Logger.log(res.getResponseCode() + ' ' + res.getContentText());
+}
+
+function createTrigger() {
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'syncComplaintsToMis') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('syncComplaintsToMis').timeBased().everyMinutes(30).create();
+}
+
+Ingest URL: https://www.agilegroup-digital.co.in/api/mis/complaint-ingest

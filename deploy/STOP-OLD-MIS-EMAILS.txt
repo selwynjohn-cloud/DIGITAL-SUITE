@@ -1,0 +1,94 @@
+STOP OLD MIS EMAILS (agilereporting.live / URGENT reminders)
+===========================================================
+
+WHAT IS HAPPENING
+-----------------
+The email in your screenshot (URGENT: MIS Not Submitted — links to
+agilereporting.live) comes from the OLD Manus / Railway MIS — NOT from
+the new site (www.agilegroup-digital.co.in).
+
+Deleting the Manus account does NOT automatically stop Railway.
+I checked today: the old server is STILL LIVE at:
+  mis-app-production-ac50.up.railway.app
+
+That old server still runs automatic reminder jobs and sends emails to
+branch addresses like vijayawada@agilegroup.co.in.
+
+YOUR NEW MIS (ours) uses different emails and links to:
+  www.agilegroup-digital.co.in/mis-report
+
+
+STEP 1 — STOP THE OLD SERVER (most important — do this first)
+-------------------------------------------------------------
+This stops the URGENT emails within minutes.
+
+1. Open Chrome and go to:
+   https://railway.app
+
+2. Sign in with the same Google/email you used for the old MIS project.
+
+3. Open the project named something like "mis-app" or "MIS production".
+
+4. Click **Settings** (gear icon).
+
+5. Click **Pause Service**  OR  **Delete Project**.
+
+6. Reply "done" and tell me what you clicked.
+
+If you cannot find Railway login, tell me — I will help another way.
+
+
+STEP 2 — MOVE agilereporting.live TO GODADDY (so old link dies)
+---------------------------------------------------------------
+After Step 1, do this so bookmarks and old links stop working.
+
+A) At GoDaddy (where your other domains live)
+   1. Sign in at godaddy.com
+   2. Go to **My Products** → **Domains** → **Transfer In**
+   3. Enter: agilereporting.live
+   4. GoDaddy will ask for an **Authorization Code** (EPP code)
+
+B) Get the Authorization Code from the OLD registrar
+   (where agilereporting.live was bought — often Manus / domain shop)
+   - If Manus account is gone, check email for "transfer code" or
+     contact the registrar support with your domain proof.
+
+C) After transfer completes (usually 3–7 days), point DNS at our new home:
+   - **A record**   Host @   →   76.76.21.21
+   - **CNAME**      Host www →   cname.vercel-dns.com
+
+D) I will attach agilereporting.live to Vercel so it shows:
+   "Old Manus MIS — CLOSED — use www.agilegroup-digital.co.in"
+
+
+STEP 3 — TELL YOUR TEAM (copy/paste WhatsApp or email)
+------------------------------------------------------
+IMPORTANT — Agile MIS
+
+The OLD website agilereporting.live is CLOSED.
+Do NOT use it. Ignore URGENT emails from that old system.
+
+Use ONLY:
+https://www.agilegroup-digital.co.in
+
+Branch HODs — daily report:
+1. Open website above
+2. App 05 Agile MIS
+3. Tap HODs / Staff
+4. Select your branch → email + branch password
+5. Daily MIS Submission
+
+— Director, Security Division
+
+
+NEW SYSTEM REMINDERS (optional — different from old URGENT mails)
+-----------------------------------------------------------------
+Our new MIS can send gentler 5 PM reminders (only to branches that did
+NOT submit) — links to agilegroup-digital.co.in, not agilereporting.live.
+
+Tell me if you want those ON or OFF for branches.
+
+
+OLD RAILWAY ADDRESS (do not use)
+--------------------------------
+mis-app-production-ac50.up.railway.app

@@ -2,70 +2,31 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
+  "headers": [
+    {
+      "source": "/(.*)\\.map",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" },
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    }
+  ],
   "redirects": [
     {
-      "source": "/crm",
-      "destination": "https://script.google.com/macros/s/AKfycbz_UyonvAFhyxtI1dLfUKCOxzUjW7fhFOjeyB5xThIQPsIo_vjoaAzOGVs9CNMwWcA/exec",
-      "permanent": false
-    },
-    {
-      "source": "/crm/:path*",
-      "destination": "https://script.google.com/macros/s/AKfycbz_UyonvAFhyxtI1dLfUKCOxzUjW7fhFOjeyB5xThIQPsIo_vjoaAzOGVs9CNMwWcA/exec",
-      "permanent": false
-    },
-    {
-      "source": "/mis",
-      "destination": "https://mis-app-production-ac50.up.railway.app/login",
-      "permanent": false
-    },
-    {
-      "source": "/mis/:path*",
-      "destination": "https://mis-app-production-ac50.up.railway.app/:path*",
-      "permanent": false
-    },
-    {
-      "source": "/reviews",
-      "destination": "https://script.google.com/macros/s/AKfycby0MYZkRDiXONTxUi2h-a9CEZYRIuN1h4Sw_7ENTPX_1s7vmrs62pWsD0RCMV-lRvDp/exec",
-      "permanent": false
-    },
-    {
-      "source": "/reviews/:path*",
-      "destination": "https://script.google.com/macros/s/AKfycby0MYZkRDiXONTxUi2h-a9CEZYRIuN1h4Sw_7ENTPX_1s7vmrs62pWsD0RCMV-lRvDp/exec",
-      "permanent": false
-    },
-    {
-      "source": "/pulse",
-      "destination": "https://script.google.com/macros/s/AKfycbzGqyQNdyvBy2Bw1p7N84rdB-8VobOGVT8g4gZcghtN27SI6guihHdaNXLTNfIOYKQ/exec",
-      "permanent": false
-    },
-    {
-      "source": "/pulse/:path*",
-      "destination": "https://script.google.com/macros/s/AKfycbzGqyQNdyvBy2Bw1p7N84rdB-8VobOGVT8g4gZcghtN27SI6guihHdaNXLTNfIOYKQ/exec",
-      "permanent": false
-    },
-    {
-      "source": "/recruitment",
-      "destination": "https://script.google.com/macros/s/AKfycbyeL3oJ423nSoqFwc_Yhjfw0o4H16fCNMiAvQ--b00yBcdZ9iK7eaj5OwkQmbDoZWs/exec",
-      "permanent": false
-    },
-    {
-      "source": "/recruitment/:path*",
-      "destination": "https://script.google.com/macros/s/AKfycbyeL3oJ423nSoqFwc_Yhjfw0o4H16fCNMiAvQ--b00yBcdZ9iK7eaj5OwkQmbDoZWs/exec",
-      "permanent": false
+      "source": "/(.*)\\.map",
+      "destination": "/404",
+      "statusCode": 404
     },
     {
       "source": "/apply",
       "destination": "https://agile-recruitment.codewords.run/",
-      "permanent": false
-    },
-    {
-      "source": "/guards",
-      "destination": "https://script.google.com/macros/s/AKfycbwVpnp26Rge5nzToy6vVDISLi4z3K7sbtD5s6-6r9wjJye-_6t-G85puxIYimglJWI/exec",
-      "permanent": false
-    },
-    {
-      "source": "/guards/:path*",
-      "destination": "https://script.google.com/macros/s/AKfycbwVpnp26Rge5nzToy6vVDISLi4z3K7sbtD5s6-6r9wjJye-_6t-G85puxIYimglJWI/exec",
       "permanent": false
     },
     {
@@ -79,40 +40,182 @@
       "permanent": false
     },
     {
-      "source": "/training",
-      "destination": "https://guard-training-app.vercel.app/",
-      "permanent": false
+      "source": "/manus",
+      "destination": "/manus-closed.html",
+      "permanent": true
     },
     {
-      "source": "/training/",
-      "destination": "https://guard-training-app.vercel.app/",
-      "permanent": false
+      "source": "/manus/:path*",
+      "destination": "/manus-closed.html",
+      "permanent": true
     },
     {
-      "source": "/training/:path*",
-      "destination": "https://guard-training-app.vercel.app/:path*",
-      "permanent": false
-    },
-    {
-      "source": "/fleets",
-      "destination": "https://script.google.com/macros/s/AKfycbwY9D16RZlRkVOxmQfrsNMRk4ofjK0B6uW7C-_bUZArrztZXv-nBuFTIGqukOEvlrgo/exec",
-      "permanent": false
-    },
-    {
-      "source": "/fleets/:path*",
-      "destination": "https://script.google.com/macros/s/AKfycbwY9D16RZlRkVOxmQfrsNMRk4ofjK0B6uW7C-_bUZArrztZXv-nBuFTIGqukOEvlrgo/exec",
-      "permanent": false
-    },
-    {
-      "source": "/deployment",
-      "destination": "https://script.google.com/macros/s/AKfycbyZYSEmhioAAM4UYaF0bRFIfn04rNst_yaShc9Iqf6_oZ7Ce69QCu5-awfS5fdwdOk/exec",
-      "permanent": false
-    },
-    {
-      "source": "/deployment/:path*",
-      "destination": "https://script.google.com/macros/s/AKfycbyZYSEmhioAAM4UYaF0bRFIfn04rNst_yaShc9Iqf6_oZ7Ce69QCu5-awfS5fdwdOk/exec",
-      "permanent": false
+      "source": "/old-mis",
+      "destination": "/manus-closed.html",
+      "permanent": true
     }
   ],
-  "rewrites": [{ "source": "/((?!api).*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/pulse/admin", "destination": "/api/pulse/admin" },
+    { "source": "/fleets", "destination": "/api/fleet/app" },
+    { "source": "/fleets/", "destination": "/api/fleet/app" },
+    { "source": "/recruitment", "destination": "/api/recruitment/app" },
+    { "source": "/recruitment/", "destination": "/api/recruitment/app" },
+    { "source": "/deployment", "destination": "/api/deployment/gate" },
+    { "source": "/deployment/", "destination": "/api/deployment/gate" },
+    { "source": "/reviews", "destination": "/api/reviews/gate" },
+    { "source": "/reviews/", "destination": "/api/reviews/gate" },
+    { "source": "/training", "destination": "/api/training/gate" },
+    { "source": "/training/", "destination": "/api/training/gate" },
+    { "source": "/pulse/admin/", "destination": "/api/pulse/admin" },
+    { "source": "/pulse", "destination": "/api/pulse/bulletin" },
+    { "source": "/pulse/", "destination": "/api/pulse/bulletin" },
+    { "source": "/securityjob/admin", "destination": "/api/securityjob/admin" },
+    { "source": "/securityjob/admin/", "destination": "/api/securityjob/admin" },
+    { "source": "/securityjob", "destination": "/api/securityjob/site" },
+    { "source": "/securityjob/", "destination": "/api/securityjob/site" },
+    { "source": "/mis-unit-issue", "destination": "/api/mis/unit-issue" },
+    { "source": "/mis-unit-issue/", "destination": "/api/mis/unit-issue" },
+    { "source": "/mis-guard-docs", "destination": "/api/mis/guard-docs" },
+    { "source": "/mis-guard-docs/", "destination": "/api/mis/guard-docs" },
+    { "source": "/mis-report", "destination": "/api/mis/report" },
+    { "source": "/mis-report/", "destination": "/api/mis/report" },
+    { "source": "/mis-staff", "destination": "/api/mis/staff" },
+    { "source": "/mis-staff/", "destination": "/api/mis/staff" },
+    { "source": "/mis-staff-daily", "destination": "/api/mis/staff?page=daily" },
+    { "source": "/mis-staff-daily/", "destination": "/api/mis/staff?page=daily" },
+    { "source": "/mis-staff-daily-deploy", "destination": "/api/mis/staff?page=daily-deploy" },
+    { "source": "/mis-staff-daily-deploy/", "destination": "/api/mis/staff?page=daily-deploy" },
+    { "source": "/mis-staff-daily-summary", "destination": "/api/mis/staff?page=daily-summary" },
+    { "source": "/mis-staff-daily-summary/", "destination": "/api/mis/staff?page=daily-summary" },
+    { "source": "/mis-staff-daily-submit", "destination": "/api/mis/staff?page=daily-submit" },
+    { "source": "/mis-staff-daily-submit/", "destination": "/api/mis/staff?page=daily-submit" },
+    { "source": "/mis-staff-board", "destination": "/api/mis/staff?page=board" },
+    { "source": "/mis-staff-board/", "destination": "/api/mis/staff?page=board" },
+    { "source": "/mis-staff-md", "destination": "/api/mis/staff?page=md" },
+    { "source": "/mis-staff-md/", "destination": "/api/mis/staff?page=md" },
+    { "source": "/mis-staff-bpi", "destination": "/api/mis/staff?page=bpi" },
+    { "source": "/mis-staff-bpi/", "destination": "/api/mis/staff?page=bpi" },
+    { "source": "/mis-staff-client", "destination": "/api/mis/staff?page=client" },
+    { "source": "/mis-staff-client/", "destination": "/api/mis/staff?page=client" },
+    { "source": "/mis-staff-visits", "destination": "/api/mis/staff?page=visits" },
+    { "source": "/mis-staff-visits/", "destination": "/api/mis/staff?page=visits" },
+    { "source": "/mis-staff-duty", "destination": "/api/mis/staff?page=duty" },
+    { "source": "/mis-staff-duty/", "destination": "/api/mis/staff?page=duty" },
+    { "source": "/mis-staff-late", "destination": "/api/mis/staff?page=duty" },
+    { "source": "/mis-staff-late/", "destination": "/api/mis/staff?page=duty" },
+    { "source": "/mis-staff-out", "destination": "/api/mis/staff?page=duty" },
+    { "source": "/mis-staff-out/", "destination": "/api/mis/staff?page=duty" },
+    { "source": "/mis-staff-unit-issue", "destination": "/api/mis/staff?page=unit-issue" },
+    { "source": "/mis-staff-unit-issue/", "destination": "/api/mis/staff?page=unit-issue" },
+    { "source": "/mis-staff-collection", "destination": "/api/mis/staff?page=collection" },
+    { "source": "/mis-staff-collection/", "destination": "/api/mis/staff?page=collection" },
+    { "source": "/mis-staff-register", "destination": "/api/mis/staff?page=register" },
+    { "source": "/mis-staff-register/", "destination": "/api/mis/staff?page=register" },
+    { "source": "/mis-staff-hr", "destination": "/api/mis/staff?page=board" },
+    { "source": "/mis-staff-hr/", "destination": "/api/mis/staff?page=board" },
+    { "source": "/mis-staff-guard-complaints", "destination": "/api/mis/staff?page=complaints" },
+    { "source": "/mis-staff-guard-complaints/", "destination": "/api/mis/staff?page=complaints" },
+    { "source": "/mis-staff-complaints", "destination": "/api/mis/staff?page=complaints" },
+    { "source": "/mis-staff-complaints/", "destination": "/api/mis/staff?page=complaints" },
+    { "source": "/mis-staff-sites", "destination": "/api/mis/staff?page=sites" },
+    { "source": "/mis-staff-sites/", "destination": "/api/mis/staff?page=sites" },
+    { "source": "/mis-staff-manual", "destination": "/api/mis/staff?page=manual" },
+    { "source": "/mis-staff-manual/", "destination": "/api/mis/staff?page=manual" },
+    { "source": "/mis-staff-help", "destination": "/api/mis/staff?page=help" },
+    { "source": "/mis-staff-help/", "destination": "/api/mis/staff?page=help" },
+    { "source": "/mis-board", "destination": "/api/mis/dashboard" },
+    { "source": "/mis-board/", "destination": "/api/mis/dashboard" },
+    { "source": "/mis-admin", "destination": "/api/mis/admin" },
+    { "source": "/mis-admin/", "destination": "/api/mis/admin" },
+    { "source": "/mis-compliance", "destination": "/api/mis/compliance" },
+    { "source": "/mis-compliance/", "destination": "/api/mis/compliance" },
+    { "source": "/mis-visits", "destination": "/api/mis/visits" },
+    { "source": "/mis-visits/", "destination": "/api/mis/visits" },
+    { "source": "/mis-duty", "destination": "/api/mis/duty" },
+    { "source": "/mis-duty/", "destination": "/api/mis/duty" },
+    { "source": "/mis-collection", "destination": "/api/mis/collection" },
+    { "source": "/mis-collection/", "destination": "/api/mis/collection" },
+    { "source": "/mis-complaints", "destination": "/api/mis/complaints" },
+    { "source": "/mis-complaints/", "destination": "/api/mis/complaints" },
+    { "source": "/mis-register-complaints", "destination": "/api/mis/register-complaints" },
+    { "source": "/mis-register-complaints/", "destination": "/api/mis/register-complaints" },
+    { "source": "/operations-complaints", "destination": "/api/mis/complaint-register" },
+    { "source": "/operations-complaints/", "destination": "/api/mis/complaint-register" },
+    { "source": "/register-complaint", "destination": "/api/mis/complaint-register" },
+    { "source": "/register-complaint/", "destination": "/api/mis/complaint-register" },
+    { "source": "/api/mis/complaint-ingest", "destination": "/api/mis/complaint-ingest" },
+    { "source": "/api/mis/complaint-register", "destination": "/api/mis/complaint-register" },
+    { "source": "/mis-dashboard", "destination": "/api/mis/dashboard-home" },
+    { "source": "/mis-dashboard/", "destination": "/api/mis/dashboard-home" },
+    { "source": "/mis-manual", "destination": "/api/mis/manual" },
+    { "source": "/mis-manual/", "destination": "/api/mis/manual" },
+    { "source": "/mis-troubleshooting", "destination": "/api/mis/troubleshooting" },
+    { "source": "/mis-troubleshooting/", "destination": "/api/mis/troubleshooting" },
+    { "source": "/mis-md", "destination": "/api/mis/md" },
+    { "source": "/mis-md/", "destination": "/api/mis/md" },
+    { "source": "/mis-submission", "destination": "/api/mis/submission" },
+    { "source": "/mis-submission/", "destination": "/api/mis/submission" },
+    { "source": "/mis-reminder-preview", "destination": "/api/mis/reminder-preview" },
+    { "source": "/mis-reminder-preview/", "destination": "/api/mis/reminder-preview" },
+    { "source": "/mis-bpi", "destination": "/api/mis/bpi" },
+    { "source": "/mis-bpi/", "destination": "/api/mis/bpi" },
+    { "source": "/mis-client", "destination": "/api/mis/client" },
+    { "source": "/mis-client/", "destination": "/api/mis/client" },
+    { "source": "/mis-users", "destination": "/api/mis/users" },
+    { "source": "/mis-users/", "destination": "/api/mis/users" },
+    { "source": "/mis-repository", "destination": "/api/mis/repository" },
+    { "source": "/mis-repository/", "destination": "/api/mis/repository" },
+    { "source": "/mis-formats", "destination": "/api/mis/formats" },
+    { "source": "/mis-formats/", "destination": "/api/mis/formats" },
+    { "source": "/mis", "destination": "/api/mis/shell" },
+    { "source": "/mis/", "destination": "/api/mis/shell" },
+    { "source": "/mis/login", "destination": "/api/mis/shell" },
+    { "source": "/mis/login/", "destination": "/api/mis/shell" },
+    { "source": "/crm/admin", "destination": "/api/crm/app?portal=admin" },
+    { "source": "/crm/admin/", "destination": "/api/crm/app?portal=admin" },
+    { "source": "/crm", "destination": "/api/crm/app" },
+    { "source": "/crm/", "destination": "/api/crm/app" },
+    { "source": "/guards/register", "destination": "/api/guards/register" },
+    { "source": "/guards/register/", "destination": "/api/guards/register" },
+    { "source": "/guards/feedback", "destination": "/api/guards/feedback" },
+    { "source": "/guards/feedback/", "destination": "/api/guards/feedback" },
+    { "source": "/guards/manual", "destination": "/api/guards/manual" },
+    { "source": "/guards/manual/", "destination": "/api/guards/manual" },
+    { "source": "/guards/troubleshooting", "destination": "/api/guards/troubleshooting" },
+    { "source": "/guards/troubleshooting/", "destination": "/api/guards/troubleshooting" },
+    { "source": "/guards", "destination": "/api/guards/app" },
+    { "source": "/guards/", "destination": "/api/guards/app" },
+    { "source": "/fleets", "destination": "/api/fleet/app" },
+    { "source": "/fleets/", "destination": "/api/fleet/app" },
+    { "source": "/fleet-report", "destination": "/api/fleet/report" },
+    { "source": "/fleet-report/", "destination": "/api/fleet/report" },
+    { "source": "/fleet-drivers", "destination": "/api/fleet/drivers" },
+    { "source": "/fleet-drivers/", "destination": "/api/fleet/drivers" },
+    { "source": "/fleet/manual", "destination": "/api/fleet/manual" },
+    { "source": "/fleet/manual/", "destination": "/api/fleet/manual" },
+    { "source": "/fleet/troubleshooting", "destination": "/api/fleet/troubleshooting" },
+    { "source": "/fleet/troubleshooting/", "destination": "/api/fleet/troubleshooting" },
+    { "source": "/((?!api).*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    { "path": "/api/pulse/cron", "schedule": "*/30 * * * *" },
+    { "path": "/api/crm/cron", "schedule": "30 4 * * 6" },
+    { "path": "/api/crm/cron", "schedule": "30 9 * * 6" },
+    { "path": "/api/fleet/cron", "schedule": "30 4 * * 6" },
+    { "path": "/api/fleet/cron", "schedule": "0 11 * * 6" },
+    { "path": "/api/fleet/cron", "schedule": "30 4 * * 0" },
+    { "path": "/api/mis/cron?job=missing-acks", "schedule": "30 6 * * *" },
+    { "path": "/api/mis/cron?job=missing-acks", "schedule": "30 12 * * *" },
+    { "path": "/api/mis/cron?job=morning-reminder", "schedule": "30 5 * * *" },
+    { "path": "/api/mis/cron?job=midday-reminder", "schedule": "30 8 * * *" },
+    { "path": "/api/mis/cron?job=consolidated-ack", "schedule": "30 11 * * *" },
+    { "path": "/api/mis/cron", "schedule": "30 12 * * *" },
+    { "path": "/api/mis/cron", "schedule": "0 1 * * *" },
+    { "path": "/api/mis/cron", "schedule": "30 13 * * *" },
+    { "path": "/api/mis/cron?job=complaint-sync", "schedule": "0 3 * * *" },
+    { "path": "/api/mis/cron?job=complaint-sync", "schedule": "30 15 * * *" },
+    { "path": "/api/pulse/winner-cron", "schedule": "30 2 * * 0" },
+    { "path": "/api/suite/health-cron", "schedule": "*/30 * * * *" }
+  ]
 }

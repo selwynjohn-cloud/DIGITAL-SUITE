@@ -1,0 +1,43 @@
+MYCARPOOL.CO.IN — Source code protection (for Codewords / Agemo team)
+=====================================================================
+
+Live check (July 2026): mycarpool.co.in already returns **403** for `.map` files — good.
+
+This site is hosted on Vercel under the Codewords/Agemo account (not agilegroup-digital).
+The source code is **not on Selwyn's Mac** — only a coming-soon HTML draft exists locally.
+
+To keep protection after future deploys, add these two files in the MyCarpool repo:
+
+--- next.config.ts ---
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
+  productionBrowserSourceMaps: false,
+};
+
+export default nextConfig;
+
+--- vercel.json ---
+{
+  "headers": [
+    {
+      "source": "/(.*)\\.map",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" },
+        { "key": "X-Robots-Tag", "value": "noindex, nofollow" }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/(.*)\\.map",
+      "destination": "/404",
+      "statusCode": 404
+    }
+  ]
+}
+
+Then redeploy MyCarpool on Vercel.
+
+When ready to move MyCarpool under Agile One Umbrella (same team as anubhavbank.com),
+reply to IT and we will link the domain to agilegroup-digital on Vercel.

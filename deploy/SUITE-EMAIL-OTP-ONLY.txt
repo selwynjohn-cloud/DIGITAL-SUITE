@@ -1,0 +1,36 @@
+AGILE SUITE — EMAIL OTP LOGIN ONLY (Apps 1–15)
+================================================
+Date: July 2026
+
+WHAT CHANGED
+------------
+All shared passwords, branch PINs, and Master PIN are REMOVED.
+
+How to sign in now:
+1. Open any suite app (CRM, MIS, Fleet, Pulse, SecurityJob, etc.)
+2. Enter your official work email: name@agilegroup.co.in
+3. Click "Send PIN to email"
+4. Check your inbox for the 6-digit PIN (valid 10 minutes)
+5. Enter the PIN and click Verify
+
+WHO CAN LOG IN
+--------------
+Only registered @agilegroup.co.in email addresses.
+
+DIRECTOR AUDIT COPY
+-------------------
+Every PIN email sends:
+- The PIN to the user's inbox
+- A BCC copy to director@agilegroup.co.in (and selwyn.john@gmail.com)
+- A separate Director audit email showing: user email + PIN + app name
+
+BRANCH DAILY REPORT / FLEET BRANCH FORMS
+----------------------------------------
+Branches no longer use a 4-digit branch PIN.
+They sign in with their @agilegroup.co.in email OTP, then select their branch.
+
+COMMAND CENTRE (main website)
+-----------------------------
+Apps 1–15: email OTP only (no SMS tab, no Master PIN button).
+
+Apps 16–18 unchanged: Facebook, LinkedIn, Mobile (external links).

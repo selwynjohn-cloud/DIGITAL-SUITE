@@ -3,16 +3,12 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   canUseEmailLogin,
   formatLoginLabel,
-  isValidMobile,
   requestPin,
   verifyPin,
 } from '../lib/auth'
 
-type LoginChannel = 'email' | 'sms'
-
 export function LoginModal() {
   const { pending, closeLogin, completeLogin, openPortal } = useAuth()
-  const [channel, setChannel] = useState<LoginChannel>('email')
   const [contact, setContact] = useState('')
   const [identifier, setIdentifier] = useState('')
   const [pin, setPin] = useState('')
@@ -23,7 +19,6 @@ export function LoginModal() {
 
   useEffect(() => {
     if (!pending) {
-      setChannel('email')
       setContact('')
       setIdentifier('')
       setPin('')
@@ -39,13 +34,8 @@ export function LoginModal() {
   const domain = import.meta.env.VITE_ALLOWED_EMAIL_DOMAIN ?? 'agilegroup.co.in'
 
   const validateContact = () => {
-    if (channel === 'email') {
-      if (!canUseEmailLogin(contact)) {
-        setError(`Use your company email ending with @${domain}, or your registered Director email`)
-        return false
-      }
-    } else if (!isValidMobile(contact)) {
-      setError('Enter your 10-digit mobile number (India)')
+    if (!canUseEmailLogin(contact)) {
+      setError(`Use your official company email ending with @${domain}`)
       return false
     }
     return true
@@ -59,7 +49,6 @@ export function LoginModal() {
     setLoading(true)
     try {
       const result = await requestPin(
-        channel,
         contact,
         pending.role,
         pending.app.id,
@@ -69,7 +58,7 @@ export function LoginModal() {
       setStep('pin')
       setInfo(result.message)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not send OTP')
+      setError(err instanceof Error ? err.message : 'Could not send PIN')
     } finally {
       setLoading(false)
     }
@@ -78,7 +67,7 @@ export function LoginModal() {
   const handleVerify = async () => {
     setError('')
     if (pin.length !== 6) {
-      setError('Enter the 6-digit OTP')
+      setError('Enter the 6-digit PIN from your email')
       return
     }
     setLoading(true)
@@ -92,7 +81,7 @@ export function LoginModal() {
       })
       openPortal(pending)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Invalid OTP')
+      setError(err instanceof Error ? err.message : 'Invalid PIN')
     } finally {
       setLoading(false)
     }
@@ -127,67 +116,20 @@ export function LoginModal() {
 
         {step === 'contact' ? (
           <div className="space-y-4">
-            <div className="flex rounded-xl border border-slate-700 bg-slate-900 p-1">
-              <button
-                type="button"
-                onClick={() => {
-                  setChannel('email')
-                  setError('')
-                }}
-                className={`flex-1 rounded-lg py-2 text-sm font-medium ${
-                  channel === 'email'
-                    ? 'bg-[#c9a84c] text-slate-950'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Email OTP
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setChannel('sms')
-                  setError('')
-                }}
-                className={`flex-1 rounded-lg py-2 text-sm font-medium ${
-                  channel === 'sms'
-                    ? 'bg-[#c9a84c] text-slate-950'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                SMS OTP
-              </button>
-            </div>
-
-            {channel === 'email' ? (
-              <label className="block text-sm text-slate-300">
-                Email address
-                <input
-                  type="email"
-                  value={contact}
-                  onChange={(e) => setContact(e.target.value)}
-                  placeholder={`name@${domain}`}
-                  className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-white placeholder:text-slate-600"
-                  autoComplete="email"
-                />
-              </label>
-            ) : (
-              <label className="block text-sm text-slate-300">
-                Mobile number
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  value={contact}
-                  onChange={(e) => setContact(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  placeholder="10-digit mobile"
-                  className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-white placeholder:text-slate-600"
-                  autoComplete="tel"
-                />
-              </label>
-            )}
+            <label className="block text-sm text-slate-300">
+              Work email (@{domain})
+              <input
+                type="email"
+                value={contact}
+                onChange={(e) => setContact(e.target.value)}
+                placeholder={`name@${domain}`}
+                className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 text-white placeholder:text-slate-600"
+                autoComplete="email"
+              />
+            </label>
 
             <p className="text-xs text-slate-500">
-              A 6-digit OTP will be sent {channel === 'email' ? 'to your email' : 'by SMS'}. Valid
-              for 10 minutes. Same for Director, Management, and Staff.
+              A 6-digit PIN is sent to your email (valid 15 minutes). Check spam if you do not see it.
             </p>
             {error && <p className="text-sm text-red-400">{error}</p>}
             <button
@@ -196,7 +138,7 @@ export function LoginModal() {
               onClick={handleSendPin}
               className="app-tap-btn w-full rounded-xl bg-[#c9a84c] py-3 font-semibold text-slate-950 shadow-sm hover:bg-[#e8d5a3] disabled:opacity-60"
             >
-              {loading ? 'Sending…' : 'Send OTP'}
+              {loading ? 'Sending…' : 'Send PIN to email'}
             </button>
           </div>
         ) : (
@@ -207,7 +149,7 @@ export function LoginModal() {
             </p>
             {info && <p className="text-sm text-emerald-400">{info}</p>}
             <label className="block text-sm text-slate-300">
-              6-digit OTP
+              6-digit PIN from your email
               <input
                 type="text"
                 inputMode="numeric"
@@ -238,7 +180,7 @@ export function LoginModal() {
               }}
               className="w-full text-sm text-slate-500 hover:text-slate-300"
             >
-              Use a different email or mobile
+              Use a different email
             </button>
           </div>
         )}

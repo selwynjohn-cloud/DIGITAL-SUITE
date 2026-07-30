@@ -1,0 +1,30 @@
+MANUS MIS — PERMANENTLY CLOSED (team notice)
+============================================
+
+Send this to ALL branch HODs and operations team (WhatsApp / email):
+
+---
+IMPORTANT — Agile MIS
+
+The OLD Manus / Railway MIS is PERMANENTLY CLOSED.
+
+From today, use ONLY:
+https://www.agilegroup-digital.co.in
+
+Branch HODs — daily report:
+1. Open website above
+2. App 05 Agile MIS
+3. Tap HODs / Staff (white button)
+4. Select your branch
+5. Enter your @agilegroup.co.in email + branch password
+
+Do NOT use old Manus links or Railway links.
+If you have an old bookmark, delete it.
+
+— Director, Security Division
+Agile Security Force Private Limited
+---
+
+Old Railway address (do not use): mis-app-production-ac50.up.railway.app
+
+Director: pause/delete that Railway project when logged in to railway.app (optional final step).

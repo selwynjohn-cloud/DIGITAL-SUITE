@@ -1,0 +1,27 @@
+AGILE MIS — FIX DOUBLE OTP (June 2026)
+======================================
+
+WHY STAFF SEE TWO OTPs
+----------------------
+1. Main website (Command Centre) asks for PIN first
+2. Then Agile MIS asks for OTP again
+
+FIX PART A — MIS (Google) — files on your Mac:
+  ~/MIS-Code.gs
+  ~/MIS-index.html
+
+Same steps as CRM:
+1. script.google.com → Agile MIS
+2. Code.gs ← paste MIS-Code.gs → Save
+3. index ← paste MIS-index.html → Save
+4. Deploy → New version → Deploy
+
+After this: MIS remembers login 8 hours. Director: Master PIN 170658.
+
+FIX PART B — Command Centre (stops first PIN for MIS)
+-----------------------------------------------------
+Vercel → agilgroup-digital → Deployments → Promote latest to Production.
+(Latest build opens CRM/MIS directly — one login only.)
+
+BOOKMARK MIS (skip Command Centre until Part B done):
+https://script.google.com/macros/s/AKfycbw90uwhaBIcnRnBsEd-Gx2oR2wmxqC3nULNn_jkvDhp9oHZQFeHnnltxJleiQBc2Upu/exec

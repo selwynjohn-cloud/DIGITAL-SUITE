@@ -43,6 +43,18 @@ function CommandCentreHub() {
             {companyWebsiteDisplay}
           </a>
         </p>
+
+        <p className="mx-auto mt-2 max-w-3xl text-center text-sm italic text-slate-400 sm:text-base">
+          To join our team, explore active openings at{' '}
+          <a
+            href="https://www.securityjob.co.in"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-bold not-italic text-[#c9a84c] underline decoration-[#c9a84c]/50 underline-offset-4 hover:text-[#e2c97e]"
+          >
+            SecurityJob.co.in
+          </a>
+        </p>
       </header>
 
       <main className="mx-auto max-w-6xl px-6 pb-16 pt-8">
