@@ -1,6 +1,8 @@
 # Activate AGILE GROUP Security News Bulletin
 
-Sends the official **SECURITY NEWS – AGILE GROUP** WhatsApp bulletin to `9441009091` via **Fast2SMS** (full free-form copy via session message).
+**Production (preferred):** the live Command Centre already auto-publishes three daily editions — see [`LIVE.md`](./LIVE.md).
+
+**Legacy / backup in this folder:** Google Apps Script + Fast2SMS sender for the official **SECURITY NEWS – AGILE GROUP** WhatsApp copy.
 
 ## Fastest path — Google Apps Script
 
