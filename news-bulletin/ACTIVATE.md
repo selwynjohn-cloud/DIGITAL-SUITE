@@ -1,6 +1,6 @@
-# Activate Security Job News Bulletin
+# Activate AGILE GROUP Security News Bulletin
 
-Sends a daily **SECURITY JOB NEWS** bulletin to WhatsApp (`9441009091`) via **Fast2SMS**.
+Sends the official **SECURITY NEWS – AGILE GROUP** WhatsApp bulletin to `9441009091` via **Fast2SMS** (full free-form copy via session message).
 
 ## Fastest path — Google Apps Script
 
@@ -13,13 +13,15 @@ Sends a daily **SECURITY JOB NEWS** bulletin to WhatsApp (`9441009091`) via **Fa
 | `FAST2SMS_API_KEY` | from [Fast2SMS Dev API](https://www.fast2sms.com/dashboard/dev-api) |
 | `BULLETIN_TO` | `9441009091` |
 | `BULLETIN_CHANNEL` | `whatsapp` |
+| `BULLETIN_FLASH_HEADLINE` | optional lead under 🔴 |
 | `FAST2SMS_PHONE_NUMBER_ID` | optional (auto) |
-| `FAST2SMS_MESSAGE_ID` | optional (auto) |
+| `FAST2SMS_MESSAGE_ID` | optional (template fallback) |
 
 4. Select function **`activateNewsBulletin`** → **Run** → approve permissions.
-5. Confirm the message on WhatsApp. A daily trigger is installed automatically.
+5. Confirm the AGILE Security News message on WhatsApp. A daily trigger is installed automatically.
 
 Helpers:
+- `previewNewsBulletin` — print full AGILE copy in logger (no send)
 - `listWhatsAppAssets` — dump WABA numbers / templates
 - `sendNewsBulletin` — send once without changing triggers
 - `deactivateNewsBulletin` — remove the daily trigger
@@ -30,15 +32,15 @@ Helpers:
 cd news-bulletin
 cp .env.example .env
 # paste FAST2SMS_API_KEY into .env
+node send.js --preview  # print AGILE bulletin body
 node send.js --list     # inspect WABA + templates
-node send.js            # send WhatsApp bulletin now
+node send.js            # send full copy via WhatsApp session
 node send.js --sms      # Quick SMS fallback
 ```
 
 ## WhatsApp prerequisites (Fast2SMS)
 
 1. Complete [WhatsApp Business API onboarding](https://www.fast2sms.com/help/how-to-complete-whatsapp-business-api-onboarding-process/) in Fast2SMS.
-2. Keep at least one **Approved** template (Fast2SMS ships sample Marketing / Utility / Authentication templates).
-3. Template body variables should accept values we send as `date|headline` (or set `BULLETIN_VARIABLES` / Script property to match your template’s `var_count`).
-
-If WhatsApp is not ready yet, set `BULLETIN_CHANNEL=sms` (or `auto`) to deliver via Fast2SMS Quick SMS immediately with only the API key.
+2. **Full AGILE copy** uses WhatsApp **session** messages (`/dev/whatsapp-session`) — recipient must be inside the 24-hour service window (they messaged you / opted in recently), or use Channel posts separately.
+3. Outside the 24h window, Fast2SMS falls back to an **Approved template** (short vars only — not the full newsletter body).
+4. Set `BULLETIN_CHANNEL=sms` (or `auto`) for Quick SMS delivery of the full text with only the API key.

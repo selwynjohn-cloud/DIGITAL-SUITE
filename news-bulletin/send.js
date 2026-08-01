@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 /**
- * DIGITAL-SUITE — Security Job News Bulletin sender (Fast2SMS)
+ * DIGITAL-SUITE — AGILE GROUP Security News Bulletin (Fast2SMS)
+ *
+ * Sends the official SECURITY NEWS – AGILE GROUP WhatsApp copy.
  *
  * Usage:
  *   cp .env.example .env   # fill FAST2SMS_API_KEY
- *   node send.js           # send now (whatsapp → sms fallback with CHANNEL=auto)
+ *   node send.js           # session WhatsApp (full copy) → template → SMS
  *   node send.js --list    # list WABA numbers / templates
+ *   node send.js --preview # print bulletin body only (no send)
  *   node send.js --sms     # force Quick SMS
  */
 
@@ -13,6 +16,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { buildAgileSecurityBulletin } = require('./bulletin');
 
 loadEnv(path.join(__dirname, '.env'));
 
@@ -23,6 +27,15 @@ const BASE = 'https://www.fast2sms.com';
 
 async function main() {
   const args = new Set(process.argv.slice(2));
+  const bulletin = buildAgileSecurityBulletin(new Date(), {
+    flashHeadline: process.env.BULLETIN_FLASH_HEADLINE,
+  });
+
+  if (args.has('--preview')) {
+    console.log(bulletin.body);
+    return;
+  }
+
   if (!API_KEY) {
     console.error('Missing FAST2SMS_API_KEY. Copy .env.example → .env and paste your key.');
     process.exit(1);
@@ -35,7 +48,6 @@ async function main() {
     return;
   }
 
-  const bulletin = buildBulletin();
   const channel = args.has('--sms')
     ? 'sms'
     : args.has('--whatsapp')
@@ -45,10 +57,15 @@ async function main() {
   let result = null;
   if (channel === 'whatsapp' || channel === 'auto') {
     try {
-      result = await sendWhatsApp(bulletin);
+      result = await sendWhatsAppSession(bulletin);
     } catch (err) {
-      console.error('[whatsapp]', err.message || err);
-      if (channel === 'whatsapp') throw err;
+      console.error('[whatsapp-session]', err.message || err);
+      try {
+        result = await sendWhatsAppTemplate(bulletin);
+      } catch (err2) {
+        console.error('[whatsapp-template]', err2.message || err2);
+        if (channel === 'whatsapp') throw err2;
+      }
     }
   }
 
@@ -60,58 +77,55 @@ async function main() {
   console.log(JSON.stringify(result, null, 2));
 }
 
-function buildBulletin() {
-  const now = new Date();
-  const dateLabel = now.toLocaleDateString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
+async function sendWhatsAppSession(bulletin) {
+  let phoneNumberId = process.env.FAST2SMS_PHONE_NUMBER_ID || '';
+  if (!phoneNumberId) {
+    const resolved = await resolveWhatsAppAssets('', '');
+    phoneNumberId = resolved.phoneNumberId;
+    console.error(`[resolve] phone_number_id=${phoneNumberId}`);
+  }
+
+  const to = `91${BULLETIN_TO}`;
+  const qs = new URLSearchParams({
+    phone_number_id: String(phoneNumberId),
+    to,
   });
-  const timeLabel = now.toLocaleTimeString('en-IN', {
-    timeZone: 'Asia/Kolkata',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
+  const url = `${BASE}/dev/whatsapp-session?${qs.toString()}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: API_KEY,
+      'Content-Type': 'application/json',
+      accept: 'application/json',
+    },
+    body: JSON.stringify({ type: 'text', text: bulletin.body }),
   });
-
-  const headlines = [
-    'New security guard vacancies are open near you — check Security Job today.',
-    'Recruiters are reviewing fresh applications. Keep your profile complete.',
-    'Interview tip from SG. Priya: arrive 15 minutes early and carry your ID.',
-    'Joining reminder: confirm your reporting time with AGILE recruitment.',
-    'Library update: new training clips are available in the Security Job app.',
-  ];
-  const istWeekday = new Date(
-    now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' })
-  ).getDay();
-  const lead = headlines[istWeekday % headlines.length];
-  const shortLead = lead.length > 60 ? `${lead.slice(0, 57)}...` : lead;
-
-  const body = [
-    `SECURITY JOB NEWS · ${dateLabel} · ${timeLabel} IST`,
-    'Anchor: SG. Priya (Id.No. 010190073)',
-    '',
-    lead,
-    '',
-    'Hotline: 1800 599 5599',
-    'Alt: 92487 07070',
-    'Email: recruitment@securityjob.co.in',
-    'Web: https://www.securityjob.co.in',
-    '',
-    '— AGILE · Experience Never Retires',
-  ].join('\n');
-
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${JSON.stringify(data)}`);
+  const ok =
+    data &&
+    (data.status === true ||
+      data.status === 'success' ||
+      data.return === true ||
+      data.success === true);
+  if (!ok && data.message && /fail|error/i.test(String(data.message))) {
+    throw new Error(JSON.stringify(data));
+  }
+  // Some Fast2SMS responses only return message id / request_id
+  if (!ok && !data.request_id && !data.messages && !data.message_id) {
+    throw new Error(JSON.stringify(data));
+  }
   return {
-    dateLabel,
-    lead,
-    shortLead,
-    body,
-    defaultVariables: process.env.BULLETIN_VARIABLES || `${dateLabel}|${shortLead}`,
+    ok: true,
+    channel: 'whatsapp-session',
+    to: BULLETIN_TO,
+    phoneNumberId,
+    requestId: data.request_id || data.message_id || null,
+    upstream: data,
   };
 }
 
-async function sendWhatsApp(bulletin) {
+async function sendWhatsAppTemplate(bulletin) {
   let phoneNumberId = process.env.FAST2SMS_PHONE_NUMBER_ID || '';
   let messageId = process.env.FAST2SMS_MESSAGE_ID || '';
 
@@ -136,12 +150,13 @@ async function sendWhatsApp(bulletin) {
   if (!ok) throw new Error(JSON.stringify(data));
   return {
     ok: true,
-    channel: 'whatsapp',
+    channel: 'whatsapp-template',
     to: BULLETIN_TO,
     phoneNumberId,
     messageId,
     requestId: data.request_id || null,
     upstream: data,
+    note: 'Template vars only — full AGILE copy requires session/window or approved long template',
   };
 }
 
@@ -170,9 +185,18 @@ async function resolveWhatsAppAssets(phoneNumberId, messageId) {
   const tplResp = await fast2smsGet('/dev/dlt_manager/whatsapp', { type: 'template' });
   const rows = (tplResp && tplResp.data) || [];
   if (!rows.length) {
-    throw new Error(
-      'No WhatsApp WABA/templates found. Finish Fast2SMS WhatsApp onboarding first.'
-    );
+    const numResp = await fast2smsGet('/dev/dlt_manager/whatsapp', { type: 'number' });
+    const nums = (numResp && numResp.data) || [];
+    if (!nums.length) {
+      throw new Error(
+        'No WhatsApp WABA/templates found. Finish Fast2SMS WhatsApp onboarding first.'
+      );
+    }
+    return {
+      phoneNumberId: String(nums[0].phone_number_id),
+      messageId: messageId || '',
+      templateName: null,
+    };
   }
 
   for (const row of rows) {
@@ -192,11 +216,12 @@ async function resolveWhatsAppAssets(phoneNumberId, messageId) {
 
   const first = rows[0];
   const firstTpl = (first.templates && first.templates[0]) || null;
-  if (!firstTpl) throw new Error('WABA connected but no templates available.');
   return {
-    phoneNumberId: String(firstTpl.phone_number_id || first.phone_number_id),
-    messageId: String(firstTpl.message_id),
-    templateName: firstTpl.template_name || null,
+    phoneNumberId: String(
+      (firstTpl && firstTpl.phone_number_id) || first.phone_number_id
+    ),
+    messageId: String((firstTpl && firstTpl.message_id) || messageId || ''),
+    templateName: (firstTpl && firstTpl.template_name) || null,
   };
 }
 

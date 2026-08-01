@@ -1,5 +1,7 @@
 /**
- * DIGITAL-SUITE — Security Job News Bulletin (WhatsApp via Fast2SMS)
+ * DIGITAL-SUITE — SECURITY NEWS – AGILE GROUP (WhatsApp via Fast2SMS)
+ *
+ * Sends the official AGILE Security News bulletin copy (full free-form body).
  *
  * ACTIVATE (Google Apps Script):
  * 1. https://script.google.com → New project → name it "News Bulletin"
@@ -8,18 +10,24 @@
  *      FAST2SMS_API_KEY          = <from https://www.fast2sms.com/dashboard/dev-api>
  *      BULLETIN_TO               = 9441009091
  *      FAST2SMS_PHONE_NUMBER_ID  = (optional — auto-resolved if blank)
- *      FAST2SMS_MESSAGE_ID       = (optional — auto-picks first Approved template)
+ *      FAST2SMS_MESSAGE_ID       = (optional — template fallback only)
  *      BULLETIN_CHANNEL          = whatsapp   (or "sms" / "auto")
+ *      BULLETIN_FLASH_HEADLINE   = (optional lead story line under 🔴)
  * 4. Run → activateNewsBulletin  (authorize when prompted)
- * 5. Check Executions log + your WhatsApp (9441009091)
+ * 5. Check Executions log + WhatsApp (9441009091)
  *
- * Daily send uses a time-driven trigger created by activateNewsBulletin().
+ * Delivery order for whatsapp/auto:
+ *   1) WhatsApp session text (full AGILE copy — needs 24h window)
+ *   2) WhatsApp approved template (vars only)
+ *   3) Quick SMS if channel=auto|sms
  */
 
 var DEFAULT_BULLETIN_TO = '9441009091';
 var FAST2SMS_BASE = 'https://www.fast2sms.com';
+var DEFAULT_FLASH =
+  'eight killed in bus collision and fire on Delhi-Mumbai Expressway in Rajasthan';
 
-/** One-shot activation: send now + install daily 09:00 IST trigger. */
+/** One-shot activation: send now + install daily trigger. */
 function activateNewsBulletin() {
   var result = sendNewsBulletin();
   ensureDailyTrigger_();
@@ -42,10 +50,15 @@ function sendNewsBulletin() {
 
   if (channel === 'whatsapp' || channel === 'auto') {
     try {
-      sent = sendWhatsAppBulletin_(cfg, bulletin);
+      sent = sendWhatsAppSession_(cfg, bulletin);
     } catch (err) {
-      Logger.log('WhatsApp send failed: ' + err);
-      if (channel === 'whatsapp') throw err;
+      Logger.log('WhatsApp session failed: ' + err);
+      try {
+        sent = sendWhatsAppTemplate_(cfg, bulletin);
+      } catch (err2) {
+        Logger.log('WhatsApp template failed: ' + err2);
+        if (channel === 'whatsapp') throw err2;
+      }
     }
   }
 
@@ -55,7 +68,7 @@ function sendNewsBulletin() {
 
   if (!sent) {
     throw new Error(
-      'No bulletin sent. Set BULLETIN_CHANNEL=whatsapp|sms|auto and ensure Fast2SMS WhatsApp WABA/templates are ready.'
+      'No bulletin sent. Set BULLETIN_CHANNEL=whatsapp|sms|auto and ensure Fast2SMS WhatsApp is ready.'
     );
   }
 
@@ -64,6 +77,13 @@ function sendNewsBulletin() {
     JSON.stringify({ at: new Date().toISOString(), result: sent })
   );
   return sent;
+}
+
+/** Preview body in Apps Script logger (no send). */
+function previewNewsBulletin() {
+  var body = buildBulletin_().body;
+  Logger.log(body);
+  return body;
 }
 
 /** List WABA numbers + approved templates (debug helper). */
@@ -104,53 +124,133 @@ function getConfig_() {
     messageId: trim_(p.getProperty('FAST2SMS_MESSAGE_ID')),
     channel: trim_(p.getProperty('BULLETIN_CHANNEL') || 'whatsapp'),
     variables: trim_(p.getProperty('BULLETIN_VARIABLES')),
+    flashHeadline: trim_(p.getProperty('BULLETIN_FLASH_HEADLINE')),
   };
 }
 
+/** Official AGILE GROUP Security News bulletin copy. */
 function buildBulletin_() {
   var tz = 'Asia/Kolkata';
   var now = new Date();
-  var dateLabel = Utilities.formatDate(now, tz, 'd MMM yyyy');
-  var timeLabel = Utilities.formatDate(now, tz, 'HH:mm');
+  var dateLabel = Utilities.formatDate(now, tz, 'd MMMM yyyy');
+  var timeLabel = Utilities.formatDate(now, tz, 'h:mm a').toUpperCase();
+  var hour24 = Number(Utilities.formatDate(now, tz, 'H'));
+  var slot = 'Evening Bulletin';
+  if (hour24 < 12) slot = 'Morning Bulletin';
+  else if (hour24 < 17) slot = 'Afternoon Bulletin';
 
-  var headlines = [
-    'New security guard vacancies are open near you — check Security Job today.',
-    'Recruiters are reviewing fresh applications. Keep your profile complete.',
-    'Interview tip from SG. Priya: arrive 15 minutes early and carry your ID.',
-    'Joining reminder: confirm your reporting time with AGILE recruitment.',
-    'Library update: new training clips are available in the Security Job app.',
-  ];
-  var dayIndex = Number(Utilities.formatDate(now, tz, 'u')) - 1; // 0=Mon
-  var lead = headlines[Math.abs(dayIndex) % headlines.length];
+  var flash = getConfig_().flashHeadline || DEFAULT_FLASH;
+  var shortFlash = flash.length > 60 ? flash.substring(0, 57) + '...' : flash;
 
-  var body =
-    'SECURITY JOB NEWS · ' +
-    dateLabel +
-    ' · ' +
-    timeLabel +
-    ' IST\n' +
-    'Anchor: SG. Priya (Id.No. 010190073)\n\n' +
-    lead +
-    '\n\n' +
-    'Hotline: 1800 599 5599\n' +
-    'Alt: 92487 07070\n' +
-    'Email: recruitment@securityjob.co.in\n' +
-    'Web: https://www.securityjob.co.in\n\n' +
-    '— AGILE · Experience Never Retires';
+  var body = [
+    '🚨 *SECURITY NEWS – AGILE GROUP* 🚨',
+    '🗓️ ' + dateLabel + ' ' + timeLabel + ' — ' + slot,
+    '━━━━━━━━━━━━━━━━━━━━━',
+    '',
+    '🔴 ' + flash,
+    '',
+    "📢 *Inside today's bulletin:*",
+    '  ▸ 🛣️ Highway & Road Closure Alerts',
+    '  ▸ 🏙️ Indian City Security News',
+    '  ▸ 🚨 Incidents, Fire, Terror & Bank/ATM',
+    '  ▸ ⛈️ Weather & IMD Alerts',
+    '  ▸ 🧠 Security Question of the Day',
+    '  ▸ 🏆 Weekly Quiz Winner — ₹250 Amazon voucher',
+    '',
+    '━━━━━━━━━━━━━━━━━━━━━',
+    '⚡ *Flash News Link*',
+    '👉 https://www.agilegroup-digital.co.in/pulse',
+    '',
+    "🎯 *PLAY & WIN — don't miss this*",
+    '',
+    '🧠 *Security Question of the Day* — answer daily',
+    "🏆 *Last week's Winner* announced every Sunday",
+    '🎁 Prize: *₹250 Amazon gift voucher*',
+    '',
+    '👇 *Follow our News Channel* to view the full News Bulletin, Question, answers & winner updates:',
+    'https://whatsapp.com/channel/0029VbCUrUAFnSz8CmYqJP1y',
+    '',
+    '✨ Tap *Follow* once — stay ahead with Flash News, quiz & jobs.',
+    '━━━━━━━━━━━━━━━━━━━━━',
+    '',
+    '💼 *Immediate Security Jobs — Register FREE:*',
+    '👉 www.SecurityJob.co.in',
+    'https://www.securityjob.co.in/#register',
+    '',
+    '🌐 Discover our full range of services at www.agilegroup.co.in',
+    '',
+    'Agile Digital Operations Command Centre — designed and built with Cursor.ai, San Francisco, California, USA, in partnership with Agile Group leadership.',
+    'www.agilegroup-digital.co.in · cursor.ai',
+  ].join('\n');
 
-  // Template vars: date | short lead (keep short for WhatsApp template limits)
-  var shortLead = lead.length > 60 ? lead.substring(0, 57) + '...' : lead;
   return {
     dateLabel: dateLabel,
     timeLabel: timeLabel,
-    lead: lead,
-    shortLead: shortLead,
+    slot: slot,
+    flash: flash,
+    shortFlash: shortFlash,
     body: body,
-    defaultVariables: dateLabel + '|' + shortLead,
+    defaultVariables: dateLabel + '|' + shortFlash,
   };
 }
 
-function sendWhatsAppBulletin_(cfg, bulletin) {
+/** Full free-form AGILE copy (requires open WhatsApp 24h session). */
+function sendWhatsAppSession_(cfg, bulletin) {
+  var phoneNumberId = cfg.phoneNumberId;
+  if (!phoneNumberId) {
+    var resolved = resolveWhatsAppAssets_(cfg.apiKey, '', '');
+    phoneNumberId = resolved.phoneNumberId;
+    PropertiesService.getScriptProperties().setProperty(
+      'FAST2SMS_PHONE_NUMBER_ID',
+      String(phoneNumberId)
+    );
+  }
+
+  var to = '91' + cfg.to;
+  var url =
+    FAST2SMS_BASE +
+    '/dev/whatsapp-session?phone_number_id=' +
+    encodeURIComponent(String(phoneNumberId)) +
+    '&to=' +
+    encodeURIComponent(to);
+
+  var resp = UrlFetchApp.fetch(url, {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      Authorization: cfg.apiKey,
+      accept: 'application/json',
+    },
+    payload: JSON.stringify({ type: 'text', text: bulletin.body }),
+    muteHttpExceptions: true,
+  });
+  var data = parseJson_(resp);
+  if (resp.getResponseCode() >= 400) {
+    throw new Error('Session HTTP ' + resp.getResponseCode() + ': ' + JSON.stringify(data));
+  }
+  var ok =
+    data &&
+    (data.status === true ||
+      data.status === 'success' ||
+      data.return === true ||
+      data.success === true ||
+      data.request_id ||
+      data.message_id ||
+      data.messages);
+  if (!ok) throw new Error('Fast2SMS session error: ' + JSON.stringify(data));
+
+  return {
+    ok: true,
+    channel: 'whatsapp-session',
+    to: cfg.to,
+    phoneNumberId: phoneNumberId,
+    requestId: data.request_id || data.message_id || null,
+    upstream: data,
+  };
+}
+
+/** Template fallback — only injects short variables, not full AGILE copy. */
+function sendWhatsAppTemplate_(cfg, bulletin) {
   var phoneNumberId = cfg.phoneNumberId;
   var messageId = cfg.messageId;
 
@@ -158,7 +258,6 @@ function sendWhatsAppBulletin_(cfg, bulletin) {
     var resolved = resolveWhatsAppAssets_(cfg.apiKey, phoneNumberId, messageId);
     phoneNumberId = resolved.phoneNumberId;
     messageId = resolved.messageId;
-    // Persist so later runs skip lookup
     var props = PropertiesService.getScriptProperties();
     if (!cfg.phoneNumberId && phoneNumberId) {
       props.setProperty('FAST2SMS_PHONE_NUMBER_ID', String(phoneNumberId));
@@ -180,11 +279,11 @@ function sendWhatsAppBulletin_(cfg, bulletin) {
   var data = fast2smsGet_('/dev/whatsapp', cfg.apiKey, params, true);
   var ok = data && (data.status === true || data.return === true || data.success === true);
   if (!ok) {
-    throw new Error('Fast2SMS WhatsApp error: ' + JSON.stringify(data));
+    throw new Error('Fast2SMS WhatsApp template error: ' + JSON.stringify(data));
   }
   return {
     ok: true,
-    channel: 'whatsapp',
+    channel: 'whatsapp-template',
     to: cfg.to,
     phoneNumberId: phoneNumberId,
     messageId: messageId,
@@ -222,10 +321,22 @@ function resolveWhatsAppAssets_(apiKey, phoneNumberId, messageId) {
     type: 'template',
   });
   var rows = (tplResp && tplResp.data) || [];
+
   if (!rows.length) {
-    throw new Error(
-      'No WhatsApp WABA/templates found. Complete Fast2SMS WhatsApp onboarding, then re-run activateNewsBulletin.'
-    );
+    var numResp = fast2smsGet_('/dev/dlt_manager/whatsapp', apiKey, {
+      type: 'number',
+    });
+    var nums = (numResp && numResp.data) || [];
+    if (!nums.length) {
+      throw new Error(
+        'No WhatsApp WABA found. Complete Fast2SMS WhatsApp onboarding, then re-run.'
+      );
+    }
+    return {
+      phoneNumberId: String(nums[0].phone_number_id),
+      messageId: messageId || '',
+      templateName: null,
+    };
   }
 
   var chosenNumberId = phoneNumberId;
@@ -240,7 +351,10 @@ function resolveWhatsAppAssets_(apiKey, phoneNumberId, messageId) {
       var status = String(t.status || '').toLowerCase();
       if (status && status !== 'approved') continue;
       if (messageId && String(t.message_id) !== String(messageId)) continue;
-      if (phoneNumberId && String(t.phone_number_id || row.phone_number_id) !== String(phoneNumberId)) {
+      if (
+        phoneNumberId &&
+        String(t.phone_number_id || row.phone_number_id) !== String(phoneNumberId)
+      ) {
         continue;
       }
       chosenTemplate = t;
@@ -252,20 +366,16 @@ function resolveWhatsAppAssets_(apiKey, phoneNumberId, messageId) {
   }
 
   if (!chosenTemplate) {
-    // Fallback: first template even if status unknown
     var first = rows[0];
     var firstTpl = (first.templates && first.templates[0]) || null;
-    if (!firstTpl) {
-      throw new Error('WABA connected but no templates available.');
-    }
-    chosenTemplate = firstTpl;
-    chosenNumberId = firstTpl.phone_number_id || first.phone_number_id;
-    chosenMessageId = firstTpl.message_id;
+    chosenNumberId = (firstTpl && firstTpl.phone_number_id) || first.phone_number_id;
+    chosenMessageId = (firstTpl && firstTpl.message_id) || messageId || '';
+    chosenTemplate = firstTpl || {};
   }
 
   return {
     phoneNumberId: String(chosenNumberId),
-    messageId: String(chosenMessageId),
+    messageId: String(chosenMessageId || ''),
     templateName: chosenTemplate.template_name || null,
   };
 }
@@ -277,7 +387,7 @@ function ensureDailyTrigger_() {
       return { created: false, existing: true };
     }
   }
-  // 09:00 Asia/Kolkata ≈ 03:30 UTC
+  // ~09:00 Asia/Kolkata ≈ 03:30 UTC
   ScriptApp.newTrigger('sendNewsBulletin')
     .timeBased()
     .everyDays(1)
@@ -304,19 +414,22 @@ function fast2smsGet_(pathname, apiKey, query, authInQuery) {
     },
     muteHttpExceptions: true,
   });
-  var text = resp.getContentText();
-  var data = {};
-  try {
-    data = JSON.parse(text);
-  } catch (e) {
-    data = { raw: text, httpStatus: resp.getResponseCode() };
-  }
+  var data = parseJson_(resp);
   if (resp.getResponseCode() >= 400) {
     throw new Error(
       'Fast2SMS HTTP ' + resp.getResponseCode() + ': ' + JSON.stringify(data)
     );
   }
   return data;
+}
+
+function parseJson_(resp) {
+  var text = resp.getContentText();
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    return { raw: text, httpStatus: resp.getResponseCode() };
+  }
 }
 
 function normalizePhone_(raw) {
