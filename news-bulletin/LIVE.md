@@ -13,13 +13,14 @@ Manager portal (OTP `@agilegroup.co.in`): **https://www.agilegroup-digital.co.in
 
 `autoPublish: true` — each edition is auto-published to the WhatsApp Channel + groups at the scheduled time. Missed slots are rescued automatically.
 
-> **6:00 PM request (04 Aug 2026):** There is **no dedicated 6:00 PM edition** in production yet. Activating “6.00 pm news bulletin” maps to sharing / redistributing the latest in-window edition (today: Afternoon rescued at **8:22 PM IST**). To add a real 6:00 PM slot, update the Pulse scheduler (`scheduleIst`) and deploy — then document it here.
-
 ## Cron / status API
 
 ```bash
 # Status (slots sent today + schedule)
 curl -sS 'https://www.agilegroup-digital.co.in/api/pulse/cron?job=status'
+
+# In-slot auto / rescue publish (preferred during the edition window)
+curl -sS 'https://www.agilegroup-digital.co.in/api/pulse/cron'
 
 # Publish a specific edition (works inside that edition’s slot window)
 curl -sS -X POST 'https://www.agilegroup-digital.co.in/api/pulse/cron?edition=morning' \
@@ -32,6 +33,19 @@ curl -sS -X POST 'https://www.agilegroup-digital.co.in/api/pulse/cron?edition=ev
 
 Outside a slot window the API returns `skipped: true, reason: "outside-slot"`. Use **Pulse Admin → Publish now** (signed-in OTP) to force-send Morning / Afternoon / Evening.
 
+## 05 August 2026 — 6:00 AM activate
+
+| Edition | Sent | Channel | Groups | At (IST) |
+|---------|------|---------|--------|----------|
+| Morning | yes | yes | 21 | 7:40 AM (rescue / activate) |
+| Afternoon | no | — | — | due 2:00 PM |
+| Evening | no | — | — | due 10:00 PM |
+
+Activated via in-slot `GET /api/pulse/cron` during the Morning retry window (`autoPublish: true`). Bulletin page + WhatsApp Channel updated; flash + full AGILE copy distributed to **21 groups**; email sent.
+
+Full bulletin page: https://www.agilegroup-digital.co.in/pulse  
+WhatsApp channel: https://whatsapp.com/channel/0029VbCUrUAFnSz8CmYqJP1y
+
 ## 04 August 2026 — 6:00 PM activate check
 
 | Edition | Sent | Channel | Groups | At (IST) |
@@ -40,5 +54,4 @@ Outside a slot window the API returns `skipped: true, reason: "outside-slot"`. U
 | Afternoon | yes | yes | 19 | 8:22 PM (rescue) |
 | Evening | no | — | — | due 10:00 PM |
 
-Full bulletin page: https://www.agilegroup-digital.co.in/pulse  
-WhatsApp channel: https://whatsapp.com/channel/0029VbCUrUAFnSz8CmYqJP1y
+> **6:00 PM note:** There is **no dedicated 6:00 PM edition** in production. Schedule remains **6:00 AM / 2:00 PM / 10:00 PM IST**.
