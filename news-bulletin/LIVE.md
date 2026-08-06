@@ -33,17 +33,17 @@ curl -sS -X POST 'https://www.agilegroup-digital.co.in/api/pulse/cron?edition=ev
 
 Outside a slot window the API returns `skipped: true, reason: "outside-slot"`. Use **Pulse Admin → Publish now** (signed-in OTP) to force-send Morning / Afternoon / Evening.
 
-## 06 August 2026 — News bulletin not received (rescue)
+## 06 August 2026 — Morning rescue + 2:00 PM Afternoon
 
 | Edition | Sent | Channel | Groups | At (IST) |
 |---------|------|---------|--------|----------|
 | Morning | yes | yes | 20 | 7:38 AM (rescue / activate) |
-| Afternoon | no | — | — | due 2:00 PM |
+| Afternoon | yes | yes | 21 | 2:50 PM (rescue / activate) |
 | Evening | no | — | — | due 10:00 PM |
 
-Status at report time: Morning slot was still `sent: false` inside the Morning retry window (`isRetry: true`). Rescued via in-slot `GET /api/pulse/cron` (`autoPublish: true`).
+**Morning:** Slot was still `sent: false` in the retry window. Rescued via in-slot `GET /api/pulse/cron`. Flash lead: Toll suspended on Rs 4,200 Kanpur-Lucknow Expressway just 13 days after opening.
 
-Result: `published: true`, WhatsApp Channel updated, flash + full AGILE copy to **20 groups**, email sent. Flash lead: Toll suspended on Rs 4,200 Kanpur-Lucknow Expressway just 13 days after opening.
+**Afternoon (2:00 PM):** Still unsent at ~2:49 PM IST (`isRetry: true`). Sent via in-slot `GET /api/pulse/cron` — Channel + **21 groups** + email. Flash lead: Heavy rain lashes Delhi, IMD issues orange alert as waterlogging slows traffic. Confirm status: `confirmed-ok`.
 
 Full bulletin page: https://www.agilegroup-digital.co.in/pulse  
 WhatsApp channel: https://whatsapp.com/channel/0029VbCUrUAFnSz8CmYqJP1y
