@@ -33,6 +33,21 @@ curl -sS -X POST 'https://www.agilegroup-digital.co.in/api/pulse/cron?edition=ev
 
 Outside a slot window the API returns `skipped: true, reason: "outside-slot"`. Use **Pulse Admin → Publish now** (signed-in OTP) to force-send Morning / Afternoon / Evening.
 
+## 09 August 2026 — 6:00 AM share
+
+| Edition | Sent | Channel | Groups | At (IST) |
+|---------|------|---------|--------|----------|
+| Morning | yes | yes | 21 | 6:21 AM |
+| Afternoon | no | — | — | due 2:00 PM |
+| Evening | no | — | — | due 10:00 PM |
+
+Shared via in-slot `GET /api/pulse/cron` during the Morning window (`autoPublish: true`, `inSlot: true`). Bulletin page + WhatsApp Channel updated; flash + full AGILE copy distributed to **21 groups**; email sent; **37** stories.
+
+Lead: *Pune Mumbai Expressway Boosts Tunnel Surveillance*
+
+Full bulletin page: https://www.agilegroup-digital.co.in/pulse  
+WhatsApp channel: https://whatsapp.com/channel/0029VbCUrUAFnSz8CmYqJP1y
+
 ## 08 August 2026 — 6:00 AM share
 
 | Edition | Sent | Channel | Groups | At (IST) |
