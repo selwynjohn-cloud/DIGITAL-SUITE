@@ -9,7 +9,7 @@ Manager portal (OTP `@agilegroup.co.in`): **https://www.agilegroup-digital.co.in
 |---------|------|-----------------|
 | Morning Bulletin | 6:00 AM | `morning` |
 | Afternoon Bulletin | 2:00 PM | `afternoon` |
-| Evening Bulletin | 6:00 PM | `evening` |
+| Evening Bulletin | 10:00 PM | `evening` |
 
 `autoPublish: true` — each edition is auto-published to the WhatsApp Channel + groups at the scheduled time. Missed slots are rescued automatically.
 
@@ -33,9 +33,32 @@ curl -sS -X POST 'https://www.agilegroup-digital.co.in/api/pulse/cron?edition=ev
 
 Outside a slot window the API returns `skipped: true, reason: "outside-slot"`. Use **Pulse Admin → Publish now** (signed-in OTP) to force-send Morning / Afternoon / Evening.
 
+## 12 August 2026 — 10:00 PM Evening share
+
+Checked at **~1:40 AM IST** (after the 10:00 PM slot). Live Pulse page shows **Evening Edition** for **12 August 2026 (Wednesday)**. Production schedule confirmed: **6:00 AM / 2:00 PM / 10:00 PM IST**.
+
+| Edition | Sent | Channel | Groups | At (IST) |
+|---------|------|---------|--------|----------|
+| Morning | no | no | 0 | due 6:00 AM (new day) |
+| Afternoon | no | no | 0 | due 2:00 PM |
+| Evening | page live · confirm `already-confirmed` / `recovered` | no* | 0 | 10:00 PM slot passed |
+
+\*Cron `GET/POST ?edition=evening` (+ `force=1`) returns `skipped: outside-slot`, `tokenOk: false`, `wantForce: false`, `groupsSent: 0`, `emailed: false`. Status job: `currentSlot: null`; all three slots `sent: false` for `2026-08-12`.
+
+To force WhatsApp Channel + groups now: **Pulse Admin → Publish now** (OTP `@agilegroup.co.in`).
+
+Lead flash: *Pune Mumbai Travel Gets Midday Traffic Rerouting*
+
+Also flashing: Visakhapatnam police bust fake AI tiger video · TN motorcycle-bus crash (2 killed) · Malviya Nagar B&B fire — 500+ buildings sealed · cash-van theft (₹46 lakh) · HP monsoon deaths / orange alert
+
+Full AGILE WhatsApp copy: `news-bulletin/SHARE-2026-08-12-evening.txt` (also in agent chat).
+
+Full bulletin page: https://www.agilegroup-digital.co.in/pulse  
+WhatsApp channel: https://whatsapp.com/channel/0029VbCUrUAFnSz8CmYqJP1y
+
 ## 11 August 2026 — 2:00 PM Afternoon share
 
-Checked at **~7:30 PM IST**. Live Pulse page shows **Evening Edition** for **11 August 2026 (Tuesday)** (production schedule: Morning 6:00 AM / Afternoon 2:00 PM / Evening **6:00 PM** IST). Afternoon slot has passed; Evening already auto-published.
+Checked at **~7:30 PM IST**. Live Pulse page showed **Evening Edition** for **11 August 2026 (Tuesday)**. Afternoon slot had passed; Evening was already on the page.
 
 | Edition | Sent | Channel | Groups | At (IST) |
 |---------|------|---------|--------|----------|
