@@ -64,9 +64,9 @@ Checked at **~7:30 PM IST**. Live Pulse page showed **Evening Edition** for **11
 |---------|------|---------|--------|----------|
 | Morning | yes* | yes* | — | due 6:00 AM |
 | Afternoon | yes* | yes* | — | due 2:00 PM (page rolled forward) |
-| Evening | yes | yes | 20 | live now · email sent · **29** stories |
+| Evening | yes | yes | 20 | live then · email sent · **29** stories |
 
-\*Cron status API currently returns only the active Evening edition (`published: true`, `groupsSent: 20`, `emailed: true`, `confirm.sent: false`). `POST ?edition=afternoon` / `force=1` returns Evening status / `outside-slot` — cannot republish Afternoon without **Pulse Admin → Publish now** (OTP `@agilegroup.co.in`).
+\*Cron status API then returned the active Evening edition (`published: true`, `groupsSent: 20`, `emailed: true`, `confirm.sent: false`). `POST ?edition=afternoon` / `force=1` returned Evening status / `outside-slot` — Afternoon force-send needs **Pulse Admin → Publish now** (OTP `@agilegroup.co.in`).
 
 Lead flash: *Pune-Mumbai Missing Link To Remain Closed For 3 Hours On August 12 – Heres All You Need To Know*
 
