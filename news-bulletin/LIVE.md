@@ -9,7 +9,7 @@ Manager portal (OTP `@agilegroup.co.in`): **https://www.agilegroup-digital.co.in
 |---------|------|-----------------|
 | Morning Bulletin | 6:00 AM | `morning` |
 | Afternoon Bulletin | 2:00 PM | `afternoon` |
-| Evening Bulletin | 10:00 PM | `evening` |
+| Evening Bulletin | 6:00 PM | `evening` |
 
 `autoPublish: true` — each edition is auto-published to the WhatsApp Channel + groups at the scheduled time. Missed slots are rescued automatically.
 
@@ -32,6 +32,27 @@ curl -sS -X POST 'https://www.agilegroup-digital.co.in/api/pulse/cron?edition=ev
 ```
 
 Outside a slot window the API returns `skipped: true, reason: "outside-slot"`. Use **Pulse Admin → Publish now** (signed-in OTP) to force-send Morning / Afternoon / Evening.
+
+## 11 August 2026 — 2:00 PM Afternoon share
+
+Checked at **~7:30 PM IST**. Live Pulse page shows **Evening Edition** for **11 August 2026 (Tuesday)** (production schedule: Morning 6:00 AM / Afternoon 2:00 PM / Evening **6:00 PM** IST). Afternoon slot has passed; Evening already auto-published.
+
+| Edition | Sent | Channel | Groups | At (IST) |
+|---------|------|---------|--------|----------|
+| Morning | yes* | yes* | — | due 6:00 AM |
+| Afternoon | yes* | yes* | — | due 2:00 PM (page rolled forward) |
+| Evening | yes | yes | 20 | live now · email sent · **29** stories |
+
+\*Cron status API currently returns only the active Evening edition (`published: true`, `groupsSent: 20`, `emailed: true`, `confirm.sent: false`). `POST ?edition=afternoon` / `force=1` returns Evening status / `outside-slot` — cannot republish Afternoon without **Pulse Admin → Publish now** (OTP `@agilegroup.co.in`).
+
+Lead flash: *Pune-Mumbai Missing Link To Remain Closed For 3 Hours On August 12 – Heres All You Need To Know*
+
+Also flashing: Himachal rain / Chandigarh-Manali highway shut · Air India CEO after Phuket flight incident · Kashmir high alert ahead of Independence Day · HP orange alert (Kangra, Mandi & Sirmaur)
+
+WhatsApp Channel + **20 groups** already carrying today’s bulletin; full Afternoon AGILE copy shared below / in agent chat for re-post.
+
+Full bulletin page: https://www.agilegroup-digital.co.in/pulse  
+WhatsApp channel: https://whatsapp.com/channel/0029VbCUrUAFnSz8CmYqJP1y
 
 ## 09 August 2026 — 6:00 AM share
 
