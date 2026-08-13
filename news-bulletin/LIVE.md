@@ -33,13 +33,13 @@ curl -sS -X POST 'https://www.agilegroup-digital.co.in/api/pulse/cron?edition=ev
 
 Outside a slot window the API returns `skipped: true, reason: "outside-slot"`. Use **Pulse Admin → Publish now** (signed-in OTP) to force-send Morning / Afternoon / Evening.
 
-## 13 August 2026 — 6:00 AM Morning share
+## 13 August 2026 — 6:00 AM Morning send
 
-Checked at **~8:56 AM IST**. Live Pulse page shows **Morning Edition** for **13 August 2026 (Thursday)**. Morning cron slot has closed (`skipped: true, reason: "outside-slot"` on `GET/POST /api/pulse/cron` and `?edition=morning` / `force=1`). Status API no longer returns the full slots table (same outside-slot payload). **Channel + groups not auto-blasted** (`published: false`, `groupsSent: 0`, `emailed: false`).
+Checked / send attempted at **~8:56–9:01 AM IST**. Live Pulse page shows **Morning Edition** for **13 August 2026 (Thursday)**. Morning cron slot has closed (`skipped: true, reason: "outside-slot"` on `GET/POST /api/pulse/cron`, `?edition=morning`, and all `force=1` / `confirm=SEND` variants). No `CRON_SECRET` / `PULSE_CRON_SECRET` / `FAST2SMS_API_KEY` in this agent env. Admin API `publishNow` requires OTP. **Channel + groups not sent** (`published: false`, `groupsSent: 0`, `emailed: false`).
 
 | Edition | Sent | Channel | Groups | At (IST) |
 |---------|------|---------|--------|----------|
-| Morning | page yes / WA no | no* | 0* | page live · force via Admin |
+| Morning | page yes / WA no | no* | 0* | page live · **Admin Publish now required** |
 | Afternoon | no | — | — | due 2:00 PM |
 | Evening | no | — | — | due schedule |
 
