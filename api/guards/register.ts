@@ -3,12 +3,15 @@ import { GUARD_CATEGORIES } from '../_lib/guards/store.js'
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   const branch = String(req.query.branch ?? '').trim()
+  const name = String(req.query.name ?? '').trim()
+  const idNo = String(req.query.idNo ?? '').trim()
+  const mobile = String(req.query.mobile ?? '').trim()
   res.setHeader('Content-Type', 'text/html; charset=utf-8')
   res.setHeader('Cache-Control', 'no-store')
-  return res.status(200).send(page(branch))
+  return res.status(200).send(page(branch, name, idNo, mobile))
 }
 
-function page(branch: string) {
+function page(branch: string, name = '', idNo = '', mobile = '') {
   const cats = Object.entries(GUARD_CATEGORIES)
     .map(([k, subs]) => {
       const opts = subs.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join('')
@@ -44,9 +47,9 @@ function page(branch: string) {
   <div class="card">
     <p style="font-size:14px;color:#666;line-height:1.5;margin-bottom:12px">No login needed. Fill your details and submit. You will get a <b>complaint code</b> — save it.<br><b style="color:#7f1d1d">Our response time is 24 hours.</b></p>
     ${branchField}
-    <label class="lbl">Guard Name *</label><input class="inp" id="guardName" required>
-    <label class="lbl">ID No. *</label><input class="inp" id="idNo" required>
-    <label class="lbl">Mobile Number *</label><input class="inp" id="mobile" type="tel" required>
+    <label class="lbl">Guard Name *</label><input class="inp" id="guardName" required value="${esc(name)}">
+    <label class="lbl">ID No. *</label><input class="inp" id="idNo" required value="${esc(idNo)}">
+    <label class="lbl">Mobile Number *</label><input class="inp" id="mobile" type="tel" required value="${esc(mobile)}">
     <label class="lbl">Category</label>
     <select class="sel" id="category" onchange="updateSubs()"><option value="">— Select —</option>${cats}</select>
     <label class="lbl">Detail</label><select class="sel" id="subCategory"><option value="">— Select category first —</option></select>

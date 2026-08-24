@@ -1,0 +1,66 @@
+---
+description: Agile Live — Security Staff phone door (no suite copies)
+globs: api/live/**/*.ts,api/_lib/agile-live/**/*.ts
+alwaysApply: false
+---
+
+# Agile Live — phone door (locked 24 Aug 2026)
+
+Director: name is **Agile Live** (two words). It is a **phone door** for Security Staff and field staff. It must **not** copy Recruitment, Training, MIS, Guards, CRM, or any other settled app.
+
+## Required
+
+1. On-screen name: **Agile Live**. Link: `/live` (phone), `/live?portal=staff`, `/live?portal=management`.
+2. No new Command Centre tile. The 20 apps stay as they are.
+3. **All branches** may open Agile Live. HOD / Staff stay on **their branch only**. Management = All Branches first; chat and week list need one real branch. Keep independent cities separate (Nellore ≠ Tada, Vizag ≠ Kakinada).
+4. Security Staff enter **ID No. + mobile** (same Master Directory person). Dummy try-out: **LIVEDEMO** / **9000000001** (Hyderabad-A, Demo — not a real person). Never say **guard** on this app’s screens — say **Security Staff**.
+5. Report for duty **30 minutes early**. Screen shows Report by (shift start minus 30).
+6. **Start Duty** and **End Duty** are **buttons on the first page**. First tap Start Duty → tick **both** **Patrolling completed** and **Taken over**, then the selfie opens. First tap End Duty → tick **both** **Reliever Reported** and **Handed over**, then the selfie opens. Then **selfie + site GPS** (photo identity, 100 metres). Calendar is **view only**. No Late Start, Out of Post, or **Break Duty** buttons on the Dashboard. No Search box on the phone first page. First page has **two** buttons under Start/End: **Agile Connect** (opens the existing Agile Guards complaint form — do not copy the form) and **Alarm**. **Alarm** first tap opens **Green (Low Risk) / Yellow (Medium Risk) / Red (High Risk)**; second tap sends one level (mail OM / HOD / Control / Director). Language picker: English plus Hindi, Telugu, Tamil, Malayalam, Kannada, Marathi, Gujarati, Assamese, Odia, Urdu (simple words). Phone Operations has **no** “Duties this month” list and **no** “Vacant Post duty” card. Dashboard round tile label is **Duties** (not Completed duty). The red location line sits **under** the first-page header (never over the logo or name). Operations page has **no** location banner over the header.
+7. Start / End Duty is a **live selfie** (front camera, not a file upload) plus **site GPS**. Start Duty is refused if the phone is more than 100 metres from the duty post (when the site has a pin). **Work360 stays official attendance.** After selfie + location match the client site pin, the phone **automatically** shows **client · location · Shift A / B / C / G** from the site book and the clock (A 06:00, G 14:00, B/C night 22:00). Same client / location / shift go on exception mail. If Start Duty is late: message only — **You have started the duty late today and it is reported late for the duty.** If he leaves the post before End Duty: **alarm sound + popup** — **You are leaving the assigned duty.** If End Duty is early: **You have ended duty early — X hrs.** Break Duty reason list pops **under the Break Duty button** (Bathroom, Medical, Dinner, Lunch, Breakfast, Get water). Mail OM / HOD / Control / Director on late start, leaving the post, early end, and Break Duty.
+8. After sign-in once, the **WhatsApp-style chat stays open** — they do not tap a second “open chat”. Branch room only. No home-made groups.
+8b. Same group chat may send **image, Word, PDF, MP3, MP4** (size cap). Files go to the branch group, not a new app.
+8c. Staff and Management may type a **10-digit mobile** when sending (blank = branch group). Book, User Management, or an **added** number (Director / Staff) all work. If the number is not in the book, type a name and tap **Add**, then Send. Phone sees group messages plus DMs to their own mobile.
+8d. Screen is **chat-first**. The **chat box** (type + **voice**) sits on the first page under Agile Connect / Alarm — they do not tap a Branch group row. Do **not** show the Branch group logo / “Security Staff” row under those buttons. **Today’s shift** and **Tomorrow’s shift** sit on **one centred line**. **First page header and Dashboard header look the same** (Operations style): large Agile logo, **Name**, **ID No.**, **Designation**, **ID card validity**, **Branch: \<name\>**. If ID card validity is not on file, show a **date picker**. Role words: Staff / Security Staff / Management. Numbers on the left. No “Report 30 minutes early · Hyderabad trial” in the header. Below header: Language, then the red location line if needed (**Turn on location to start duty.** — do not cover the logo or letters), then **Today’s shift — A/B/C/G**, **Tomorrow’s shift — A/B/C/G**, then **Start Duty · End Duty**, then **Agile Connect · Alarm**, then the chat box. One **Dashboard** icon opens three **round** tiles on one line: **Duties · Late Start · Left Post**. Start/End Duty from the first-page buttons (tick both, then selfie).
+8e. **Phone first** — 5,000+ Security Staff on Android. Big tap rows, 16px boxes, full-height list (`100dvh`). Laptop two-column only from 1100px. Do not make the phone screen a tiny desktop page.
+8f. Phone Operations does **not** list Duties this month or Vacant Post duty. Staff / Management still see the month list for their branch. Management must pick one real branch first (not All Branches). Billing cycle 26–25 is not this ticket.
+9. Strike / stop-work / Union / Association / don't-go-for-duty / unlawful messages are **blocked**. Staff/HOD rule stays “sent to your HOD”. **Management only** uses: *This is a company duty chat. Strike talk, stop-work calls, Union, Association, don't go for duty or unlawful messages are blocked and sent to your Management.* HOD can Mute 24h / Remove.
+10. HOD / Staff = their branch only. Management = **All Branches** first; chat needs one real branch.
+10b. Duty board is **today’s activity only** (Start Duty / Late Start / Out of Post / Break Duty) plus This month. Do not dump the full Master Directory or HDFC client list.
+11. Recruitment portal stays separate until Director opens a new numbered list.
+12. **First page** shows that person’s **week schedule** (Sunday to Saturday). Duty **changes every Sunday**. **8 hrs** rotate Shift A → G → B → C. **12 hrs** rotate Day ↔ Night. **Weekly off is Sunday** unless the OM / incharge sets another day **for that unit**. Site comes from the assigned client location. Rank on screen: HDFC = **Facility Attendant** (not Guard); some units **Armed Guard**; **Lady Guard** where posted; otherwise **Security Staff**.
+13. **Work360 move (gradual):** Agile Live starts the attendance book. OM can **Mark present today** on the portal when the phone has no signal. Operations reports: **absent more than 7 days**, **irregular (less than 13 duty days in the month)**, **monthly attendance**, **unit attendance for billing / wages**. Work360 stays until Director says the move is finished. Do not copy the Work360 app.
+14. **Phone inbox (backend-first):** Security Staff keep Chat · Start Duty · End Duty · Break Duty · leaving-post alarm. They also see **this month’s weekly off dates**, **duty performed**, and **Vacant Post duty** when the OM allots it. OM / Staff / Management send **duty reminder** (opens **Wage Slip** + reply list: On the way · Will report · Leave informed · Traffic delay) and **training (OJT) reminder** (notify only — do not copy the Training completion report). Every new chat message, reminder, and leaving-post alert plays the **sound alarm**. Wage slip reads the uploaded branch wage + this month’s duty days; if no wage row, say the amount will show when the branch wage is uploaded. Do not copy Recruitment wage-upload screens.
+15. **First page footer (four tabs, with sub-menus):** **Chat** (Chat · Call & Video) · **Security News** (Security News · Weather & Traffic) · **Training** (Training · Emergency Number · Site Instructions) · **Profile** (Profile & Documents · Important Links). Soft Skill tips sit under Training (not a fifth footer tab). **Dashboard** shows three round tiles on one line: Duties · Late Start · Left Post. **Monthly calendar** marks **Duty (green) · Absent (red) · Weekly off (amber-golden)** on **one horizontal line below the calendar**. Do not put that legend under the month title. Weather is for the duty city. Security News opens the public bulletin (do not copy Pulse Admin). Do **not** show “Follow the Security News Channel” on the News menu. Site Instructions and Soft Skill are written by OM / Staff / Management — Soft Skill is short tips only, not the Training report.
+16. **Header + first-page duty:** First page and Dashboard use the **same header** with a **prominent Agile logo**: **Name**, **ID No.**, **Designation**, **ID card validity** (date picker if missing), **Branch: \<name\>**. Below header: **Today’s shift — A/B/C/G**, **Tomorrow’s shift — A/B/C/G**. **Start Duty** and **End Duty** are on the first page (same selfie, 100 m GPS, schedule, Reliever, HDFC 2FA rules). Calendar is view only. Tick **Reliever took over** on the End Duty selfie. No Reliever / Break Duty buttons under the calendar. No “Start Duty 30 minutes early…” line under Duty today. End Duty needs the tick, selfie, and site GPS. HDFC 2FA hours are **7:00 AM–3:00 PM** and **3:00 PM–11:00 PM** — **no night Facility Attendant**. If he does not End Duty, **30 minutes after scheduled end** mail OM / HOD / Control / Director (**Duty continuation**). Do not list weekly-off dates under the calendar.
+
+## Check
+
+```bash
+npm run check:agile-live
+```
+
+## Do not
+
+- Rename the app AgileLive / WhatsApp / Agile Connect (the **button** Agile Connect is allowed)
+- Copy DRR, Training completion, Recruitment wage-upload, MIS menus, or complaint forms into this app (Agile Connect must open `/guards/register`)
+- Add a 21st Command Centre card
+- Replace Work360 as official attendance
+- Mix Nellore with Tada, or Vizag with Kakinada
+- Touch login / Send PIN except the `live` appId email PIN for staff
+- Say “guard” on Agile Live screens except the ranks **Armed Guard** and **Lady Guard**
+- Change the fence away from 100 metres without Director’s new list
+- Put weekly-off date lists back under the calendar
+- Allow End Duty without both Reliever Reported and Handed over ticked
+- Put night Facility Attendant duty on HDFC 2FA branches
+- Put Reliever / Break Duty buttons back under the calendar
+- Put Start / End Duty back onto the calendar
+- Put a Search box back on the phone first page
+- Put the Branch group logo / Security Staff row back under Agile Connect / Alarm
+- Hide the first-page chat box or drop voice messages
+- Put “Follow the Security News Channel” back on the News menu
+- Put Duties this month or Vacant Post duty cards back on the phone Operations page
+- Put the Duty / Absent / Weekly off line back under the month title
+- Restore the “Start Duty 30 minutes early…” line under Dashboard
+- Rename the Duties round tile back to Completed duty
+- Put the red location banner over the Operations header or over the logo / name
+- Drop the Language list (Hindi, Telugu, Tamil, Malayalam, Kannada, Marathi, Gujarati, Assamese, Odia, Urdu)
