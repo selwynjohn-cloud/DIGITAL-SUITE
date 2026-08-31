@@ -33,6 +33,32 @@ curl -sS -X POST 'https://www.agilegroup-digital.co.in/api/pulse/cron?edition=ev
 
 Outside a slot window the API returns `skipped: true, reason: "outside-slot"`. Use **Pulse Admin → Publish now** (signed-in OTP) to force-send Morning / Afternoon / Evening.
 
+## 31 August 2026 — 10:00 PM Evening share
+
+Shared / published at **~10:09 PM IST** during the live evening slot (`inSlot: true`). Live Pulse page shows **10:00 PM Edition** for **31 August 2026 (Monday)**. Cron `GET /api/pulse/cron` and `POST ?edition=evening` both returned `published: true`, `groupsSent: 39`, `emailed: true`.
+
+| Edition | Sent | Channel | Groups | At (IST) |
+|---------|------|---------|--------|----------|
+| Morning | no | no | 0 | — |
+| Afternoon | yes | yes | 39 | 2:29:24 pm |
+| Evening | yes | yes | 39 | **10:09:04 pm** |
+
+Lead flash: *Monsoon alert: Heavy rainfall expected in several states till September 6. What's for Delhi-NCR?*
+
+Also flashing: Navi Mumbai Sanpada housekeeping fraud (₹10.16 Lakh) · Delhi playschool assault case · Karnataka doctor cheated ₹1.79 crore by fake cyber crime officer · Air India bomb-note divert to Ahmedabad · Delhi Police 72-hour crackdown · Nashik Samruddhi Mahamarg slash-and-rob patrols · IMD Red Warning Sundargarh & Keonjhar (Odisha)
+
+Copy-paste packs: [`SHARE-2026-08-31-evening.txt`](./SHARE-2026-08-31-evening.txt) (msg2) · [`SHARE-2026-08-31-evening-flash.txt`](./SHARE-2026-08-31-evening-flash.txt) (msg1)
+
+Full bulletin page: https://www.agilegroup-digital.co.in/pulse  
+WhatsApp channel: https://whatsapp.com/channel/0029VbCUrUAFnSz8CmYqJP1y
+
+**Security Question of the Day (sq42):** A delivery boy wants to enter the office floors alone with a large parcel. You should:  
+A) Send him up alone to save time · B) Verify the host, issue a pass, and escort or announce as per SOP · C) Keep the parcel and send him away without a record · D) Ask him to leave the parcel on the road
+
+**Week 35 winners:** Mr. ShaijoJoseph (AG-2026W35-6558) · Mr. Shaijin (AG-2026W35-3407)
+
+**Next edition:** Morning Bulletin — **6:00 AM IST** (tomorrow)
+
 ## 13 August 2026 — 10:00 PM Evening activate / share
 
 Activated / shared at **~11:44 PM IST**. Live Pulse page shows **Evening Edition** for **13 August 2026 (Thursday)**. Evening cron slot closed (`skipped: true, reason: "outside-slot"` on `GET/POST /api/pulse/cron` and `?edition=evening` / `force=1`). No cron secret in agent env. **Channel + groups not auto-blasted** (`published: false`, `groupsSent: 0`, `emailed: false`).
