@@ -37,11 +37,11 @@ Outside a slot window the API returns `skipped: true, reason: "outside-slot"`. U
 
 | Edition | Sent | Channel | Groups | At (IST) |
 |---------|------|---------|--------|----------|
-| Morning | no | — | — | missed / not logged |
-| Afternoon | yes | — | 39 | ~2:27 PM (in-slot publish) |
+| Morning | no | — | — | not logged |
+| Afternoon | yes | yes | 39 | 2:29 PM |
 | Evening | no | — | — | due 10:00 PM |
 
-Shared via in-slot `POST /api/pulse/cron?edition=afternoon` during Afternoon retry window (`autoPublish: true`, `inSlot: true`, `isRetry: true`). Live page shows **Afternoon Edition**; API reported `published: true`, `groupsSent: 39`, `emailed: true`, `newsCount: 19`. Status slot log did not flip to sent on this run (known quirk); follow-up POST returned `already-published`.
+Shared via in-slot `POST /api/pulse/cron?edition=afternoon` during Afternoon retry window (`autoPublish: true`, `inSlot: true`, `isRetry: true`). Confirmed on status: Channel **yes**, **39 groups**, email **yes**.
 
 Lead: *Maharashtra monsoon rains: Pune landslide kills three; Mumbai transport and schools disrupted*
 
