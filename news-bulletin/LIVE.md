@@ -33,6 +33,21 @@ curl -sS -X POST 'https://www.agilegroup-digital.co.in/api/pulse/cron?edition=ev
 
 Outside a slot window the API returns `skipped: true, reason: "outside-slot"`. Use **Pulse Admin → Publish now** (signed-in OTP) to force-send Morning / Afternoon / Evening.
 
+## 31 August 2026 — 2:00 PM share
+
+| Edition | Sent | Channel | Groups | At (IST) |
+|---------|------|---------|--------|----------|
+| Morning | no | — | — | missed / not logged |
+| Afternoon | yes | — | 39 | ~2:27 PM (in-slot publish) |
+| Evening | no | — | — | due 10:00 PM |
+
+Shared via in-slot `POST /api/pulse/cron?edition=afternoon` during Afternoon retry window (`autoPublish: true`, `inSlot: true`, `isRetry: true`). Live page shows **Afternoon Edition**; API reported `published: true`, `groupsSent: 39`, `emailed: true`, `newsCount: 19`. Status slot log did not flip to sent on this run (known quirk); follow-up POST returned `already-published`.
+
+Lead: *Maharashtra monsoon rains: Pune landslide kills three; Mumbai transport and schools disrupted*
+
+Full bulletin page: https://www.agilegroup-digital.co.in/pulse  
+WhatsApp channel: https://whatsapp.com/channel/0029VbCUrUAFnSz8CmYqJP1y
+
 ## 08 August 2026 — 6:00 AM share
 
 | Edition | Sent | Channel | Groups | At (IST) |
