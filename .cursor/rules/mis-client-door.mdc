@@ -1,0 +1,42 @@
+---
+description: Agile MIS — Client Door (locked 3 Sep 2026)
+globs: api/client/**/*.ts,api/_lib/client-door/**/*.ts,api/_lib/mis/client-door*.ts,api/mis/client-door.ts,api/mis/staff-client-door.ts
+alwaysApply: false
+---
+
+# Agile MIS — Client Door (locked 3 Sep 2026)
+
+Director: the **client** sees yesterday’s duty numbers only. Not SIS cameras. Not money.
+
+## Required
+
+1. Public page: `https://www.agilegroup-digital.co.in/client` → `api/client/gate.ts`. Not a Command Centre card.
+2. Login: client work email → **Send PIN** → 6-digit PIN → **Open**. Standalone PIN (`appId: client-door`). Do **not** use `otpLoginScript`, `canLoginWithEmail`, or `/api/auth/send-pin`.
+3. Email must be on that client in Master Directory (`clientEmail`, several allowed) or written when HOD/Management **Preview / Send / Add email**. Director / Sai may Send PIN on `/client` to test (HDFC sites first).
+4. **Strategic clients (Apex) only**: HDFC, Canara, IDBI, Ultra Tech, AIG, Premier Energies, Harsha Toyota, Coromandel, Gemini, Zigma, KRC.
+4b. Client Door books only (not Daily MIS / Master Directory): **HDFC, Canara, IDBI** club **state-wise**. Other Apex clients club as **one** book.
+4c. Telangana = Hyderabad-A + Hyderabad-B (and Hi-Tech City). Andhra Pradesh = Vizag, Kakinada, Vijayawada, Nellore, Tirupati, Tada. Every state book stays visible even from Hyderabad-A. Do not filter the list to the signed-in branch.
+5. Report date is **yesterday** (previous duty completed day), never today.
+6. Numbers only: Sanctioned Post · Absent · OT · Deployed Strength · Vacant · Agile Visits · Last Night Check · Last Training · Guards Complaints · Clients Complaints · Incident · Late Start · Out Of Post.
+7. Two pies: Sanctioned / Deployed / OT / Vacant · Sanctioned / Duty Start on time / Late start / Out of post.
+8. Link mail + opened page share the same header & footer. Header: **Client Door - &lt;client Name&gt;**. Client name heading also sits below the report.
+9. MIS menus (HOD + Management): **Client Door**. Management = All Branches first. The Apex list shows **every** HDFC / Canara / IDBI state book (not only the signed-in branch). Records **opened date and time**. Add / Edit / Delete emails.
+10. When the client opens Client Door: record opened time, mail the report **To Client · CC HOD**.
+11. Client never sees other clients, other branches, money, collection, OST, internal remarks, Control, Recruitment, Training marks.
+
+## Check
+
+```bash
+npm run check:client-door
+npm run check:mis-menu
+npm run check:mgmt-all-branches
+node scripts/check-recruitment-login-pin.mjs
+```
+
+## Do not
+
+- Rewrite Command Centre / suite PIN / `otpLoginScript`
+- Put Gate / Officer (Visitors) on this door
+- Show non-strategic clients
+- Use today’s Daily MIS as the Client Door report date
+- Reopen without Director’s new numbered list
