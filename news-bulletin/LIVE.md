@@ -40,7 +40,9 @@ Outside a slot window the API returns `skipped: true, reason: "outside-slot"`. U
 
 ## 05 September 2026 — 6:00 AM Morning share
 
-Shared / published at **7:51:15 AM IST** during the live morning slot (`inSlot: true`, rescue retry). Live Pulse page shows **Morning Edition** for **05 September 2026 (Saturday)**. Cron `GET /api/pulse/cron` returned `published: true`, `groupsSent: 39`, `emailed: true`, `newsCount: 9`. Status: `sent: true`, `channelSent: true`, `groupsSent: 39`.
+Shared / published at **7:51:15 AM IST** during the live morning slot (`inSlot: true`, rescue retry). Live Pulse page shows **Morning Edition** for **05 September 2026 (Saturday)**. Cron `GET /api/pulse/cron` returned `published: true`, `groupsSent: 39`, `emailed: true`. Status: `sent: true`, `channelSent: true`, `groupsSent: 39`.
+
+**Feed check (07:55+ IST):** the live page currently has **only 1 RSS news card** — *Heavy rain halts Chardham Yatra…*. Highway / City Flash / Incidents sections are empty. Cron `newsCount: 9` at publish time does **not** match the page. Extra lines still on the page are the IMD ticker (Pune landslide / Mumbai–Worli Dahi Handi), not extra RSS stories. Google News itself still has many India headlines; Pulse’s other category pulls dropped after publish. Cron jobs now return `already-published` (no unsigned refresh).
 
 | Edition | Sent | Channel | Groups | At (IST) |
 |---------|------|---------|--------|----------|
@@ -50,7 +52,7 @@ Shared / published at **7:51:15 AM IST** during the live morning slot (`inSlot: 
 
 Lead flash: *Heavy rain halts Chardham Yatra in Kedarnath: Floodwater enters 150 homes in Kanpur, 16 districts flooded*
 
-Also flashing: Delhi Class 9 student stabbed in Nangloi (3 juveniles held) · 8 Tamil Nadu students killed in Thrissur crash · Dahi Handi traffic diversions in Pune / Pimpri Chinchwad / Worli · IMD Red Alert Eastern Madhya Pradesh · Maharashtra monsoon / Pune landslide kills three · Delhi-Doon eway truck death · Tirupati Brahmotsavams crowd-control review · Anantapur Bengaluru-Hyderabad bus fire (37 evacuated)
+Also on page (IMD box only): Maharashtra monsoon / Pune landslide kills three · Mumbai Worli diversions for Parivartan Dahi Handi 2026
 
 Copy-paste packs (newly designed): [`SHARE-2026-09-05-morning-channel.txt`](./SHARE-2026-09-05-morning-channel.txt) (Channel) · [`SHARE-2026-09-05-morning-groups.txt`](./SHARE-2026-09-05-morning-groups.txt) (All groups)
 
