@@ -38,6 +38,32 @@ Outside a slot window the API returns `skipped: true, reason: "outside-slot"`. U
 1. **WhatsApp News Channel** — short (news + Pulse only). No jobs.
 2. **All groups** — fuller (duty line + `https://tinyurl.com/Security-News` + jobs). Never long section menus.
 
+## 05 September 2026 — 6:00 AM Morning share
+
+Shared / published at **7:51:15 AM IST** during the live morning slot (`inSlot: true`, rescue retry). Live Pulse page shows **Morning Edition** for **05 September 2026 (Saturday)**. Cron `GET /api/pulse/cron` returned `published: true`, `groupsSent: 39`, `emailed: true`, `newsCount: 9`. Status: `sent: true`, `channelSent: true`, `groupsSent: 39`.
+
+| Edition | Sent | Channel | Groups | At (IST) |
+|---------|------|---------|--------|----------|
+| Morning | yes | yes | 39 | **7:51:15 AM** |
+| Afternoon | no | — | — | due 2:00 PM |
+| Evening | no | — | — | due 10:00 PM |
+
+Lead flash: *Heavy rain halts Chardham Yatra in Kedarnath: Floodwater enters 150 homes in Kanpur, 16 districts flooded*
+
+Also flashing: Delhi Class 9 student stabbed in Nangloi (3 juveniles held) · 8 Tamil Nadu students killed in Thrissur crash · Dahi Handi traffic diversions in Pune / Pimpri Chinchwad / Worli · IMD Red Alert Eastern Madhya Pradesh · Maharashtra monsoon / Pune landslide kills three · Delhi-Doon eway truck death · Tirupati Brahmotsavams crowd-control review · Anantapur Bengaluru-Hyderabad bus fire (37 evacuated)
+
+Copy-paste packs (newly designed): [`SHARE-2026-09-05-morning-channel.txt`](./SHARE-2026-09-05-morning-channel.txt) (Channel) · [`SHARE-2026-09-05-morning-groups.txt`](./SHARE-2026-09-05-morning-groups.txt) (All groups)
+
+Full bulletin page: https://www.agilegroup-digital.co.in/pulse  
+WhatsApp channel: https://whatsapp.com/channel/0029VbCUrUAFnSz8CmYqJP1y
+
+**Security Question of the Day (sq100):** Posting photos of the site, guards, or CCTV on personal WhatsApp status is:  
+A) Good publicity · B) Not allowed — it can leak security details; use only official company channels if asked · C) Allowed after midnight · D) Allowed if you hide the company board
+
+**Week 35 winners:** Mr. ShaijoJoseph (AG-2026W35-6558) · Mr. Shaijin (AG-2026W35-3407)
+
+**Next edition:** Afternoon Bulletin — **2:00 PM IST**
+
 ## 03 September 2026 — 6:00 AM Morning share
 
 Shared / published at **7:36:00 AM IST** during the live morning slot (`inSlot: true`, rescue retry). Live Pulse page shows **Morning Edition** for **03 September 2026 (Thursday)**. Cron status: `sent: true`, `channelSent: true`, `groupsSent: 39`, `emailed: true`.
