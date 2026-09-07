@@ -13,9 +13,9 @@ Apple Developer and Google Play Console are ready. Complete these console clicks
 6. User Access: Full Access
 
 Copy and send:
-- **Apple Team ID** (Membership details → Team ID)
+- **Apple Team ID** — received: `3D9CZYWR4Z` ✓
 - **Apple ID** email used for the account (likely `selwyn.john@gmail.com`)
-- **App Store Connect App ID** (App Information → Apple ID — numeric)
+- **App Store Connect App ID** (App Information → Apple ID — numeric) — still needed
 
 ### Google Play Console
 1. Open [play.google.com/console](https://play.google.com/console) → **Create app**
