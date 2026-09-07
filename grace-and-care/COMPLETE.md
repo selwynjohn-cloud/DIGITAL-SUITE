@@ -1,19 +1,13 @@
-# Grace Vision — almost live (I finished the deploy)
+# Grace Vision — completion status
 
-## Already live now
-1. **GitHub Pages:** https://selwynjohn-cloud.github.io/grace-and-care/
-2. **Vercel preview (temporary):** https://temporary-spry-cove-aki3v3x.vercel.app/
+## Live now (permanent)
+**GitHub Pages:** https://selwynjohn-cloud.github.io/grace-and-care/
 
-## One tap to keep the Vercel site (expires ~60 min)
-Open and claim (sign in with your Vercel account):  
-**https://vercel.com/claim-deployment?code=d008d88c-7596-4b2e-93e3-e470022bfec5**
+## Vercel (claim within ~60 minutes to keep)
+- Preview: https://temporary-snappy-gold-cwrvliw.vercel.app/
+- **Claim:** https://vercel.com/claim-deployment?code=ea65fd14-194d-419c-9e0c-65fc720388ca
 
-After claiming:
-1. Vercel project → **Settings → Domains**
-2. Add **graceandcare.co.in** only if you want this Vision page to replace the current full site  
-   **OR** add **vision.graceandcare.co.in** to keep the full multilingual site as-is
-
-> Recommended: use **vision.graceandcare.co.in** so the existing Bridge of Hope site stays untouched.
+After claim → Domains → add **vision.graceandcare.co.in** (recommended).
 
 ## Repo
 https://github.com/selwynjohn-cloud/grace-and-care
