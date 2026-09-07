@@ -2,17 +2,9 @@
 
 Personal site for **John Selwyn** — *Secure Your Peace of Mind*.
 
-This is **not** Agile DIGITAL-SUITE. It is a separate personal front door.
+No company website links on this site.
 
-## Ownership (from your domain portfolio)
-
-### Company (Agile) only
-- securityjob.co.in — SecurityJob
-- agilegroup-digital.co.in — Digital Suite
-- agilegroup-digital.com — Digital Suite
-- agilegroup.co.in — Agile Group
-
-### Personal websites
+## Personal websites listed here
 - johnselwyn.com — this site
 - graceandcare.co.in
 - anubhavbank.com
