@@ -17,7 +17,8 @@
       "bundleIdentifier": "in.co.egate.app",
       "buildNumber": "1",
       "infoPlist": {
-        "CFBundleDisplayName": "eGate"
+        "CFBundleDisplayName": "eGate",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
