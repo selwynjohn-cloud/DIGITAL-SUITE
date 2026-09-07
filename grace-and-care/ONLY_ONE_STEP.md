@@ -1,21 +1,20 @@
-# Sir — only ONE step (I will do the rest)
+# Almost done — one tap so I can finish
 
-I already prepared Vision, Mission, and Core Values.
+Your empty repo is ready:  
+https://github.com/selwynjohn-cloud/grace-and-care
 
-I **cannot** open your private Grace website code from this agent.
-So please do only this:
+I already prepared Vision / Mission / Core Values.  
+I **cannot upload yet** because Cursor is not allowed on that new repo.
 
-## Tap this link on your phone
-https://github.com/new?name=grace-and-care
+## Please do this (one time)
 
-1. Make sure you are signed in as **selwynjohn-cloud** (or your GitHub)
-2. Repository name must be: **grace-and-care**
-3. Keep it **Public**
-4. Do **not** add README
-5. Tap green **Create repository**
+1. Open: **https://github.com/settings/installations**
+2. Tap **Cursor** (or “Cursor Agent”)
+3. Tap **Configure**
+4. Under Repository access, choose **Only select repositories**
+5. Add **grace-and-care**
+6. Tap **Save**
 
-Then come back here and type only:
+Then type here: **done**
 
-**done**
-
-I will upload the Vision / Mission / Values page myself and guide the live domain.
+I will upload everything and continue.
