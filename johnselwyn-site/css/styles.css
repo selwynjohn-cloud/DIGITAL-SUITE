@@ -271,6 +271,17 @@ main {
   font-weight: 600;
 }
 
+.company-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+}
+
+.company-links span {
+  color: var(--line);
+}
+
 .about p {
   max-width: 40rem;
   color: var(--ink-soft);
