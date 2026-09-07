@@ -9,6 +9,9 @@ Built with **Expo (React Native)** so one codebase ships to:
 
 No company (Agile) branding or links.
 
+**Accounts:** Apple Developer + Google Play Console are open.  
+**Next:** follow [`STORE_UPLOAD.md`](./STORE_UPLOAD.md) — create the app records, then send Team ID, ASC App ID, and Expo token so we can build & submit.
+
 ## What this first version does
 
 - Home — product intro + actions
@@ -28,41 +31,23 @@ npx expo start
 
 Scan the QR with Expo Go (Android) or Camera (iOS).
 
-## Accounts you need (one-time)
+## Upload docs
 
-1. **Apple Developer Program** — $99/year  
-   India: enroll in the **Apple Developer** app → [developer.apple.com](https://developer.apple.com)
-2. **Google Play Console** — $25 one-time  
-   [play.google.com/console](https://play.google.com/console)
-3. **Expo account** (free) — for cloud builds  
-   [expo.dev/signup](https://expo.dev/signup)
-
-## Upload path (EAS)
+| File | Purpose |
+|------|---------|
+| `STORE_UPLOAD.md` | Console steps + what to send back |
+| `STORE_LISTING.md` | Copy for store listings |
+| `privacy.html` | Host at egate.co.in/privacy.html before submit |
+| `eas.json` | Build + submit profiles |
 
 ```bash
 cd egate-app
 npm install -g eas-cli
 eas login
-eas init          # writes real projectId into app.json
-eas build --platform android --profile production
-eas build --platform ios --profile production
+eas init
+eas build --platform all --profile production
+eas submit --platform all --profile production
 ```
-
-Then submit:
-
-```bash
-eas submit --platform android --profile production
-eas submit --platform ios --profile production
-```
-
-### Before first submit
-
-| Item | Where |
-|------|--------|
-| Replace `REPLACE_AFTER_EAS_INIT` | `app.json` → `extra.eas.projectId` (or run `eas init`) |
-| Apple Team ID + App Store Connect App ID | `eas.json` → `submit.production.ios` |
-| Play service account JSON | `google-play-service-account.json` (do **not** commit) |
-| Store listing screenshots + privacy policy | App Store Connect / Play Console |
 
 ### Play note (personal accounts)
 
@@ -74,4 +59,4 @@ Enrollment is through the Apple Developer **app**. Seller name will be your lega
 
 ## Privacy
 
-This scaffold stores visitor data **only on the device in memory** (cleared when the app restarts). Add a privacy policy URL on egate.co.in before store submission.
+This scaffold stores visitor data **only on the device in memory** (cleared when the app restarts). Publish `privacy.html` on egate.co.in before store submission.
