@@ -22,8 +22,12 @@ Then visit http://localhost:5173
 3. In Vercel: **Add New Project** → import the repo → Root Directory = `johnselwyn-site` (if nested)
 4. Point GoDaddy DNS for `johnselwyn.com` / `www` to Vercel (replace the current Website Builder hosting)
 
-## Links
+## Ownership
 
-- Live personal domain (current stub): https://johnselwyn.com
-- Grace and Care: https://www.graceandcare.co.in
-- Agile Digital Suite (separate official ops site): https://www.agilegroup-digital.co.in
+| Property | Owner |
+|----------|--------|
+| johnselwyn.com (this site) | Personal — John Selwyn |
+| graceandcare.co.in | Personal / Grace and Care ministry |
+| securityjob.co.in | **Company — Agile Security Force** |
+| agilegroup-digital.co.in | **Company — Agile Security Force** |
+| agilegroup.co.in | **Company — Agile Security Force** |
