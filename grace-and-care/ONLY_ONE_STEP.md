@@ -1,20 +1,30 @@
-# Almost done — one tap so I can finish
+# Grace upload — phone steps (Cursor still blocked on new repo)
 
-Your empty repo is ready:  
-https://github.com/selwynjohn-cloud/grace-and-care
+I still cannot push to https://github.com/selwynjohn-cloud/grace-and-care  
+(Cursor app access not active on that repo yet).
 
-I already prepared Vision / Mission / Core Values.  
-I **cannot upload yet** because Cursor is not allowed on that new repo.
+## Fastest way on your phone
 
-## Please do this (one time)
+### 1) Download the files
+Open this link and download the zip:  
+https://github.com/selwynjohn-cloud/DIGITAL-SUITE/releases/tag/grace-vision-mission-1  
 
-1. Open: **https://github.com/settings/installations**
-2. Tap **Cursor** (or “Cursor Agent”)
-3. Tap **Configure**
-4. Under Repository access, choose **Only select repositories**
-5. Add **grace-and-care**
-6. Tap **Save**
+File: **grace-and-care-vision-mission.zip**
 
-Then type here: **done**
+### 2) Upload into your empty repo
+1. Open: https://github.com/selwynjohn-cloud/grace-and-care/upload  
+2. Sign in as **selwynjohn-cloud** if asked  
+3. Unzip on your phone, then upload these files (keep folder names):
+   - `index.html`
+   - `README.md`
+   - `vercel.json`
+   - `preview-vision-mission.html`
+   - `content/en-vision-mission.json`
+   - `components/VisionMissionValues.tsx`
+4. Commit message: `Add Vision, Mission, and Core Values`
+5. Tap **Commit changes**
 
-I will upload everything and continue.
+### Optional — so I can push next time
+https://github.com/settings/installations → **Cursor** → **Configure**  
+→ Repository access → include **grace-and-care** → **Save**  
+(or choose **All repositories**)
