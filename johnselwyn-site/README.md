@@ -14,7 +14,8 @@ No company website links on this site.
 - driverpool.co.in
 - truckdrivers.co.in
 - rentalspace.co.in
-- myvisitor.co.in — Visitor Desk (visitor management)
+- egate.co.in — eGate (gate & visitor management)
+- myvisitor.co.in — alias for eGate
 
 ## Local preview
 
