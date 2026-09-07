@@ -308,9 +308,9 @@ main {
   text-decoration: none;
 }
 
-.site-list a:hover {
-  color: var(--gold-deep);
-  text-decoration: underline;
+.site-list strong {
+  color: var(--ink);
+  font-weight: 600;
 }
 
 .site-list span {
