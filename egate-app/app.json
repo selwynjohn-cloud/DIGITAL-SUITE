@@ -34,6 +34,14 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": ["expo-font"]
+    "plugins": [
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "46b83b3d-5e00-443e-9c70-0eaa98a0035d"
+      }
+    },
+    "owner": "john-selwyn"
   }
 }
