@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Contact — John Selwyn</title>
+    <meta
+      name="description"
+      content="Contact John Selwyn for Grace and Care, digital builds, and partnership."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,650;9..144,700&family=Sora:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <div class="atmosphere" aria-hidden="true"></div>
+
+    <header class="site-header">
+      <a class="brand" href="index.html">John Selwyn</a>
+      <nav class="nav" aria-label="Primary">
+        <a href="index.html#work">Work</a>
+        <a href="index.html#about">About</a>
+        <a href="contact.html" aria-current="page">Contact</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero contact-hero">
+        <p class="brand-mark">John Selwyn</p>
+        <h1>Let’s talk</h1>
+        <p class="lede">
+          For Grace and Care, digital builds, or a quiet conversation about the
+          next bridge to build.
+        </p>
+      </section>
+
+      <section class="section contact-section">
+        <form class="contact-form" name="contact" method="POST" data-netlify="true" netlify>
+          <input type="hidden" name="form-name" value="contact" />
+          <label>
+            Name
+            <input type="text" name="name" required autocomplete="name" />
+          </label>
+          <label>
+            Email
+            <input type="email" name="email" required autocomplete="email" />
+          </label>
+          <label>
+            Message
+            <textarea name="message" rows="6" required></textarea>
+          </label>
+          <button class="btn btn-primary" type="submit">Send message</button>
+        </form>
+
+        <aside class="contact-aside">
+          <p>
+            Prefer email directly? Write to
+            <a href="mailto:selwyn.john@gmail.com">selwyn.john@gmail.com</a>
+          </p>
+          <p>
+            Grace and Care:
+            <a href="https://www.graceandcare.co.in/" target="_blank" rel="noopener"
+              >graceandcare.co.in</a
+            >
+          </p>
+        </aside>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>© <span id="year"></span> John Selwyn. All rights reserved.</p>
+      <p><a href="index.html">Home</a></p>
+    </footer>
+
+    <script src="js/main.js"></script>
+  </body>
+</html>
