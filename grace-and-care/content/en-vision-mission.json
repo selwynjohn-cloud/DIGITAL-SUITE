@@ -1,0 +1,40 @@
+{
+  "visionMission": {
+    "eyebrow": "Who we are",
+    "title": "Vision, mission & core values",
+    "lede": "The heart behind Grace and Care — why we serve, and how we choose to serve.",
+    "vision": {
+      "label": "Vision",
+      "text": "Hearts filled with hope. Lives touched by care."
+    },
+    "mission": {
+      "label": "Mission",
+      "text": "To uplift hearts through spiritual music and serve people in need with compassion."
+    },
+    "values": {
+      "label": "Core values",
+      "items": [
+        {
+          "name": "Faith",
+          "text": "Rooted in devotion."
+        },
+        {
+          "name": "Compassion",
+          "text": "See the person. Feel the need."
+        },
+        {
+          "name": "Service",
+          "text": "Turn love into action."
+        },
+        {
+          "name": "Dignity",
+          "text": "Honour every life."
+        },
+        {
+          "name": "Integrity",
+          "text": "Live what we believe."
+        }
+      ]
+    }
+  }
+}
