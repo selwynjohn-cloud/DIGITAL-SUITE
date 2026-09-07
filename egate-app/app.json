@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "eGate",
+    "slug": "egate",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "egate",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B3D3A"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "in.co.egate.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "CFBundleDisplayName": "eGate",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "in.co.egate.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#0B3D3A",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "46b83b3d-5e00-443e-9c70-0eaa98a0035d"
+      }
+    },
+    "owner": "john-selwyn"
+  }
+}
