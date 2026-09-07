@@ -38,6 +38,32 @@ Outside a slot window the API returns `skipped: true, reason: "outside-slot"`. U
 1. **WhatsApp News Channel** — short (news + Pulse only). No jobs.
 2. **All groups** — fuller (duty line + `https://tinyurl.com/Security-News` + jobs). Never long section menus.
 
+## 07 September 2026 — 2:00 PM Afternoon rescue
+
+Afternoon was **not sent** in the 2:00 PM slot (`sent: false`, `currentSlot: null` at **8:18 PM IST**). Morning had gone at **9:25:44 AM** (Channel + 39 groups). Live Pulse page already showed **Afternoon Edition** for **07 September 2026 (Monday)** with a full feed (`newsCount: 20`).
+
+Rescue via `GET /api/pulse/cron` at **8:20:04 PM IST** returned `published: true`, `groupsSent: 38`, `emailed: true`, `newsCount: 20`. Status then: Afternoon `sent: true`, `channelSent: true`. `POST ?edition=afternoon` / `force=1` after that returned `outside-slot` / `already-confirmed`.
+
+| Edition | Sent | Channel | Groups | At (IST) |
+|---------|------|---------|--------|----------|
+| Morning | yes | yes | 39 | **9:25:44 AM** |
+| Afternoon | yes | yes | **38** | **8:20:04 PM** (missed-slot rescue) |
+| Evening | no | — | — | due 10:00 PM |
+
+Lead flash: *4 killed in Bengaluru-Chennai Expressway crash while returning from Tirupati*
+
+Also flashing: Amritsar airport drone / flight diversions · IMD rain alert (Delhi, UP, Bihar + North/East) · Gujarat chemical-factory gas leak · Delhi teen murdered over social-media remarks · Satya Niketan building collapse · Jharkhand elephant electrocution · Delhi Police 72-hour crackdown
+
+Copy-paste packs: [`SHARE-2026-09-07-afternoon-channel.txt`](./SHARE-2026-09-07-afternoon-channel.txt) (Channel) · [`SHARE-2026-09-07-afternoon-groups.txt`](./SHARE-2026-09-07-afternoon-groups.txt) (All groups)
+
+Full bulletin page: https://www.agilegroup-digital.co.in/pulse  
+WhatsApp channel: https://whatsapp.com/channel/0029VbCUrUAFnSz8CmYqJP1y
+
+**Security Question of the Day (sq110):** During a medical emergency you should give the ambulance driver:  
+A) A long speech about the company · B) A clear path, the patient’s location, and any known facts — then complete the register · C) The full visitor book to take away · D) Nothing; they should find the patient themselves
+
+**Next edition:** Evening Bulletin — **10:00 PM IST**
+
 ## 05 September 2026 — 6:00 AM Morning share
 
 Shared / published at **7:51:15 AM IST** during the live morning slot (`inSlot: true`, rescue retry). Live Pulse page shows **Morning Edition** for **05 September 2026 (Saturday)**. Cron `GET /api/pulse/cron` returned `published: true`, `groupsSent: 39`, `emailed: true`. Status: `sent: true`, `channelSent: true`, `groupsSent: 39`.
