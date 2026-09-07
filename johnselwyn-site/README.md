@@ -14,7 +14,7 @@ No company website links on this site.
 - driverpool.co.in
 - truckdrivers.co.in
 - rentalspace.co.in
-- Visitor Desk (visitor management — scaffold in `visitor-management-site/`, domain TBD)
+- myvisitor.co.in — Visitor Desk (visitor management)
 
 ## Local preview
 

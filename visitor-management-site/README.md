@@ -1,12 +1,9 @@
-# Visitor Desk — personal visitor management site
+# Visitor Desk — myvisitor.co.in
 
-Personal product by **John Selwyn**. No company website links.
+Personal visitor management site by **John Selwyn**.  
+**Domain:** https://myvisitor.co.in  
 
-## Suggested domains (not in your GoDaddy list yet)
-Register one, then point DNS to Vercel:
-- visitdesk.co.in
-- visitormanagement.co.in
-- myvisitor.co.in
+No company website links.
 
 ## Local preview
 
@@ -17,7 +14,8 @@ python3 -m http.server 5174
 
 Visit http://localhost:5174
 
-## Deploy
-1. Prefer its own repo later (or keep as a folder until domain is ready)
-2. Vercel → import → root = `visitor-management-site`
-3. Attach your chosen domain
+## Deploy to myvisitor.co.in
+
+1. Vercel → New Project → root directory `visitor-management-site`
+2. Add domain **myvisitor.co.in** (and `www` if you use it)
+3. In GoDaddy DNS for `myvisitor.co.in`, point to Vercel (A / CNAME as Vercel shows)
