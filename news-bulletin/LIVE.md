@@ -38,6 +38,27 @@ Outside a slot window the API returns `skipped: true, reason: "outside-slot"`. U
 1. **WhatsApp News Channel** — short (news + Pulse only). No jobs.
 2. **All groups** — fuller (duty line + `https://tinyurl.com/Security-News` + jobs). Never long section menus.
 
+## 08 September 2026 — 6:00 AM Morning share
+
+Shared / published at **7:35:59 AM IST** during the live morning slot (`inSlot: true`, rescue retry). Live Pulse page shows **Morning Edition** for **08 September 2026 (Tuesday)**. Cron status: `sent: true`, `channelSent: true`, `groupsSent: 38`.
+
+| Edition | Sent | Channel | Groups | At (IST) |
+|---------|------|---------|--------|----------|
+| Morning | yes | yes | 38 | **7:35:59 AM** |
+| Afternoon | no | — | — | due 2:00 PM |
+| Evening | no | — | — | due 10:00 PM |
+
+Lead flash: *Delhi building collapse: Rescue operation ends after 27 hours, no fresh casualties*
+
+Also flashing: Delhi collapse death toll 7 / 12 rescued at AIIMS · 5 MCD officials suspended (Satya Niketan) · Manali highway landslide-bypass tunnel opening in 4 days · Uttarakhand IMD orange alert (heavy to very heavy rain, 3 districts)
+
+Copy-paste packs (newly designed): [`SHARE-2026-09-08-morning-channel.txt`](./SHARE-2026-09-08-morning-channel.txt) (Channel) · [`SHARE-2026-09-08-morning-groups.txt`](./SHARE-2026-09-08-morning-groups.txt) (All groups)
+
+Full bulletin page: https://www.agilegroup-digital.co.in/pulse  
+WhatsApp channel: https://whatsapp.com/channel/0029VbCUrUAFnSz8CmYqJP1y
+
+**Next edition:** Afternoon Bulletin — **2:00 PM IST**
+
 ## 03 September 2026 — 6:00 AM Morning share
 
 Shared / published at **7:36:00 AM IST** during the live morning slot (`inSlot: true`, rescue retry). Live Pulse page shows **Morning Edition** for **03 September 2026 (Thursday)**. Cron status: `sent: true`, `channelSent: true`, `groupsSent: 39`, `emailed: true`.
