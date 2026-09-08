@@ -3,6 +3,8 @@
 Production publisher: **https://www.agilegroup-digital.co.in/pulse**  
 Manager portal (OTP `@agilegroup.co.in`): **https://www.agilegroup-digital.co.in/pulse/admin**
 
+**Ops rule:** Pulse auto-publishes; Cursor agents are status + code only. See [`OPERATING.md`](./OPERATING.md).
+
 ## Daily schedule (IST)
 
 | Edition | Time | Cron `edition=` |
