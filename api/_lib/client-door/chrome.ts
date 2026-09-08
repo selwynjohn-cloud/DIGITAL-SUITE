@@ -5,7 +5,34 @@ import { branchLetterheadAddressLines } from '../mis/branch-letterhead.js'
 import { MIS_BRAND, misLetterPrintFooter } from '../mis/brand.js'
 
 export const CLIENT_DOOR_SEE_TEXT =
-  "You will see your dashboard for the previous duty completed day (yesterday's) — Sanctioned Post, Absent, OT, Deployed Strength, Vacant, Agile Visits, Last Night Check, Last Training, Guards Complaints, Clients Complaints, Incident, Late Start, Out Of Post (numbers only)."
+  'You will see yesterday’s Daily Operations Report — Deployment, Attendance & Post Compliance, HR Statutory, Complaint Management, duty-start and deployment pies, and Collection & DSO for your book only.'
+
+/** Client-facing line: "HDFC Bank – Telangana" / "Ultra Tech – Tadipatri". */
+export function clientDoorAccessTitle(opts: { clientLabel: string; groupKey?: string }): string {
+  const label = String(opts.clientLabel || '').trim() || 'Client'
+  const key = String(opts.groupKey || '').trim().toLowerCase()
+  const parts = label.split(/\s*[—–-]\s*/).map((p) => p.trim()).filter(Boolean)
+  const head = parts[0] || label
+  const tail = parts.slice(1).join(' – ')
+  let brand = head
+  if (key === 'hdfc' || key === 'canara' || key === 'idbi' || /^(HDFC|Canara|IDBI)$/i.test(head)) {
+    brand = /bank/i.test(head) ? head : `${head} Bank`
+  } else if (key === 'ultra' || /ultra/i.test(head)) {
+    brand = 'Ultra Tech'
+  }
+  return tail ? `${brand} – ${tail}` : brand
+}
+
+export function clientDoorWelcomeHtml(accessTitle: string): string {
+  return (
+    `<div style="font-size:14px;color:#0f172a;line-height:1.65;margin:0 0 18px">` +
+    `<p style="margin:0 0 10px">Dear Sir,</p>` +
+    `<p style="margin:0 0 10px">Greetings from Agile group.</p>` +
+    `<p style="margin:0 0 10px">You are accessing the <b>${escDoor(accessTitle)}</b> Daily Operations Report through our Client Door.</p>` +
+    `<p style="margin:0">The report provides key operational insights on deployment, incidents, compliance, and service performance, enabling data-driven actions and continuous improvement in service levels.</p>` +
+    `</div>`
+  )
+}
 
 export function clientDoorTitle(clientName: string): string {
   const name = String(clientName || '').trim() || 'Client'

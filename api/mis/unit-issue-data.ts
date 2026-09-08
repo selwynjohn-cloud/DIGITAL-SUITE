@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { verifyAppSession } from '../_lib/app-session.js'
-import { getBranches, getActiveBranch, getClients, misStorageOk } from '../_lib/mis/store.js'
+import { getBranches, getMisReportBranches, getActiveBranch, getClients, misStorageOk } from '../_lib/mis/store.js'
 import { getUnitIssueRegister, saveUnitIssueRegister, type UnitIssueRow } from '../_lib/mis/unit-issue.js'
 import {
   buildSlaIndentMailHtml,
@@ -20,13 +20,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const action = String(body.action ?? '')
 
   if (action === 'branches') {
-    const branches = await getBranches(true)
+    const branches = await getMisReportBranches(true)
     return res.status(200).json({ ok: true, branches: branches.map((b) => ({ id: b.id, name: b.name })) })
   }
 
   if (action === 'slaPendingAll') {
     if (!misRequestAuthed(req)) return res.status(401).json({ error: 'Please sign in.' })
-    const branches = await getBranches(true)
+    const branches = await getMisReportBranches(true)
     const rows: { branchId: string; branchName: string; summary: ReturnType<typeof summarizeSlaPending>; units: SlaUnitRow[] }[] = []
     for (const b of branches) {
       const units = await getSlaIssueRegister(b.id, false)

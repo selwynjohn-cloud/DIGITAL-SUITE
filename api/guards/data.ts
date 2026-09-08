@@ -1,8 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { verifyAppSession } from '../_lib/app-session.js'
-import { isSuperAdminEmail } from '../_lib/auth.js'
+import { isSuiteAdminEmail } from '../_lib/auth.js'
 import { getBranches, getUsers as getMisUsers, getActiveBranch } from '../_lib/mis/store.js'
 import { isHodUser } from '../_lib/mis/digest.js'
+import {
+  findDeptInDirectoryOrSaved,
+  findOpsInDirectoryOrSaved,
+  mergeDeptWithDirectory,
+  mergeOpsWithDirectory,
+} from '../_lib/guards/directory-staff.js'
 import { listAllHodContacts } from '../_lib/guards/hod-contacts.js'
 import {
   computeComplaintAnalysis,
@@ -10,12 +16,15 @@ import {
   delayedComplaintAnalysis,
   weeklyManagementReport,
 } from '../_lib/guards/dashboard.js'
-import { displayStatus } from '../_lib/guards/completion.js'
+import { completionLetterPreviewHtml, completionLetterSubject, displayStatus } from '../_lib/guards/completion.js'
 import { PAGE_HELP, MANAGEMENT_PAGE_HELP } from '../_lib/guards/page-help.js'
+import { sendDailyGuardsDelayedMail } from '../_lib/guards/delayed-daily.js'
+import { processDelayedEscalations } from '../_lib/guards/escalation.js'
+import { isDemoStaffId, purgePracticeRecords, realComplaintsOnly } from '../_lib/guards/practice.js'
+import { guardsGoogleReviewUrl } from '../_lib/guards/brand.js'
 import {
   notifyNewGuardComplaint,
   sendCompletionLetter,
-  sendDelayedEscalationMail,
   sendDelayedReminderMail,
   sendDeptAppreciationMail,
   sendComplaintStatusMail,
@@ -66,6 +75,8 @@ import {
   type GuardComplaint,
 } from '../_lib/guards/store.js'
 
+export const maxDuration = 60
+
 async function resolveUser(
   email: string,
   sessionRole: 'staff' | 'management',
@@ -74,33 +85,43 @@ async function resolveUser(
     misUsers?: Awaited<ReturnType<typeof getMisUsers>>
     branches?: Awaited<ReturnType<typeof getBranches>>
   },
+  sessionBranchId?: string,
 ): Promise<{ role: 'management' | 'hod'; branchId: string | null; name: string; canAssign: boolean }> {
-  if (sessionRole === 'management' || isSuperAdminEmail(email)) {
+  const branches = cache?.branches ?? (await getBranches(true))
+  const canon = (raw: string) => resolveBranchId(raw, branches)?.id || ''
+  const sessionResolved = canon(String(sessionBranchId ?? ''))
+  const adminName = email.trim().toLowerCase() === 'sai@agilegroup.co.in' ? 'Sai' : 'Director'
+
+  if (isSuiteAdminEmail(email)) {
+    if (sessionRole === 'staff' && sessionResolved) {
+      return { role: 'hod', branchId: sessionResolved, name: adminName, canAssign: true }
+    }
+    return { role: 'management', branchId: null, name: adminName, canAssign: true }
+  }
+  if (sessionRole === 'management') {
     return { role: 'management', branchId: null, name: 'Management', canAssign: true }
   }
+
   const portalUsers = cache?.portalUsers ?? (await getPortalUsers())
-  const pu = portalUsers.find((u) => u.email === email && u.active)
+  const pu = portalUsers.find((u) => u.email?.toLowerCase() === email.toLowerCase() && u.active)
   if (pu) {
     const role = pu.role === 'management' ? 'management' : 'hod'
-    if (role === 'hod' && pu.branchId) {
-      const active = await getActiveBranch(pu.branchId)
-      if (!active) {
-        return { role: 'hod', branchId: null, name: pu.name, canAssign: false }
-      }
+    if (role === 'management') {
+      return { role: 'management', branchId: null, name: pu.name, canAssign: true }
     }
-    return { role, branchId: pu.branchId || null, name: pu.name, canAssign: role === 'hod' || role === 'management' }
+    const bid = canon(pu.branchId) || sessionResolved
+    if (bid) return { role: 'hod', branchId: bid, name: pu.name, canAssign: true }
   }
 
   const misUsers = cache?.misUsers ?? (await getMisUsers())
   const mu = misUsers.find((u) => u.email?.toLowerCase() === email.toLowerCase() && u.active !== false)
   if (mu && isHodUser(mu)) {
-    const misBranch = await getActiveBranch(mu.branchId || '')
-    if (!misBranch) {
-      return { role: 'hod', branchId: null, name: mu.name || email, canAssign: false }
-    }
-    const branches = cache?.branches ?? (await getBranches(true))
-    const resolved = resolveBranchId(misBranch.id, branches)
-    return { role: 'hod', branchId: resolved?.id || misBranch.id, name: mu.name || email, canAssign: true }
+    const bid = canon(mu.branchId || '') || sessionResolved
+    if (!bid) return { role: 'hod', branchId: null, name: mu.name || email, canAssign: false }
+    return { role: 'hod', branchId: bid, name: mu.name || email, canAssign: true }
+  }
+  if (sessionResolved) {
+    return { role: 'hod', branchId: sessionResolved, name: email, canAssign: true }
   }
   return { role: 'hod', branchId: null, name: email, canAssign: false }
 }
@@ -111,40 +132,6 @@ function branchScope(
 ) {
   if (user.role === 'management') return branchIdFromBody.trim() || null
   return user.branchId
-}
-
-async function processDelayedEscalations(
-  all: GuardComplaint[],
-  branches: { id: string; name: string }[],
-  opts?: { sendEmails?: boolean },
-): Promise<GuardComplaint[]> {
-  const sendEmails = opts?.sendEmails !== false
-  let changed = false
-  for (const c of all) {
-    const n = applySla(c)
-    if (sendEmails && n.isDelayed && n.status !== 'solved' && !n.delayedNotifiedAt) {
-      const branchName = branchDisplayName(n.branchId, branches)
-      const mail = await sendDelayedEscalationMail(n, branchName)
-      n.delayedNotifiedAt = new Date().toISOString()
-      changed = true
-      await logEvent(n.id, 'SLA', 'Delayed escalation', `Email sent to Director & HODs.`, 'System')
-      if (mail.ok) {
-        await logCommunication({
-          complaintId: n.id,
-          code: n.code,
-          channel: 'email',
-          type: 'delayed_escalation',
-          subject: `DELAYED — ${n.code}`,
-          body: `Delayed complaint escalation — ${branchName}`,
-          sentTo: (mail.to || []).join(', '),
-          sentBy: 'System',
-        })
-      }
-    }
-    Object.assign(c, n)
-  }
-  if (changed) await saveComplaints(all)
-  return all
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -263,15 +250,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
       await logEvent(c.id, 'Guard', 'Feedback submitted', `${rating}/5 stars`, c.guardName)
     }
-    return res.status(200).json({ ok: true, message: 'Thank you for your feedback!' })
+    return res.status(200).json({
+      ok: true,
+      message: 'Thank you for your feedback!',
+      rating: Math.round(rating),
+      googleReviewUrl: Math.round(rating) >= 4 ? guardsGoogleReviewUrl() : '',
+    })
   }
 
   const session = await verifyAppSession(String(body.sessionToken ?? ''), 'guards')
   if (!session) return res.status(401).json({ error: 'Please sign in with your @agilegroup.co.in email OTP.' })
 
+  if (
+    action === 'waConnectQr' ||
+    action === 'waConnectStatus' ||
+    action === 'branchWaGroups' ||
+    action === 'createBranchWaGroup' ||
+    action === 'updateBranchWaGroup' ||
+    action === 'createNextMissingWaGroup' ||
+    action === 'resetStaleWaGroups' ||
+    action === 'addGuardsNextWaGroup'
+  ) {
+    const { disconnectUnofficialWhatsAppOnce } = await import('../_lib/guards/branch-wa-groups.js')
+    await disconnectUnofficialWhatsAppOnce()
+    return res.status(200).json({
+      ok: false,
+      error: 'Branch WhatsApp groups have been removed. WhatsApp was blocking. Do not connect a computer WhatsApp.',
+    })
+  }
+
   const isLoad = action === 'login' || action === 'load'
 
-  const [branches, complaintsRaw, portalUsers, misUsers, events, communications] =
+  if (isLoad) {
+    await purgePracticeRecords().catch(() => null)
+  }
+
+  const [branches, complaintsFetched, portalUsers, misUsers, events, communications] =
     await Promise.all([
       getBranches(),
       getComplaints(),
@@ -280,16 +294,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       isLoad ? Promise.resolve([]) : getEvents(),
       isLoad ? Promise.resolve([]) : getCommunications(),
     ])
+  const complaintsRaw = realComplaintsOnly(complaintsFetched)
 
   const healedStaff = await healGuardsStaffBranches(branches)
-  const opsStaff = healedStaff.ops
-  const deptStaff = healedStaff.dept
+  const opsStaff = mergeOpsWithDirectory(healedStaff.ops, misUsers, portalUsers, branches)
+  const deptStaff = mergeDeptWithDirectory(healedStaff.dept, misUsers)
   const branchList = guardsBranchList(branches)
 
-  const user = await resolveUser(session.email, session.role, { branches, portalUsers, misUsers })
+  const user = await resolveUser(session.email, session.role, { branches, portalUsers, misUsers }, session.branchId)
   if (session.role === 'staff' && user.role === 'hod' && !user.branchId && !user.canAssign) {
     const mu = misUsers.find((u) => u.email?.toLowerCase() === session.email.toLowerCase() && u.active !== false)
-    if (mu?.branchId && !(await getActiveBranch(mu.branchId))) {
+    if (mu?.branchId && !resolveBranchId(mu.branchId, branches) && !(await getActiveBranch(mu.branchId))) {
       return res.status(403).json({
         error:
           'This branch is deactivated. Only activated branch teams can access the portal. Contact management.',
@@ -316,28 +331,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     })
   }
 
-  const healedAssignments = await healComplaintAssignments(
-    branches,
-    complaintsRaw,
-    opsStaff,
-    deptStaff,
-  )
-  const healedBranches = await healComplaintBranches(branches, healedAssignments.complaints)
+  // Open / Assign / Submit must not wait for delayed WhatsApp or a full-book heal-save.
+  // Cron + escalateDelayed still send those alerts.
+  const healedAssignments = isLoad
+    ? await healComplaintAssignments(branches, complaintsRaw, opsStaff, deptStaff)
+    : { complaints: complaintsRaw, fixed: 0 }
+  const healedBranches = isLoad
+    ? await healComplaintBranches(branches, healedAssignments.complaints)
+    : { complaints: healedAssignments.complaints, fixed: 0 }
 
-  let allComplaints = await processDelayedEscalations(healedBranches.complaints, branches, {
-    sendEmails: !isLoad,
-  })
+  let allComplaints = isLoad
+    ? await processDelayedEscalations(healedBranches.complaints, branches, { sendEmails: false })
+    : healedBranches.complaints
 
   let complaints = allComplaints.map((c) => applySla(c))
-  const dirty = !isLoad && complaints.some((c, i) => c.isDelayed !== complaintsRaw[i]?.isDelayed)
-  if (dirty) await saveComplaints(complaints)
+  if (isLoad) {
+    const dirty = complaints.some((c, i) => c.isDelayed !== complaintsRaw[i]?.isDelayed)
+    if (dirty) await saveComplaints(complaints)
+  }
 
   if (scopeBranch) {
     complaints = filterByBranch(complaints, scopeBranch, branches)
   }
 
-  const ops = scopeBranch ? filterByBranch(opsStaff, scopeBranch, branches) : opsStaff
-  const dept = scopeBranch ? filterByBranch(deptStaff, scopeBranch, branches) : deptStaff
+  const ops = (scopeBranch ? filterByBranch(opsStaff, scopeBranch, branches) : opsStaff).filter(
+    (o) => !isDemoStaffId(o.id),
+  )
+  // Department staff is shared across all branches (Director: same dept list everywhere)
+  const dept = deptStaff.filter((d) => !isDemoStaffId(d.id) && d.active !== false)
   const comms = scopeBranch
     ? communications.filter((c) => {
         const row = complaints.find((x) => x.id === c.complaintId)
@@ -378,7 +399,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? branches.find((b) => b.id === scopeBranch)?.name || scopeBranch
       : 'All branches'
     const weekly = weeklyManagementReport(complaints, branchName)
-    const feedbackRaw = await getFeedback()
+    const liveIds = new Set(complaints.map((c) => c.id))
+    const feedbackRaw = (await getFeedback()).filter((f) => liveIds.has(f.complaintId))
     const feedback = scopeBranch ? filterByBranch(feedbackRaw, scopeBranch, branches) : feedbackRaw
 
     return res.status(200).json({
@@ -389,7 +411,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       email: session.email,
       name: user.name,
       canAssign: user.canAssign,
-      branches: user.role === 'management' ? branchList : [],
+      branches: branchList,
       complaints: enrichedComplaints,
       opsStaff: ops.map(enrichStaff),
       deptStaff: dept.map(enrichStaff),
@@ -411,7 +433,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (action === 'escalateDelayed') {
-    const all = await getComplaints()
+    const all = realComplaintsOnly(await getComplaints())
     await processDelayedEscalations(all, branches, { sendEmails: true })
     return res.status(200).json({ ok: true })
   }
@@ -437,7 +459,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (idx >= 0) all[idx] = row
     else all.push(row)
     await saveOpsStaff(all)
-    return res.status(200).json({ ok: true })
+    return res.status(200).json({
+      ok: true,
+      staff: { ...row, branchName: branchDisplayName(row.branchId, branches) },
+    })
   }
 
   if (action === 'saveDept') {
@@ -459,7 +484,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (idx >= 0) all[idx] = row
     else all.push(row)
     await saveDeptStaff(all)
-    return res.status(200).json({ ok: true })
+    return res.status(200).json({
+      ok: true,
+      staff: { ...row, branchName: branchDisplayName(row.branchId, branches) },
+    })
   }
 
   if (action === 'assignComplaint') {
@@ -473,22 +501,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!c) return res.status(404).json({ error: 'Complaint not found.' })
     if (scopeBranch && !complaintMatchesBranch(c.branchId, scopeBranch, branches))
       return res.status(403).json({ error: 'Branch access only.' })
+    c.branchId = canonicalBranchStorageId(c.branchId, branches) || c.branchId
 
-    const staffList = await getOpsStaff()
-    const deptList = await getDeptStaff()
-    const staff = staffList.find((o) => o.id === opsId)
-    const ds = deptList.find((d) => d.id === deptId)
+    // Re-heal staff ids so Karnataka / Bengaluru / Bangalore all match this complaint branch
+    const staffHealed = await healGuardsStaffBranches(branches)
+    const staffList = mergeOpsWithDirectory(staffHealed.ops, misUsers, portalUsers, branches)
+    const deptList = mergeDeptWithDirectory(staffHealed.dept, misUsers)
+    const staff =
+      staffList.find((o) => o.id === opsId) ||
+      findOpsInDirectoryOrSaved(opsId, staffHealed.ops, misUsers, portalUsers, branches)
+    const ds = findDeptInDirectoryOrSaved(deptId, deptList, misUsers) || deptList.find((d) => d.id === deptId)
 
-    if (staff && !complaintMatchesBranch(staff.branchId, c.branchId, branches)) {
+    if (!opsId && !deptId && !deptEmailManual.includes('@')) {
       return res.status(400).json({
-        error: `Operations staff (${staff.name}) is for ${branchDisplayName(staff.branchId, branches)} — this complaint is ${branchDisplayName(c.branchId, branches)}. Pick staff from the same branch.`,
+        error:
+          'Select Operations staff and/or Department staff (same branch as this complaint), then Save assignment.',
       })
     }
-    if (ds && !complaintMatchesBranch(ds.branchId, c.branchId, branches)) {
+
+    if (opsId && !staff) {
       return res.status(400).json({
-        error: `Department staff (${ds.name}) is for ${branchDisplayName(ds.branchId, branches)} — this complaint is ${branchDisplayName(c.branchId, branches)}. Pick staff from the same branch.`,
+        error:
+          'That name is not on this branch’s HOD / Operation Manager list. Pick someone from the dropdown (User Management), or add Operations staff for this branch.',
       })
     }
+    if (deptId && !ds) {
+      return res.status(400).json({
+        error:
+          'That Department name is not on the list. Pick HR or another Department person from the dropdown.',
+      })
+    }
+
+    if (staff && String(staff.branchId || '').trim() && !complaintMatchesBranch(staff.branchId, c.branchId, branches)) {
+      return res.status(400).json({
+        error: `Operations staff (${staff.name}) is for ${branchDisplayName(staff.branchId, branches)} — this complaint is ${branchDisplayName(c.branchId, branches)}. Pick Operations staff from the same branch (not another city).`,
+      })
+    }
+    // Department staff may be from any branch — company-wide list
 
     if (staff) {
       c.opsStaffId = staff.id
@@ -557,6 +606,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await saveComplaints(all)
     await logEvent(c.id, 'Department', 'Completion report', resolution.slice(0, 500), session.email)
     return res.status(200).json({ ok: true })
+  }
+
+  if (action === 'previewCompletion') {
+    const id = String(body.complaintId ?? '')
+    const assurance = String(body.assuranceNote ?? '').trim()
+    const all = await getComplaints()
+    const c = all.find((x) => x.id === id)
+    if (!c) return res.status(404).json({ error: 'Not found.' })
+    if (scopeBranch && !complaintMatchesBranch(c.branchId, scopeBranch, branches))
+      return res.status(403).json({ error: 'Branch access only.' })
+    return res.status(200).json({
+      ok: true,
+      subject: completionLetterSubject(c.code),
+      html: completionLetterPreviewHtml(c, assurance || c.assuranceNote),
+    })
   }
 
   if (action === 'sendCompletion') {
@@ -697,7 +761,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (action === 'deleteComplaint') {
-    if (user.role !== 'management' && !isSuperAdminEmail(session.email)) {
+    if (user.role !== 'management' && !isSuiteAdminEmail(session.email)) {
       return res.status(403).json({ error: 'Director / Management only.' })
     }
     const id = String(body.complaintId ?? '').trim()
@@ -713,7 +777,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (action === 'sendReminder') {
-    if (user.role !== 'management' && !isSuperAdminEmail(session.email)) {
+    if (user.role !== 'management' && !isSuiteAdminEmail(session.email)) {
       return res.status(403).json({ error: 'Director / Management only.' })
     }
     const id = String(body.complaintId ?? '')
@@ -747,7 +811,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
       await logEvent(c.id, 'Director', 'Reminder sent', `To ${target}`, session.email)
     }
-    return res.status(200).json({ ok: result.ok, result })
+    if (!result.ok) {
+      return res.status(400).json({
+        ok: false,
+        error: result.error || 'Could not send reminder mail. Select HOD or staff, then try again.',
+        result,
+      })
+    }
+    return res.status(200).json({ ok: true, result })
+  }
+
+  if (action === 'previewDelayedMail') {
+    if (user.role !== 'management' && !isSuiteAdminEmail(session.email)) {
+      return res.status(403).json({ error: 'Director / Management only.' })
+    }
+    const draft = await sendDailyGuardsDelayedMail({ preview: true, slot: 'am' })
+    if (!draft.ok || !('html' in draft) || !draft.html) {
+      return res.status(400).json({ ok: false, error: 'Could not build the 9:30 AM draft.' })
+    }
+    return res.status(200).json({
+      ok: true,
+      html: draft.html,
+      date: 'date' in draft ? draft.date : '',
+      branches: 'branches' in draft ? draft.branches : 0,
+      delayedTotal: 'delayedTotal' in draft ? draft.delayedTotal : 0,
+    })
   }
 
   if (action === 'sendFeedbackRequest') {
@@ -801,7 +889,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (action === 'sendStatusUpdate') {
-    if (user.role !== 'management' && !isSuperAdminEmail(session.email)) {
+    if (user.role !== 'management' && !isSuiteAdminEmail(session.email)) {
       return res.status(403).json({ error: 'Director / Management only.' })
     }
     const id = String(body.complaintId ?? '')
@@ -817,11 +905,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const branchName = branchDisplayName(c.branchId, branches)
     if (target === 'department') {
       if (opsStaffId) {
-        const staff = (await getOpsStaff()).find((s) => s.id === opsStaffId)
+        const staff = findOpsInDirectoryOrSaved(
+          opsStaffId,
+          await getOpsStaff(),
+          misUsers,
+          portalUsers,
+          branches,
+        )
         if (staff?.email?.includes('@')) toEmail = staff.email.trim()
       }
       if (!toEmail.includes('@') && deptStaffId) {
-        const staff = (await getDeptStaff()).find((s) => s.id === deptStaffId)
+        const staff = findDeptInDirectoryOrSaved(deptStaffId, await getDeptStaff(), misUsers)
         if (staff?.email?.includes('@')) toEmail = staff.email.trim()
       }
       if (!toEmail.includes('@') && c.deptStaffEmail?.includes('@')) {
@@ -876,7 +970,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         session.email,
       )
     }
-    return res.status(200).json({ ok: result.ok, result })
+    if (!result.ok) {
+      return res.status(400).json({
+        ok: false,
+        error: result.error || 'Could not send status mail. Select HOD or staff, then try again.',
+        result,
+      })
+    }
+    return res.status(200).json({ ok: true, result })
   }
 
   if (action === 'shareDashboard') {
@@ -884,17 +985,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!to.includes('@')) return res.status(400).json({ error: 'Please enter a valid email address.' })
     const branchName = scopeBranch
       ? branches.find((b) => b.id === scopeBranch)?.name || scopeBranch
-      : 'All branches'
+      : user.role === 'management'
+        ? 'All branches'
+        : branches.find((b) => b.id === user.branchId)?.name || 'Branch'
     const scoped = scopeBranch ? filterByBranch(allComplaints, scopeBranch, branches) : allComplaints
     const dash = computeGuardsDashboard(scoped, opsStaff, Object.fromEntries(branches.map((b) => [b.id, b.name])))
-    const result = await sendDashboardShareMail(branchName, {
-      total: dash.total,
-      open: dash.received,
-      delayed: dash.delayed,
-      solved: dash.solved,
-      avgResponseHours: dash.avgResponseHours,
-      slaCompliancePct: dash.slaCompliancePct,
-    }, to)
+    const result = await sendDashboardShareMail(
+      branchName,
+      {
+        total: dash.total,
+        open: dash.received,
+        received: dash.received,
+        delayed: dash.delayed,
+        solved: dash.solved,
+        avgResponseHours: dash.avgResponseHours,
+        slaCompliancePct: dash.slaCompliancePct,
+        topCategories: dash.topCategories,
+        byDepartment: dash.byDepartment,
+        byBranch: user.role === 'management' ? dash.byBranch : [],
+        hurdles: dash.hurdles,
+        suggestions: dash.suggestions,
+      },
+      to,
+      { portal: user.role === 'management' ? 'management' : 'staff' },
+    )
     return res.status(200).json({ ok: result.ok, result })
   }
 
@@ -904,15 +1018,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!c) return res.status(404).json({ error: 'Not found.' })
     const ev = events.filter((e) => e.complaintId === id)
     const caseComms = communications.filter((cm) => cm.complaintId === id)
+    const complaintBranch = canonicalBranchStorageId(c.branchId, branches) || c.branchId
+    const pickBranch = scopeBranch || complaintBranch
+    const enrichStaff = <T extends { branchId: string }>(row: T) => ({
+      ...row,
+      branchName: branchDisplayName(row.branchId, branches),
+    })
+    // Ops = same branch as complaint, plus company-wide HOD / OM (no branch). Dept = company-wide.
+    const caseOps = opsStaff
+      .filter(
+        (o) =>
+          o.active !== false &&
+          (!String(o.branchId || '').trim() || complaintMatchesBranch(o.branchId, pickBranch, branches)),
+      )
+      .map(enrichStaff)
+    const caseDept = deptStaff.filter((d) => d.active !== false).map(enrichStaff)
     return res.status(200).json({
       ok: true,
       complaint: {
         ...c,
-        branchName: branchDisplayName(c.branchId, branches),
+        branchId: complaintBranch,
+        branchName: branchDisplayName(complaintBranch, branches),
         registeredAtLabel: guardsFmtIstDateTime(c.registeredAt),
       },
       events: ev,
       communications: caseComms,
+      opsStaff: caseOps,
+      deptStaff: caseDept,
     })
   }
 

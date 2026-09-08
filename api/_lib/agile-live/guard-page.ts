@@ -1,9 +1,10 @@
+import { SUITE_APP_FOOTER_CSS, suiteAppOpenPageFooterHtml } from '../suite-app-footer.js'
 import { SUITE_TAP_FEEDBACK_CSS, suiteTapFeedbackInitScript } from '../suite-tap-feedback.js'
 import { LIVE_APP_NAME, LIVE_DUTY_REPLIES, LIVE_JOBS_URL, LIVE_LEAVE_POST_MSG, LIVE_NEWS_CHANNEL, LIVE_NEWS_PAGE } from './types.js'
 import { LIVE_CHAT_ACCEPT, liveVoiceBindScript } from './media.js'
-import { LIVE_CHAT_RULE } from './moderation.js'
+import { liveChatExtrasScript, liveComposerInnerHtml } from './chat-ui.js'
 import { liveI18nScript, liveLangBarHtml } from './i18n.js'
-import { LIVE_SHELL_CSS, liveFooterHtml, liveLogoImg, liveOpsIcon, livePersonHeadHtml } from './shell.js'
+import { LIVE_SHELL_CSS, liveDisclaimerHtml, liveFooterHtml, liveHonourBannerHtml, liveIconHeadHtml, liveLoginArrowHtml, liveOpenHeadHtml, liveOpsIcon, livePersonHeadHtml } from './shell.js'
 
 export function agileLiveGuardPage(): string {
   return `<!DOCTYPE html>
@@ -14,27 +15,28 @@ export function agileLiveGuardPage(): string {
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Agile Live">
+${liveIconHeadHtml()}
 <title>${LIVE_APP_NAME}</title>
 <style>
 ${LIVE_SHELL_CSS}
+${SUITE_APP_FOOTER_CSS}
 ${SUITE_TAP_FEEDBACK_CSS}
 </style></head>
 <body class="live-home-chat">
 <div id="gate" class="gate">
-  <div class="live-head">
-    <div class="live-crest">${liveLogoImg()}</div>
-    <div class="live-me"><b>${LIVE_APP_NAME}</b><span data-i18n="staffRole">Security Staff</span></div>
-  </div>
-  ${liveLangBarHtml('langPickGate')}
+  ${liveOpenHeadHtml('Security Staff')}
+  ${liveHonourBannerHtml()}
   <div id="gateBanner" class="msg"></div>
   <div class="gate-card">
-    <p class="muted" data-i18n="gateHint">Same ID No. and mobile as Master Directory. After this, the chat stays open — you do not open a second screen.</p>
-    <label data-i18n="idNo">ID No.</label>
+    <p class="muted">Same ID No. and mobile as Master Directory. After this, the chat stays open — you do not open a second screen.</p>
+    <label>ID No.</label>
     <input id="idNo" autocomplete="username" enterkeyhint="next" inputmode="text">
-    <label data-i18n="mobile">Mobile (10 digits)</label>
+    <label>Mobile (10 digits)</label>
     <input id="mobile" inputmode="numeric" maxlength="10" enterkeyhint="go">
-    <button type="button" class="btn green" id="btnIn" style="width:100%" data-i18n="openLive">Open ${LIVE_APP_NAME}</button>
+    <button type="button" class="btn green" id="btnIn" style="width:100%">Open ${LIVE_APP_NAME}</button>
+    ${liveDisclaimerHtml()}
   </div>
+  ${suiteAppOpenPageFooterHtml()}
 </div>
 <div id="home" class="live-fill hidden">
   <div class="live-desk">
@@ -47,12 +49,29 @@ ${SUITE_TAP_FEEDBACK_CSS}
         cardPickId: 'meCardPick',
         cardDateId: 'meCardDate',
         branchId: 'meBr',
-        extra: `<button type="button" class="live-ico" id="btnOps" title="Dashboard" aria-label="Dashboard">${liveOpsIcon()}</button>`,
+        lead: liveLoginArrowHtml(),
+        extra: `<div class="live-head-actions"><button type="button" class="live-ico" id="btnOps" title="Dashboard" aria-label="Dashboard">${liveOpsIcon()}</button></div>`,
       })}
       ${liveLangBarHtml('langPickHome')}
       <div id="banner" class="msg"></div>
       <div id="dutyTimes" class="live-times one-line">
         <p><span id="timeToday">Today’s shift —</span> · <span id="timeTomorrow">Tomorrow’s shift —</span></p>
+      </div>
+      <div class="live-week" id="homeWeek">
+        <b id="homeWeekTitle">This week</b>
+        <p id="homeWeekLine" class="week-today"></p>
+        <div id="homeWeekDays" class="live-week-days"></div>
+      </div>
+      <div class="card hidden" id="offExtraBox" style="margin:10px 14px 0">
+        <b>Weekly off — extra duty</b>
+        <p class="muted">Work on weekly off to earn more. Same site or another location in your branch. Then Start Duty.</p>
+        <label>Weekly off date</label>
+        <select class="m-inp" id="offExtraDate"></select>
+        <label>Site</label>
+        <select class="m-inp" id="offExtraSite"></select>
+        <label>Shift</label>
+        <select class="m-inp" id="offExtraShift"></select>
+        <button type="button" class="btn gold wide" id="btnOffExtra" style="margin-top:10px">Schedule extra duty</button>
       </div>
       <div class="live-duty-btns">
         <button type="button" class="btn green" id="btnInDuty" data-i18n="startDuty">Start Duty</button>
@@ -79,15 +98,8 @@ ${SUITE_TAP_FEEDBACK_CSS}
       <div id="tabChats" class="live-tab">
         <p id="vacantLine" class="week-today hidden" style="margin:8px 14px 0"></p>
         <div class="live-list hidden" id="people"></div>
-        <p class="rule">${LIVE_CHAT_RULE}</p>
         <div class="live-chat" id="chat"></div>
-        <div class="composer">
-          <input id="chatFile" type="file" class="hidden" accept="${LIVE_CHAT_ACCEPT}">
-          <button type="button" class="btn grey" id="btnAttach">+</button>
-          <button type="button" class="btn grey voice" id="btnVoice" aria-label="Voice" title="Voice"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11h-2z"/></svg></button>
-          <input id="chatText" type="text" maxlength="400" placeholder="Type a message" data-i18n="typeMsg" data-i18n-placeholder="1">
-          <button type="button" class="btn green" id="btnSend" data-i18n="send">Send</button>
-        </div>
+        ${liveComposerInnerHtml(LIVE_CHAT_ACCEPT, { textI18n: true })}
       </div>
       <div id="tabCalls" class="live-tab hidden"><div class="live-tab-body" id="callList"><p class="muted">Open Call & Video after sign-in.</p></div></div>
       <div id="tabNews" class="live-tab hidden"><div class="live-tab-body" id="newsBox"><p class="muted">Open Security News after sign-in.</p></div></div>
@@ -131,7 +143,7 @@ ${SUITE_TAP_FEEDBACK_CSS}
         <div class="live-how">
           <b data-i18n="howStartTitle">How to Start Duty</b><br>
           <span data-i18n="howStart">Tap Start Duty, then tick both Patrolling completed and Taken over. The selfie then opens. Phone location must match the duty post (100 metres).</span>
-          Time must match today’s schedule (HDFC 2FA: 7:00 AM–3:00 PM or 3:00 PM–11:00 PM — no night Facility Attendant). If today is Off Duty, Start Duty is only for a Vacant Post allotment.<br>
+          Time must match today’s schedule (HDFC 2FA: 7:00 AM–3:00 PM or 3:00 PM–11:00 PM — no night Facility Attendant). On Off Duty (weekly off), tap <b>Schedule extra duty</b> (same site or another location), then Start Duty. Vacant Post allotment still works.<br>
           <b data-i18n="howEndTitle">How to End Duty</b><br>
           <span data-i18n="howEnd">Tap End Duty, then tick both Reliever Reported and Handed over. The selfie then opens. Location must match the duty post.</span>
         </div>
@@ -173,17 +185,19 @@ ${SUITE_TAP_FEEDBACK_CSS}
 ${suiteTapFeedbackInitScript()}
 ${liveI18nScript()}
 (function(){
-var TOKEN='', ME='', MOB='', LAST='', PUNCH='in', POLL=null, GEO=null, ON=false, LEFT=false, ALL=[], WIDE=false, SHOW_RM='', RM_ID='', DONE_RM='', TODAY='', LAST_DUTY=null, DUTY_ACT='';
+var TOKEN='', ME='', MOB='', LAST='', PUNCH='in', POLL=null, GEO=null, ON=false, LEFT=false, ALL=[], WIDE=false, SHOW_RM='', RM_ID='', DONE_RM='', TODAY='', LAST_DUTY=null, DUTY_ACT='', OFF_SITES=[];
 function isWide(){return window.matchMedia('(min-width:1100px)').matches;}
 var SEL={id:'group',mobile:'',name:'Branch group',role:'Security Staff'};
 function el(id){return document.getElementById(id);}
 function show(id,on){var n=el(id);if(n)n.classList.toggle('hidden',!on);}
+function paintMsg(id,t,ok){
+  var n=el(id); if(!n)return;
+  n.textContent=t||'';
+  n.className='msg '+(t?(ok?'ok':'err'):'');
+}
 function banner(t,ok){
-  ['banner','gateBanner'].forEach(function(id){
-    var n=el(id); if(!n)return;
-    n.textContent=t||'';
-    n.className='msg '+(t?(ok?'ok':'err'):'');
-  });
+  var home=el('home');
+  paintMsg(home&&!home.classList.contains('hidden')?'banner':'gateBanner',t,ok);
 }
 function api(action,extra){
   return fetch('/api/live/data',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action:action,guardToken:TOKEN},extra||{}))})
@@ -214,6 +228,8 @@ function paintDuty(d){
   TODAY=d.today||'';
   paintHead(d, desig);
   paintShifts(d);
+  paintHomeWeek(d);
+  paintOffExtra(d);
   paintDash(d, site, desig);
   var geo=el('dutyGeo');
   var map=el('dutyMap');
@@ -233,11 +249,11 @@ function paintHead(d, desig){
   var missing=!!d.idCardMissing;
   var brLine=d.branch?(t('branchLine')+' '+d.branch):(t('branchLine')+' —');
   function one(who,id,des,card,pick,date,br){
-    if(who) who.textContent=d.name||'Name';
-    if(id) id.textContent=d.idNo?'ID No. '+d.idNo:'ID No.';
-    if(des) des.textContent=desig||d.designation||'Security Staff';
+    if(who) who.textContent=d.name||t('name');
+    if(id) id.textContent=d.idNo?t('idNo')+' '+d.idNo:t('idNo');
+    if(des) des.textContent=desig||d.designation||t('staffRole');
     if(card){
-      card.textContent=missing?'':'ID card validity: '+(d.idCardValidity||'');
+      card.textContent=missing?'':t('idCardLine')+': '+(d.idCardValidity||'');
       card.classList.toggle('hidden', missing);
     }
     if(pick) pick.classList.toggle('hidden', !missing);
@@ -276,6 +292,87 @@ function paintShifts(d){
   var t1=el('timeToday'); if(t1) t1.textContent=today;
   var t2=el('timeTomorrow'); if(t2) t2.textContent=tom;
   var ds=el('dashShifts'); if(ds) ds.textContent=today+' · '+tom;
+}
+function paintHomeWeek(d){
+  var w=d&&d.week?d.week:{};
+  var title=el('homeWeekTitle');
+  if(title) title.textContent=w.weekLabel||'This week';
+  var line=el('homeWeekLine');
+  if(line){
+    var bits=[];
+    if(w.todayLine) bits.push(w.todayLine);
+    if(w.todayTime&&w.todayTime!==w.todayLine) bits.push(w.todayTime);
+    line.textContent=bits.join(' · ');
+  }
+  var box=el('homeWeekDays');
+  if(!box) return;
+  var days=w.days||[];
+  var todayI=-1;
+  for(var i=0;i<days.length;i++){ if(days[i]&&days[i].isToday) todayI=i; }
+  var html='';
+  for(var i=0;i<days.length;i++){
+    var day=days[i]||{};
+    var extra=!!day.isExtra;
+    var off=!!day.isOff && !extra;
+    var lab=extra?'Extra':(off?'Off':'Duty');
+    if(day.isToday) lab=w.todayShift||lab;
+    else if(todayI>=0&&i===todayI+1) lab=w.tomorrowShift||lab;
+    var cls=(extra?'extra':(off?'off':'on'))+(day.isToday?' today':'');
+    html+='<span class="'+cls+'">'+esc(day.dow||'')+'<br>'+esc(lab)+'</span>';
+  }
+  box.innerHTML=html;
+}
+function extraShiftOptions(d){
+  if(d&&d.hdfc2fa) return '<option value="M">7:00 AM – 3:00 PM</option><option value="P">3:00 PM – 11:00 PM</option>';
+  if(d&&d.shiftHours===8) return '<option value="A">Shift A</option><option value="G">Shift G</option><option value="B">Shift B</option><option value="C">Shift C</option>';
+  return '<option value="D">12 hrs Day</option><option value="N">12 hrs Night</option>';
+}
+function paintOffExtra(d){
+  var box=el('offExtraBox');
+  if(!box) return;
+  var w=d&&d.week?d.week:{};
+  var days=w.days||[];
+  var today=d&&d.today||TODAY||'';
+  var extras=d.extraDuty||[];
+  var names=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var offDays=(w.upcomingOffs||[]).filter(function(ymd){ return ymd>=today; });
+  days.forEach(function(day){
+    if(day&&(day.isOff||day.isExtra)&&day.ymd>=today&&offDays.indexOf(day.ymd)<0) offDays.push(day.ymd);
+  });
+  box.classList.toggle('hidden', !offDays.length);
+  if(!offDays.length) return;
+  var dateSel=el('offExtraDate');
+  var siteSel=el('offExtraSite');
+  var shiftSel=el('offExtraShift');
+  if(dateSel){
+    dateSel.innerHTML=offDays.map(function(ymd){
+      var booked=extras.some(function(e){ return e.date===ymd; });
+      var dt=new Date(ymd+'T12:00:00');
+      var dow=names[dt.getDay()]||'';
+      return '<option value="'+esc(ymd)+'"'+(ymd===today?' selected':'')+'>'+esc(dow)+' '+esc(ymd)+(booked?' · Extra':'')+'</option>';
+    }).join('');
+  }
+  if(siteSel){
+    var sites=OFF_SITES||[];
+    if(!sites.length && d.clientSite) sites=[{label:'Same site — '+d.clientSite,name:d.clientSite}];
+    siteSel.innerHTML=sites.map(function(s){
+      return '<option value="'+esc(s.label||s.name||'')+'">'+esc(s.label||s.name||'')+'</option>';
+    }).join('');
+  }
+  if(shiftSel) shiftSel.innerHTML=extraShiftOptions(d);
+}
+function saveOffExtra(){
+  var date=el('offExtraDate')&&el('offExtraDate').value;
+  var site=el('offExtraSite')&&el('offExtraSite').value;
+  var shift=el('offExtraShift')&&el('offExtraShift').value;
+  if(!date){banner('Pick the weekly off date.',false);return;}
+  if(!site){banner('Pick the site (same place or another location).',false);return;}
+  banner('Saving extra duty…',true);
+  api('scheduleOffExtra',{date:date,clientSite:site,shiftCode:shift}).then(function(res){
+    banner(res.j.message||res.j.error||'',res.s===200);
+    if(res.s===200&&res.j.offSites) OFF_SITES=res.j.offSites;
+    if(res.s===200&&res.j.duty) paintDuty(res.j.duty);
+  });
 }
 function paintDash(d, site, desig){
   var duty=el('dashDuty');
@@ -348,14 +445,13 @@ function showGroup(group,pane){
 function callRow(r){
   return '<div class="live-row"><div class="live-row-mid"><div class="live-row-top"><span class="live-num">'+esc(r.name)+'</span></div>'+
     '<div class="live-row-sub"><span class="live-sub">'+esc(r.mobile)+'</span><span class="live-role">'+esc(r.role||'')+'</span></div>'+
-    '<div class="live-split"><a class="btn green" href="tel:+91'+esc(r.mobile)+'">Call</a>'+
-    '<a class="btn navy" href="https://wa.me/91'+esc(r.mobile)+'" target="_blank" rel="noopener">Video</a></div></div></div>';
+    '<div class="live-split"><a class="btn green" href="tel:+91'+esc(r.mobile)+'">Call</a></div></div></div>';
 }
 function loadCalls(boxId){
   api('callBook',{}).then(function(res){
     var box=el(boxId||'callList'); if(!box)return;
     var rows=res.s===200?(res.j.calls||[]):[];
-    var title=boxId==='emBox'?'<div class="card"><h3>Emergency Number</h3><p class="muted">Call the OM / HOD / Control first. Video opens WhatsApp.</p></div>':'<div class="card"><h3>Call & Video</h3><p class="muted">Call the phone, or tap Video to open WhatsApp.</p></div>';
+    var title=boxId==='emBox'?'<div class="card"><h3>Emergency Number</h3><p class="muted">Call the OM / HOD / Control first. Chat stays in Agile Live.</p></div>':'<div class="card"><h3>Call & Video</h3><p class="muted">Call the phone. Chat stays in Agile Live.</p></div>';
     if(!rows.length){box.innerHTML=title+'<p class="muted">No numbers on this branch yet.</p>';return;}
     box.innerHTML=title+rows.map(callRow).join('');
   });
@@ -448,19 +544,23 @@ function paintPeople(){
   var box=el('people'); if(box) box.innerHTML='';
 }
 function paintThread(){
+  var rows=ALL.filter(inThread);
+  rows.forEach(function(m){ if(m.id) LAST=m.id; });
+  if(typeof liveSyncThread==='function'){
+    liveSyncThread(el('chat'), rows, function(m){return String(m.fromName)===ME;}, function(m){
+      return (m.fromName||'')+' · '+roleOf(m)+(m.toMobile?' · To you':'');
+    });
+    return;
+  }
   var box=el('chat'); box.innerHTML='';
-  ALL.filter(inThread).forEach(function(m){
-    LAST=m.id;
+  rows.forEach(function(m){
+    if(typeof liveIsHidden==='function'&&liveIsHidden(m.id))return;
     var div=document.createElement('div');
     div.className='bub '+(String(m.fromName)===ME?'me':'them');
     var sm=document.createElement('small');
     sm.textContent=(m.fromName||'')+' · '+roleOf(m)+(m.toMobile?' · To you':'');
     div.appendChild(sm);
-    if(m.fileUrl&&m.fileKind==='image'){var im=document.createElement('img');im.src=m.fileUrl;im.alt=m.fileName||'photo';div.appendChild(im);}
-    else if(m.fileUrl&&m.fileKind==='audio'){var au=document.createElement('audio');au.controls=true;au.src=m.fileUrl;div.appendChild(au);}
-    else if(m.fileUrl&&m.fileKind==='video'){var vd=document.createElement('video');vd.controls=true;vd.src=m.fileUrl;div.appendChild(vd);}
-    else if(m.fileUrl){var a=document.createElement('a');a.className='file';a.href=m.fileUrl;a.target='_blank';a.rel='noopener';a.textContent=m.fileName||'Open file';div.appendChild(a);}
-    if(m.text)div.appendChild(document.createTextNode(m.text));
+    if(typeof livePaintBubble==='function') livePaintBubble(div,m);
     box.appendChild(div);
   });
   box.scrollTop=box.scrollHeight;
@@ -578,6 +678,7 @@ function askLocBanner(){
 }
 function openHome(d, extra){
   show('gate',false);show('home',true);
+  if(extra&&extra.offSites) OFF_SITES=extra.offSites;
   paintDuty(d);
   paintInbox(extra||{});
   showMain(false);
@@ -585,6 +686,7 @@ function openHome(d, extra){
   loadMonth();
   applyLang();
   askLocBanner();
+  showGroup('Chat');
   if(POLL)clearInterval(POLL);
   POLL=setInterval(function(){loadChat(false);},4000);
 }
@@ -729,25 +831,50 @@ el('chatFile').addEventListener('change',function(){
 function sendChat(){
   var t=el('chatText').value;
   if(!t.trim()&&!PENDING)return;
-  locThen(function(lat,lng){
-    api('chatSend',{text:t,lat:lat,lng:lng,fileName:PENDING&&PENDING.name,fileMime:PENDING&&PENDING.mime,fileData:PENDING&&PENDING.data}).then(function(res){
+  var sentKind=typeof liveSentKind==='function'?liveSentKind(PENDING,t):'message';
+  var pending=PENDING;
+  function go(lat,lng){
+    api('chatSend',{text:t,lat:lat,lng:lng,fileName:pending&&pending.name,fileMime:pending&&pending.mime,fileData:pending&&pending.data}).then(function(res){
+      if(typeof liveVoiceSetBtn==='function') liveVoiceSetBtn(false);
       if(res.s!==200){banner(res.j.error||'Not sent.',false);return;}
       el('chatText').value='';
       PENDING=null;
       banner('',true);
+      if(typeof liveShowSent==='function') liveShowSent(sentKind);
       if(res.j.message){ALL.push(res.j.message);LAST=res.j.message.id;paintPeople();paintThread();}
+    }).catch(function(){
+      if(typeof liveVoiceSetBtn==='function') liveVoiceSetBtn(false);
+      banner('Could not send. Try again.',false);
     });
-  });
+  }
+  if(pending&&pending.kind==='audio'){ go(null,null); return; }
+  locThen(go);
 }
 el('btnIn').addEventListener('click',signIn);
 el('mobile').addEventListener('keydown',function(e){if(e.key==='Enter')signIn();});
 el('btnOps').addEventListener('click',function(){el('ops').classList.remove('hidden');loadMonth();});
+function goLogin(){
+  if(POLL){clearInterval(POLL);POLL=null;}
+  saveTok('');
+  TOKEN='';
+  show('home',false);
+  var ops=el('ops'); if(ops) ops.classList.add('hidden');
+  paintMsg('banner','',true);
+  paintMsg('gateBanner','',true);
+  show('gate',true);
+}
+var toLogin=el('btnToLogin');
+if(toLogin) toLogin.addEventListener('click',goLogin);
 ['Chat','News','Train','Profile'].forEach(function(name){
   var b=el('foot'+name);
-  if(b)b.addEventListener('click',function(){showGroup(name);});
+  if(b)b.addEventListener('click',function(){
+    if(!TOKEN){banner('Open Agile Live first.',false);return;}
+    show('home',true); show('gate',false);
+    showGroup(name);
+  });
 });
-showGroup('Chat');
 el('btnOpsClose').addEventListener('click',function(){el('ops').classList.add('hidden');});
+el('btnOffExtra').addEventListener('click',saveOffExtra);
 el('btnInDuty').addEventListener('click',function(){
   var row=el('startLv'); var end=el('endLv');
   if(end) end.classList.add('hidden');
@@ -804,7 +931,7 @@ el('btnRemindYes').addEventListener('click',sendRemindReply);
 el('btnSend').addEventListener('click',sendChat);
 el('chatText').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();sendChat();}});
 ${liveVoiceBindScript()}
-el('btnVoice').addEventListener('click',liveVoiceToggle);
+${liveChatExtrasScript()}
 window.liveAfterLang=function(){
   if(LAST_DUTY){
     paintShifts(LAST_DUTY);
@@ -815,7 +942,6 @@ window.liveAfterLang=function(){
   })[0]||'Chat';
   showGroup(on);
 };
-bindLangPick('langPickGate');
 bindLangPick('langPickHome');
 applyLang();
 try{

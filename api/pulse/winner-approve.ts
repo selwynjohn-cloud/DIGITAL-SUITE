@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { getPendingWinner, publishPendingWinner } from '../_lib/pulse/quiz.js'
-import { notifyWinnerPublished } from '../_lib/pulse/winner-notify.js'
+import { getPendingCandidates, getPendingWinner, publishPendingWinners, weekWinnerHeading, winnerCourtesyName } from '../_lib/pulse/quiz.js'
+import { notifyWinnersPublished } from '../_lib/pulse/winner-notify.js'
 
 export const maxDuration = 30
 
@@ -31,9 +31,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const pending = await getPendingWinner()
+  const candidates = await getPendingCandidates()
   if (!pending) {
     return res.status(200).send(page('Nothing to publish', 'No quiz winner is waiting for approval right now.'))
   }
+
+  const names = (candidates.length ? candidates : [pending]).map((c) => winnerCourtesyName(c.name)).join(', ')
+  const heading = weekWinnerHeading(pending.weekKey, candidates.length || 1)
 
   const confirm = String(req.query.confirm ?? '') === '1'
   if (!confirm) {
@@ -48,19 +52,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .send(
         page(
           'Publish quiz winner?',
-          `<b>${pending.name}</b><br>Week: ${pending.weekKey}<br>Entries: ${pending.entryCount}`,
+          `<b>${heading}</b><br>${names}<br>Entries: ${pending.entryCount}`,
           button,
         ),
       )
   }
 
-  const published = await publishPendingWinner(pending)
-  const notify = await notifyWinnerPublished(pending, published)
+  const published = await publishPendingWinners()
+  const notify = await notifyWinnersPublished(candidates.length ? candidates : [pending], published)
+  const first = published[0]
+  const lines = published
+    .map((w) => `<b>${w.name}</b>${w.couponCode ? ` — Code: <b>${w.couponCode}</b>` : ''}`)
+    .join('<br>')
 
   return res.status(200).send(
     page(
       '✅ Winner published!',
-      `<b>${published.name}</b> is now on the bulletin winners board (${published.weekKey}).<br><br>` +
+      `${heading}<br>${lines}` +
+        `<br><br>Gift coupon is sent to the ${published.length > 1 ? 'winners' : 'winner'}.<br><br>` +
         `Winner card WhatsApp: ${notify.winnerSent ? 'sent ✓' : 'could not send'}<br>` +
         `Copy to Director: ${notify.adminSent ? 'sent ✓' : '—'}`,
     ),

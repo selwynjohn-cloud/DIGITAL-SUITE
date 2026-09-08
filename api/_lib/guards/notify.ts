@@ -1,8 +1,15 @@
 import { Resend } from 'resend'
 import { sendSuiteEmail } from '../suite-mail.js'
+import {
+  suiteColourEmailShell,
+  suiteStatRow,
+  suiteTable,
+  escHtml,
+} from '../suite-digest-shell.js'
 import type { GuardComplaint } from './store.js'
 import { departmentForCategory, getDeptStaff, getOpsStaff } from './store.js'
 import { getHodEmailsForBranch } from '../mis/digest.js'
+import { findDeptInDirectoryOrSaved, findOpsInDirectoryOrSaved } from './directory-staff.js'
 import { hodEmailsForBranch } from './hod-contacts.js'
 import { waSendText, whatsappConfigured } from '../pulse/whatsapp.js'
 import {
@@ -12,6 +19,9 @@ import {
   displayStatus,
   SLA_LABEL,
 } from './completion.js'
+import { satisfactionFromFeedback } from './digest.js'
+import { guardsGoogleReviewUrl } from './brand.js'
+import type { GuardsDashboard } from './dashboard.js'
 
 function esc(s: unknown) {
   return String(s ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
@@ -224,13 +234,14 @@ export async function sendCompletionLetter(
   actor: string,
 ) {
   const fbUrl = feedbackFormUrl(c.code)
+  const reviewUrl = guardsGoogleReviewUrl()
   const subject = completionLetterSubject(c.code)
-  const body = completionLetterBody(c, assurance, fbUrl)
+  const body = completionLetterBody(c, assurance, fbUrl, reviewUrl)
   if (channel === 'whatsapp') {
     if (!whatsappConfigured()) return { ok: false, skipped: true }
     const to = whatsappMobile(c.mobile)
     if (to.length < 12) return { ok: false, error: 'Guard mobile invalid' }
-    const r = await waSendText(to, completionLetterWhatsApp(c, assurance, fbUrl))
+    const r = await waSendText(to, completionLetterWhatsApp(c, assurance, fbUrl, reviewUrl))
     return { ok: Boolean(r?.ok), channel, subject, body, sentTo: c.mobile, feedbackUrl: fbUrl }
   }
   const apiKey = process.env.RESEND_API_KEY?.trim()
@@ -243,6 +254,8 @@ export async function sendCompletionLetter(
     subject,
     html: `<pre style="font-family:Arial;font-size:14px;white-space:pre-wrap">${esc(body)}</pre>
       <p style="margin-top:14px"><a href="${esc(fbUrl)}" style="color:#b91c1c;font-weight:bold">Share your feedback (1–5 stars) →</a></p>
+      <p style="margin-top:8px;font-size:13px">Optional — if you are satisfied, you may also leave a Google review (not compulsory):<br>
+      <a href="${esc(reviewUrl)}">${esc(reviewUrl)}</a></p>
       <p><i>Forward to guard ${esc(c.mobile)} if no email on file.</i></p>`,
   })
   return { ok: !r.error, channel, subject, body, sentTo: c.mobile, feedbackUrl: fbUrl, error: r.error?.message }
@@ -271,6 +284,93 @@ export async function sendDelayedEscalationMail(c: GuardComplaint, branchName: s
       ${complaintDetailHtml(c, branchName)}</div>`,
   })
   return { ok: !r.error, to: toList, error: r.error?.message }
+}
+
+/** Delayed apology to the guard (WhatsApp once) + email copy CC: IT, HOD, assigned staff, Director. */
+export async function sendDelayedGuardApologyWhatsApp(c: GuardComplaint, branchName: string) {
+  const mobile = whatsappMobile(c.mobile || '')
+  const subject = `Delayed apology — ${c.code} — ${branchName}`
+  const body =
+    `Agile Security Force — Guard Care\n\n` +
+    `Dear ${c.guardName || 'Guard'},\n\n` +
+    `We apologise that complaint *${c.code}* (${branchName}) is taking longer than our ${SLA_LABEL} promise.\n\n` +
+    `Our team is following up. You will get a completion message when it is closed.\n\n` +
+    `— Agile Guards`
+  const html =
+    `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#0f172a">` +
+    `<p><b>Agile Security Force — Guard Care</b></p>` +
+    `<p>Dear ${esc(c.guardName || 'Guard')},</p>` +
+    `<p>We apologise that complaint <b>${esc(c.code)}</b> (${esc(branchName)}) is taking longer than our ${esc(SLA_LABEL)} promise.</p>` +
+    `<p>Our team is following up. You will get a completion message when it is closed.</p>` +
+    `<p>— Agile Guards</p>` +
+    `<hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0">` +
+    `<p style="font-size:12px;color:#64748b">Staff copy — To: Assigned staff · CC: IT, HOD, Director. Same apology sent once to the guard on WhatsApp.</p>` +
+    `${complaintDetailHtml(c, branchName)}` +
+    `</div>`
+
+  let waOk = false
+  let waSkipped = false
+  let waError: string | undefined
+  if (!whatsappConfigured() || mobile.length < 12) {
+    waSkipped = true
+  } else {
+    const r = await waSendText(mobile, body)
+    waOk = Boolean(r?.ok)
+    if (!waOk) waError = 'WhatsApp send failed'
+  }
+
+  const apiKey = process.env.RESEND_API_KEY?.trim()
+  let mailOk = false
+  let mailTo: string[] = []
+  let mailCc: string[] = []
+  let mailError: string | undefined
+  if (apiKey) {
+    const resend = new Resend(apiKey)
+    const from = process.env.EMAIL_FROM ?? 'Agile Guards <noreply@agilegroup.co.in>'
+    const director = directorEmail()
+    const hodEmails = await getHodEmailsForBranch(c.branchId)
+    const assigned = [c.opsStaffEmail, c.deptStaffEmail]
+      .map((e) => String(e || '').trim().toLowerCase())
+      .filter((e) => e.includes('@'))
+    // To: assigned staff · CC: HOD, Director — never it@ (left the company)
+    const toSet = new Set<string>(assigned)
+    if (!toSet.size) {
+      // No assigned email yet — Director holds To so the copy still goes out once.
+      toSet.add(director.toLowerCase())
+    }
+    const ccSet = new Set<string>()
+    for (const e of [...hodEmails, director]) {
+      const em = String(e || '').trim().toLowerCase()
+      if (!em.includes('@') || toSet.has(em)) continue
+      ccSet.add(em)
+    }
+    mailTo = [...toSet]
+    mailCc = [...ccSet]
+    if (mailTo.length) {
+      const r = await sendSuiteEmail(resend, {
+        from,
+        to: mailTo,
+        cc: mailCc.length ? mailCc : undefined,
+        subject: `${subject} (staff copy)`,
+        html,
+      })
+      mailOk = !r.error
+      if (r.error) mailError = r.error.message
+    }
+  }
+
+  return {
+    ok: waOk || mailOk,
+    skipped: waSkipped && !mailOk,
+    subject,
+    body,
+    sentTo: waOk ? mobile : c.mobile || '',
+    emailTo: mailTo,
+    emailCc: mailCc,
+    whatsappOk: waOk,
+    emailOk: mailOk,
+    error: waError || mailError,
+  }
 }
 
 export async function notifyNewGuardComplaint(c: GuardComplaint, branchName: string) {
@@ -361,7 +461,9 @@ export async function sendDelayedReminderMail(
   },
 ) {
   const apiKey = process.env.RESEND_API_KEY?.trim()
-  if (!apiKey) return { ok: false, skipped: true }
+  if (!apiKey) {
+    return { ok: false, skipped: true, error: 'Email is not configured. Branch delayed lists still go at 9:30 AM and 5:00 PM.' }
+  }
   const resend = new Resend(apiKey)
   const from = process.env.EMAIL_FROM ?? 'Agile Guards <noreply@agilegroup.co.in>'
   const director = directorEmail()
@@ -387,14 +489,20 @@ export async function sendDelayedReminderMail(
   if (target === 'department' || target === 'both') {
     let picked = false
     if (opts?.opsStaffId) {
-      const staff = (await getOpsStaff()).find((o) => o.id === opts.opsStaffId)
+      const staff = findOpsInDirectoryOrSaved(
+        opts.opsStaffId,
+        await getOpsStaff(),
+        opts.misUsers ?? [],
+        opts.portalUsers ?? [],
+        opts.branches ?? [],
+      )
       if (staff?.email?.includes('@')) {
         to.add(staff.email.trim())
         picked = true
       }
     }
     if (opts?.deptStaffId) {
-      const staff = (await getDeptStaff()).find((d) => d.id === opts.deptStaffId)
+      const staff = findDeptInDirectoryOrSaved(opts.deptStaffId, await getDeptStaff(), opts.misUsers ?? [])
       if (staff?.email?.includes('@')) {
         to.add(staff.email.trim())
         picked = true
@@ -508,6 +616,7 @@ export async function sendFeedbackSubmittedMail(
   const toList = [...new Set(hodEmails.filter((e) => e.includes('@')))]
   if (!toList.length) toList.push(director)
   const stars = '★'.repeat(rating) + '☆'.repeat(5 - rating)
+  const sat = satisfactionFromFeedback(rating, comment)
   const html = `<div style="font-family:Arial,sans-serif;max-width:640px">
     <div style="background:linear-gradient(135deg,#7f1d1d,#450a0a);color:#fff;padding:16px;border-radius:8px 8px 0 0">
       <b>Agile Guards — Guard Feedback Received</b>
@@ -520,6 +629,7 @@ export async function sendFeedbackSubmittedMail(
         <tr><td style="padding:6px;font-weight:600">ID No.</td><td style="padding:6px">${esc(c.idNo)}</td></tr>
         <tr><td style="padding:6px;font-weight:600">Category</td><td style="padding:6px">${esc(c.category)} — ${esc(c.subCategory)}</td></tr>
         <tr><td style="padding:6px;font-weight:600">Rating for Agile</td><td style="padding:6px;color:#f59e0b;font-size:18px">${stars} (${rating}/5)</td></tr>
+        <tr><td style="padding:6px;font-weight:600">AI reading</td><td style="padding:6px">${esc(sat.label)}</td></tr>
         <tr><td style="padding:6px;font-weight:600;vertical-align:top">Comment</td><td style="padding:6px">${esc(comment || '—')}</td></tr>
       </table>
       <p style="font-size:12px;color:#64748b;margin-top:14px">
@@ -530,46 +640,195 @@ export async function sendFeedbackSubmittedMail(
   const r = await sendSuiteEmail(resend, {
     from,
     to: toList,
-    cc: [director],
     subject: `Guard Feedback — ${c.code} — ${rating}/5 stars — ${c.guardName}`,
     html,
   })
   return { ok: !r.error, to: toList, error: r.error?.message }
 }
 
+export type GuardsDashboardShareSummary = Pick<
+  GuardsDashboard,
+  | 'total'
+  | 'received'
+  | 'delayed'
+  | 'solved'
+  | 'avgResponseHours'
+  | 'slaCompliancePct'
+  | 'topCategories'
+  | 'byDepartment'
+  | 'byBranch'
+  | 'hurdles'
+  | 'suggestions'
+> & {
+  /** Alias used by older callers — same as received (open cases). */
+  open?: number
+}
+
+/** Colourful shareable dashboard HTML — regular Agile header + footer. */
+export function buildGuardsDashboardShareHtml(
+  branchName: string,
+  summary: GuardsDashboardShareSummary,
+  opts?: { portal?: 'staff' | 'management' },
+): string {
+  const open = summary.open ?? summary.received ?? 0
+  const today = new Date().toLocaleDateString('en-IN', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'Asia/Kolkata',
+  })
+  const portal = opts?.portal === 'management' ? 'management' : 'staff'
+  const portalUrl =
+    portal === 'management'
+      ? 'https://www.agilegroup-digital.co.in/guards?portal=management'
+      : 'https://www.agilegroup-digital.co.in/guards'
+
+  const kpis = suiteStatRow([
+    { label: 'Total', value: summary.total || 0, color: '#14224f', bg: 'linear-gradient(145deg,#eff6ff,#dbeafe)' },
+    { label: 'Open', value: open, color: '#1d4ed8', bg: 'linear-gradient(145deg,#eff6ff,#bfdbfe)' },
+    {
+      label: 'Delayed >24h',
+      value: summary.delayed || 0,
+      color: '#b91c1c',
+      bg: 'linear-gradient(145deg,#fef2f2,#fecaca)',
+    },
+    {
+      label: 'Solved',
+      value: summary.solved || 0,
+      color: '#047857',
+      bg: 'linear-gradient(145deg,#ecfdf5,#bbf7d0)',
+    },
+    {
+      label: 'Avg hours',
+      value: `${summary.avgResponseHours || 0}h`,
+      color: '#a16207',
+      bg: 'linear-gradient(145deg,#fffbeb,#fde68a)',
+    },
+    {
+      label: 'Within 24h',
+      value: `${summary.slaCompliancePct || 0}%`,
+      color: '#0f766e',
+      bg: 'linear-gradient(145deg,#f0fdfa,#99f6e4)',
+    },
+  ])
+
+  const catRows = (summary.topCategories || [])
+    .slice(0, 8)
+    .map(
+      (c, i) =>
+        `<tr style="background:${i % 2 ? '#f8fafc' : '#fff'}">
+          <td style="padding:9px 8px;border-bottom:1px solid #e2e8f0;font-weight:700;color:#0f172a">${escHtml(c.category)}</td>
+          <td style="padding:9px 8px;border-bottom:1px solid #e2e8f0;color:#1d4ed8;font-weight:800">${c.count}</td>
+          <td style="padding:9px 8px;border-bottom:1px solid #e2e8f0;color:#64748b">${c.avgHours}h avg</td>
+        </tr>`,
+    )
+    .join('')
+
+  const deptRows = (summary.byDepartment || [])
+    .slice(0, 10)
+    .map(
+      (d, i) =>
+        `<tr style="background:${i % 2 ? '#f8fafc' : '#fff'}">
+          <td style="padding:9px 8px;border-bottom:1px solid #e2e8f0;font-weight:700">${escHtml(d.department)}</td>
+          <td style="padding:9px 8px;border-bottom:1px solid #e2e8f0">${d.count}</td>
+          <td style="padding:9px 8px;border-bottom:1px solid #e2e8f0">${d.avgHours}h</td>
+          <td style="padding:9px 8px;border-bottom:1px solid #e2e8f0;color:${d.delayed ? '#b91c1c' : '#047857'};font-weight:800">${d.delayed}</td>
+        </tr>`,
+    )
+    .join('')
+
+  const branchRows = (summary.byBranch || [])
+    .slice(0, 20)
+    .map(
+      (b, i) =>
+        `<tr style="background:${i % 2 ? '#f8fafc' : '#fff'}">
+          <td style="padding:9px 8px;border-bottom:1px solid #e2e8f0;font-weight:800;color:#14224f">${escHtml(b.branchName)}</td>
+          <td style="padding:9px 8px;border-bottom:1px solid #e2e8f0">${b.total}</td>
+          <td style="padding:9px 8px;border-bottom:1px solid #e2e8f0">${b.received}</td>
+          <td style="padding:9px 8px;border-bottom:1px solid #e2e8f0;color:${b.delayed ? '#b91c1c' : '#334155'};font-weight:700">${b.delayed}</td>
+          <td style="padding:9px 8px;border-bottom:1px solid #e2e8f0;color:#047857;font-weight:700">${b.solved}</td>
+          <td style="padding:9px 8px;border-bottom:1px solid #e2e8f0">${b.avgHours}h</td>
+          <td style="padding:9px 8px;border-bottom:1px solid #e2e8f0;font-weight:800">${b.slaPct}%</td>
+        </tr>`,
+    )
+    .join('')
+
+  const hurdles = (summary.hurdles || [])
+    .slice(0, 6)
+    .map(
+      (x) =>
+        `<div style="margin:8px 0;padding:12px 14px;border-radius:12px;background:${x.count > 2 ? 'linear-gradient(135deg,#fef2f2,#fee2e2)' : 'linear-gradient(135deg,#fffbeb,#fef3c7)'};border:1px solid ${x.count > 2 ? '#fecaca' : '#fde68a'}">
+          <div style="font-weight:800;color:${x.count > 2 ? '#991b1b' : '#92400e'}">${escHtml(x.label)} (${x.count})</div>
+          <div style="font-size:13px;color:#475569;margin-top:4px">${escHtml(x.hint)}</div>
+        </div>`,
+    )
+    .join('')
+
+  const suggestions = (summary.suggestions || [])
+    .slice(0, 8)
+    .map(
+      (s) =>
+        `<li style="margin:6px 0;padding:8px 10px;background:linear-gradient(90deg,#f0f9ff,#eff6ff);border-radius:8px;border-left:4px solid #3b82f6;color:#0f172a">${escHtml(s)}</li>`,
+    )
+    .join('')
+
+  const bodyHtml = `
+    <p style="margin:0 0 6px;font-size:13px;color:#64748b">Scope: <b style="color:#14224f">${escHtml(branchName)}</b> · ${escHtml(today)}</p>
+    <p style="margin:0 0 12px;font-size:13px;color:#475569">Internal Customer Care · Response standard: <b>${escHtml(SLA_LABEL)}</b></p>
+    ${kpis}
+    ${
+      branchRows
+        ? `<h3 style="margin:18px 0 8px;color:#14224f;font-size:16px">Branch-wise breakdown</h3>${suiteTable(['Branch', 'Total', 'Open', 'Delayed', 'Solved', 'Avg h', 'Within 24h'], branchRows, 7)}`
+        : ''
+    }
+    ${
+      deptRows
+        ? `<h3 style="margin:18px 0 8px;color:#14224f;font-size:16px">Time per department</h3>${suiteTable(['Department', 'Cases', 'Avg hours', 'Delayed'], deptRows, 4)}`
+        : ''
+    }
+    ${
+      catRows
+        ? `<h3 style="margin:18px 0 8px;color:#14224f;font-size:16px">Complaint categories</h3>${suiteTable(['Category', 'Cases', 'Avg hours'], catRows, 3)}`
+        : ''
+    }
+    ${hurdles ? `<h3 style="margin:18px 0 8px;color:#991b1b;font-size:16px">Where it is delayed</h3>${hurdles}` : ''}
+    ${
+      suggestions
+        ? `<h3 style="margin:18px 0 8px;color:#1d4ed8;font-size:16px">Suggestions to reduce response time (${escHtml(SLA_LABEL)})</h3><ul style="margin:0;padding:0;list-style:none">${suggestions}</ul>`
+        : ''
+    }
+    <p style="margin:18px 0 0;font-size:13px">
+      <a href="${portalUrl}" style="display:inline-block;padding:10px 16px;background:linear-gradient(135deg,#14224f,#1e3a8a);color:#fff;text-decoration:none;border-radius:10px;font-weight:800">Open Agile Guards portal</a>
+    </p>
+  `
+
+  return suiteColourEmailShell({
+    appName: 'Agile Guards · Internal Customer Care',
+    title: 'Branch Dashboard',
+    subtitle: `${escHtml(branchName)} · Colourful complaint status report`,
+    accentFrom: '#7f1d1d',
+    accentTo: '#1e3a8a',
+    bodyHtml,
+  })
+}
+
 export async function sendDashboardShareMail(
   branchName: string,
-  summary: {
-    total: number
-    open: number
-    delayed: number
-    solved: number
-    avgResponseHours: number
-    slaCompliancePct: number
-  },
+  summary: GuardsDashboardShareSummary,
   toEmail: string,
+  opts?: { portal?: 'staff' | 'management' },
 ) {
   const apiKey = process.env.RESEND_API_KEY?.trim()
   if (!apiKey || !toEmail.includes('@')) return { ok: false, skipped: true }
   const resend = new Resend(apiKey)
   const from = process.env.EMAIL_FROM ?? 'Agile Guards <noreply@agilegroup.co.in>'
+  const html = buildGuardsDashboardShareHtml(branchName, summary, opts)
   const r = await sendSuiteEmail(resend, {
     from,
     to: [toEmail],
     subject: `Agile Guards Dashboard — ${branchName}`,
-    html: `<div style="font-family:Arial,sans-serif">
-      <h2>Agile Guards — Branch Dashboard</h2>
-      <p><b>Branch / scope:</b> ${esc(branchName)}</p>
-      <ul>
-        <li>Total complaints: <b>${summary.total}</b></li>
-        <li>Open: <b>${summary.open}</b></li>
-        <li>Delayed (&gt;24h): <b>${summary.delayed}</b></li>
-        <li>Solved: <b>${summary.solved}</b></li>
-        <li>Average response: <b>${summary.avgResponseHours} hours</b></li>
-        <li>Within 24h: <b>${summary.slaCompliancePct}%</b></li>
-      </ul>
-      <p><a href="https://www.agilegroup-digital.co.in/guards?portal=management">Open Management Portal</a></p>
-    </div>`,
+    html,
   })
   return { ok: !r.error, error: r.error?.message }
 }

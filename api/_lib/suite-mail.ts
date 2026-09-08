@@ -3,6 +3,24 @@ import type { Resend } from 'resend'
 import { getUsers as getFleetUsers } from './fleet/store.js'
 import { getUsers as getMisUsers } from './mis/store.js'
 
+/** IT must never receive copies of suite activity (mail / alerts). */
+export function itBlockedEmails(): Set<string> {
+  const fromEnv = (process.env.IT_SUITE_EMAILS ?? process.env.IT_EMAIL ?? '')
+    .split(',')
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean)
+  return new Set(['it@agilegroup.co.in', ...fromEnv])
+}
+
+export function isItBlockedEmail(email: string): boolean {
+  return itBlockedEmails().has(normaliseEmail(email))
+}
+
+function withoutItEmails(emails: string[]): string[] {
+  const blocked = itBlockedEmails()
+  return emails.filter((e) => !blocked.has(e.trim().toLowerCase()))
+}
+
 /** Director inbox — CC on every mail from agilegroup-digital.co.in apps. */
 export function suiteDirectorEmail(): string {
   return (
@@ -37,6 +55,12 @@ export function mergeDirectorCc(
   return withoutNoMailRecipients([...ccList, director])
 }
 
+export type SuiteEmailAttachment = {
+  filename: string
+  content: string
+  contentType?: string
+}
+
 export type SuiteEmailPayload = {
   from: string
   to: string | string[]
@@ -46,22 +70,46 @@ export type SuiteEmailPayload = {
   html?: string
   text?: string
   replyTo?: string | string[]
+  attachments?: SuiteEmailAttachment[]
   /** Director CC is on by default for all suite applications. */
   skipDirectorCc?: boolean
+  /**
+   * Only for IT's own login PIN mail (so IT can open apps).
+   * Never used for copies of other people's activity.
+   */
+  allowItOwnMail?: boolean
 }
 
 /** Send mail via Resend — always CC Director (visible) unless Director is already in To. */
 export async function sendSuiteEmail(resend: Resend, payload: SuiteEmailPayload) {
-  const { skipDirectorCc, to, cc, bcc, ...rest } = payload
+  const { skipDirectorCc, allowItOwnMail: _allowItOwnMail, to, cc, bcc, ...rest } = payload
   const director = suiteDirectorEmail()
-  const ccMerged = mergeDirectorCc(to, cc, { skip: skipDirectorCc })
-  const bccList = withoutNoMailRecipients(emailList(bcc).filter((e) => e !== director))
-  return resend.emails.send({
-    ...rest,
-    to,
-    cc: ccMerged.length ? ccMerged : undefined,
-    bcc: bccList.length ? bccList : undefined,
-  })
+  // Never To / CC / BCC it@ — Prabhakar left the company.
+  const ccMerged = withoutItEmails(mergeDirectorCc(to, cc, { skip: skipDirectorCc }))
+  const bccList = withoutItEmails(
+    withoutNoMailRecipients(emailList(bcc).filter((e) => e !== director)),
+  )
+  const toList = withoutItEmails(withoutNoMailRecipients(emailList(to)))
+  if (!toList.length) {
+    return {
+      data: null,
+      error: { message: 'No valid recipients after IT monitoring block.', name: 'it_blocked' },
+    }
+  }
+  const sendOnce = () =>
+    resend.emails.send({
+      ...rest,
+      to: toList.length === 1 ? toList[0] : toList,
+      cc: ccMerged.length ? ccMerged : undefined,
+      bcc: bccList.length ? bccList : undefined,
+    } as Parameters<typeof resend.emails.send>[0])
+  const first = await sendOnce()
+  if (!first.error) return first
+  const name = String(first.error.name || '')
+  if (name === 'it_blocked') return first
+  // One retry if the first Resend call fails (timeout / brief outage).
+  await new Promise((resolve) => setTimeout(resolve, 1600))
+  return sendOnce()
 }
 
 /** Verified Resend sender (must be a domain/address Resend accepts). */

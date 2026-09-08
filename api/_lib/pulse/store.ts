@@ -46,10 +46,31 @@ export async function redisCommand(command: unknown[]): Promise<{ result?: unkno
 /** Local alias kept for readability inside this module. */
 const redis = redisCommand
 
+function isRemovedHdfcMumbaiEvent(heading: string): boolean {
+  const h = String(heading || '').toLowerCase()
+  return h.includes('appreciation and cash reward') && h.includes('hdfc mumbai')
+}
+
+const INDEPENDENCE_DAY_VIDEO = '/news-assets/independence-day-2026.mp4'
+
+function isIndependenceDayEvent(heading: string): boolean {
+  const h = String(heading || '').toLowerCase()
+  return h.includes('independence day') || h.includes('tricolour') || h.includes('tricolor')
+}
+
 function normalise(raw: unknown): EditorialContent {
   const data = (raw ?? {}) as Partial<EditorialContent>
+  const events = (Array.isArray(data.events) ? data.events : [])
+    .filter((e) => !isRemovedHdfcMumbaiEvent(String((e as { heading?: string })?.heading ?? '')))
+    .map((e) => {
+      const ev = e as EditorialContent['events'][number]
+      if (isIndependenceDayEvent(ev.heading) && !String(ev.videoUrl || '').trim()) {
+        return { ...ev, videoUrl: INDEPENDENCE_DAY_VIDEO }
+      }
+      return ev
+    })
   return {
-    events: Array.isArray(data.events) ? data.events : [],
+    events,
     jobImages: Array.isArray(data.jobImages) ? data.jobImages.slice(0, 3) : [],
     guards: Array.isArray(data.guards) ? data.guards.slice(0, 3) : [],
   }
@@ -60,7 +81,13 @@ export async function getEditorial(): Promise<EditorialContent> {
   const data = await redis(['GET', EDITORIAL_KEY])
   if (data?.result && typeof data.result === 'string') {
     try {
-      return normalise(JSON.parse(data.result))
+      const parsed = JSON.parse(data.result) as Partial<EditorialContent>
+      const before = Array.isArray(parsed.events) ? parsed.events.length : 0
+      const editorial = normalise(parsed)
+      if (editorial.events.length < before) {
+        await redis(['SET', EDITORIAL_KEY, JSON.stringify(editorial)])
+      }
+      return editorial
     } catch {
       return DEFAULT_EDITORIAL
     }

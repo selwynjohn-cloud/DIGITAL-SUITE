@@ -4,7 +4,7 @@
 import { getComplaints as getGuardComplaints } from '../guards/store.js'
 import { resolveBranchId } from '../guards/store.js'
 import {
-  getBranches,
+  getMisReportBranches,
   getComplaints,
   saveComplaints,
   type MisComplaint,
@@ -27,7 +27,7 @@ export async function syncGuardsComplaintsToMis(): Promise<{
   skipped: number
   errors: string[]
 }> {
-  const [guardList, misBranches] = await Promise.all([getGuardComplaints(), getBranches(true)])
+  const [guardList, misBranches] = await Promise.all([getGuardComplaints(), getMisReportBranches(true)])
   let imported = 0
   let updated = 0
   let skipped = 0

@@ -14,6 +14,7 @@ import type {
   LiveStatusRow,
   LiveUnitWeekOff,
   LiveVacantAllot,
+  LiveOffExtraDuty,
 } from './types.js'
 import { liveUnitWoKey } from './weekly-roster.js'
 
@@ -27,6 +28,7 @@ const SESS_PREFIX = 'live:gsess:'
 const UNIT_WO_KEY = 'live:unit-week-off:v1'
 const REMIND_KEY = 'live:reminders:v1'
 const VACANT_KEY = 'live:vacant-allot:v1'
+const OFF_EXTRA_KEY = 'live:off-extra:v1'
 const SITE_NOTE_KEY = 'live:site-notes:v1'
 const SOFT_KEY = 'live:soft-skills:v1'
 const ID_CARD_KEY = 'live:id-cards:v1'
@@ -347,6 +349,27 @@ export async function replyLiveReminder(id: string, reply: string, mobile: strin
   rec.reply = reply
   rec.repliedAt = new Date().toISOString()
   await setJson(REMIND_KEY, list.slice(0, 4000))
+  return rec
+}
+
+export async function listLiveOffExtras(): Promise<LiveOffExtraDuty[]> {
+  const list = await getJson<LiveOffExtraDuty[]>(OFF_EXTRA_KEY, [])
+  return Array.isArray(list) ? list : []
+}
+
+export async function listLiveOffExtrasForMobile(mobile: string): Promise<LiveOffExtraDuty[]> {
+  const want = String(mobile || '').replace(/\D/g, '').slice(-10)
+  if (want.length !== 10) return []
+  return (await listLiveOffExtras()).filter((r) => String(r.mobile || '').replace(/\D/g, '').slice(-10) === want)
+}
+
+export async function saveLiveOffExtra(row: Omit<LiveOffExtraDuty, 'id' | 'at'>): Promise<LiveOffExtraDuty> {
+  const rec: LiveOffExtraDuty = { ...row, id: opsNid('ox'), at: new Date().toISOString() }
+  const list = (await listLiveOffExtras()).filter(
+    (r) => !(r.date === rec.date && String(r.mobile || '').replace(/\D/g, '').slice(-10) === String(rec.mobile || '').replace(/\D/g, '').slice(-10)),
+  )
+  list.unshift(rec)
+  await setJson(OFF_EXTRA_KEY, list.slice(0, 4000))
   return rec
 }
 

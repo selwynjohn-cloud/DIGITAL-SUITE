@@ -2,11 +2,18 @@ import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { verifyAppSession } from '../_lib/app-session.js'
 import { getEditorial, saveEditorial, saveImage, storageStatus } from '../_lib/pulse/store.js'
 import {
-  drawWinner,
+  dedupeQuizBank,
+  drawWinners,
+  findEntryMobile,
+  formatQuizWhatsApp,
   generateQuestions,
+  getAllEntries,
   getBank,
   getEntries,
   getWinners,
+  listQualifiedForWeek,
+  listWeekPlayers,
+  questionFingerprint,
   saveBank,
   weekKey,
 } from '../_lib/pulse/quiz.js'
@@ -135,13 +142,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (action === 'quiz-load') {
     const [bank, winners] = await Promise.all([getBank(), getWinners()])
-    const entries = await getEntries(weekKey())
-    return res.status(200).json({ ok: true, bank, winners, week: weekKey(), entryCount: entries.length })
+    const week = weekKey()
+    const weeks = [...new Set([week, ...winners.map((w) => w.weekKey).filter(Boolean)])]
+    const byWeek = new Map<string, Awaited<ReturnType<typeof getEntries>>>()
+    for (const key of weeks) byWeek.set(key, await getEntries(key))
+    const adminWinners = winners.map((w) => ({
+      ...w,
+      whatsapp: formatQuizWhatsApp(findEntryMobile(byWeek.get(w.weekKey) || [], w)),
+    }))
+    const qualified = await listQualifiedForWeek(week)
+    return res.status(200).json({
+      ok: true,
+      bank,
+      winners: adminWinners,
+      week,
+      entryCount: (byWeek.get(week) || []).length,
+      qualifiedCount: qualified.length,
+    })
   }
 
   if (action === 'quiz-save') {
     if (!storage.ok) return res.status(503).json({ error: 'Storage not connected.' })
-    const bank = sanitiseBank(body.bank)
+    const bank = dedupeQuizBank(sanitiseBank(body.bank))
     const saved = await saveBank(bank)
     if (!saved) return res.status(503).json({ error: 'Could not save questions.' })
     return res.status(200).json({ ok: true, bank })
@@ -149,28 +171,57 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (action === 'quiz-generate') {
     if (!storage.ok) return res.status(503).json({ error: 'Storage not connected.' })
-    const count = Number(body.count) || 5
-    const { questions, error } = await generateQuestions(count)
-    if (error) return res.status(400).json({ error })
     const existing = await getBank()
-    const merged = sanitiseBank([...existing, ...questions])
+    const count = Math.min(20, Math.max(1, Number(body.count) || 20))
+    const { questions, error } = await generateQuestions(
+      count,
+      existing.map((q) => q.question),
+    )
+    if (error) return res.status(400).json({ error })
+    const have = new Set(existing.map((q) => questionFingerprint(q.question)))
+    const uniqueNew = questions.filter((q) => {
+      const fp = questionFingerprint(q.question)
+      if (!fp || have.has(fp)) return false
+      have.add(fp)
+      return true
+    })
+    const merged = dedupeQuizBank(sanitiseBank([...existing, ...uniqueNew]))
     await saveBank(merged)
-    return res.status(200).json({ ok: true, bank: merged, added: questions.length })
+    return res.status(200).json({ ok: true, bank: merged, added: uniqueNew.length })
   }
 
   if (action === 'quiz-entries') {
-    const week = String(body.week ?? weekKey())
-    const entries = await getEntries(week)
-    const masked = entries.map((e) => ({ name: e.name, date: e.date }))
-    return res.status(200).json({ ok: true, week, count: entries.length, entries: masked })
+    const week = String(body.week ?? 'ALL').trim() || 'ALL'
+    const rows = week === 'ALL' || week === '—' ? await getAllEntries() : (await getEntries(week)).map((e) => ({ ...e, week }))
+    const listed = rows.map((e) => ({
+      name: e.name,
+      date: e.date,
+      week: e.week,
+      whatsapp: formatQuizWhatsApp(e.mobile),
+    }))
+    const progressWeek = week === 'ALL' || week === '—' ? weekKey() : week
+    const progress = (await listWeekPlayers(progressWeek)).map((p) => ({
+      ...p,
+      whatsapp: formatQuizWhatsApp(p.mobile),
+    }))
+    return res.status(200).json({ ok: true, week, count: listed.length, entries: listed, progress })
   }
 
   if (action === 'quiz-draw') {
     if (!storage.ok) return res.status(503).json({ error: 'Storage not connected.' })
     const week = String(body.week ?? weekKey())
-    const winner = await drawWinner(week)
-    if (!winner) return res.status(400).json({ error: 'No entries to draw from for this week yet.' })
-    return res.status(200).json({ ok: true, winner })
+    const winners = await drawWinners(week)
+    if (!winners.length) {
+      return res.status(400).json({
+        error: 'No one has completed all 7 days (Sunday to Saturday) with a first-time correct answer yet.',
+      })
+    }
+    const entries = await getEntries(week)
+    const withWa = winners.map((w) => ({
+      ...w,
+      whatsapp: formatQuizWhatsApp(findEntryMobile(entries, w)),
+    }))
+    return res.status(200).json({ ok: true, winner: withWa[0], winners: withWa })
   }
 
   if (action === 'quiz-thankyou') {

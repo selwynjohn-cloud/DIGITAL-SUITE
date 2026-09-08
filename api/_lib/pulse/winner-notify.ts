@@ -85,15 +85,15 @@ export async function sendThankYouToParticipants(week: string): Promise<{
 export function noWinnerWeekMessage(week: string): string {
   return (
     `ℹ️ *Security Quiz — ${week}*\n\n` +
-    `There was *no winner* this week — no one submitted a correct answer.\n\n` +
+    `There was *no winner* this week — no one completed all 7 days (Sunday to Saturday) with a first-time correct answer.\n\n` +
     `"No winner this week" has been published automatically on the bulletin board.\n\n` +
-    `Encourage guards to answer the daily question — next Sunday's draw will pick from correct entries.\n\n` +
+    `Encourage everyone to play every day — first answer must be correct. Next Sunday's draw picks two lucky winners from those who finish the week.\n\n` +
     `— Agile Pulse\n\n` +
     `${CURSOR_ATTRIBUTION}`
   )
 }
 
-export function winnerCongratsMessage(w: Pick<QuizWinner, 'name' | 'weekKey'>): string {
+export function winnerCongratsMessage(w: Pick<QuizWinner, 'name' | 'weekKey' | 'couponCode'>): string {
   return winnerCardText(w)
 }
 
@@ -101,27 +101,41 @@ export async function notifyWinnerPublished(
   pending: PendingQuizWinner,
   published: QuizWinner,
 ): Promise<{ winnerSent: boolean; adminSent: boolean }> {
+  return notifyWinnersPublished([pending], [published])
+}
+
+export async function notifyWinnersPublished(
+  pendingList: PendingQuizWinner[],
+  publishedList: QuizWinner[],
+): Promise<{ winnerSent: boolean; adminSent: boolean }> {
   if (!whatsappConfigured()) return { winnerSent: false, adminSent: false }
 
   const admin = (process.env.ADMIN_WHATSAPP ?? '').replace(/\D/g, '')
-  const toWinner = whatsappMobile(pending.mobile)
-  const imageInfo = await cardImageForGuardId(pending.guardId)
-  const winnerMsg = winnerCardText(published, imageInfo.agileGuard)
-
   let winnerSent = false
   let adminSent = false
 
-  if (toWinner.length >= 12) {
-    const r = await waSendImageCard(toWinner, imageInfo.url, winnerMsg)
-    winnerSent = Boolean(r?.ok)
+  for (let i = 0; i < pendingList.length; i++) {
+    const pending = pendingList[i]
+    const published = publishedList[i] || publishedList[0]
+    if (!pending || !published) continue
+    const toWinner = whatsappMobile(pending.mobile)
+    const imageInfo = await cardImageForGuardId(pending.guardId)
+    const winnerMsg = winnerCardText(published, imageInfo.agileGuard)
+    if (toWinner.length >= 12) {
+      const r = await waSendImageCard(toWinner, imageInfo.url, winnerMsg)
+      if (r?.ok) winnerSent = true
+    }
   }
 
   if (admin) {
+    const names = publishedList.map((w) => `*${w.name}*${w.couponCode ? ` (${w.couponCode})` : ''}`).join(', ')
+    const first = publishedList[0]
     const r = await waSendText(
       admin,
-      `✅ *Quiz winner published* — ${published.weekKey}\n\n` +
-        `Winner: *${published.name}*\n` +
-        `Entries this week: ${pending.entryCount}\n\n` +
+      `✅ *Quiz winner published* — ${first?.weekKey || ''}\n\n` +
+        `Winner: ${names}\n` +
+        `Gift coupon is sent to the ${publishedList.length > 1 ? 'winners' : 'winner'}.\n` +
+        `Entries this week: ${pendingList[0]?.entryCount || 0}\n\n` +
         `Winner card WhatsApp: ${winnerSent ? 'sent ✓' : 'could not send'}\n` +
         `Bulletin board updated.\n\n` +
         `${CURSOR_ATTRIBUTION}`,

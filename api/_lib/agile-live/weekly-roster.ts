@@ -68,6 +68,19 @@ export function liveRankLabel(opts: { designation?: string; clientSite?: string 
   return 'Security Staff'
 }
 
+export function liveUpcomingOffDates(offWeekday?: number, fromYmd?: string, count = 2): string[] {
+  const off = liveWeeklyOffWeekday(offWeekday)
+  const start = String(fromYmd || istYmd())
+  const [ys, ms, ds] = start.split('-').map(Number)
+  const cur = new Date(ys || 2026, (ms || 1) - 1, ds || 1)
+  const out: string[] = []
+  for (let i = 0; i < 21 && out.length < count; i++) {
+    if (cur.getDay() === off) out.push(istYmd(cur))
+    cur.setDate(cur.getDate() + 1)
+  }
+  return out
+}
+
 export function liveWeeklyOffWeekday(offWeekday?: number): number {
   const n = Number(offWeekday)
   if (Number.isInteger(n) && n >= 0 && n <= 6) return n
@@ -151,6 +164,55 @@ export type LiveWeekDay = {
   dow: string
   isToday: boolean
   isOff: boolean
+  isExtra?: boolean
+}
+
+export type LiveWeekExtra = {
+  date: string
+  clientSite: string
+  shiftCode?: string
+}
+
+export function liveShiftForExtra(opts: {
+  shiftRaw: string
+  clientSite: string
+  designation?: string
+  shiftCode?: string
+  at?: Date
+}) {
+  const base = liveWeekShift({
+    shiftRaw: opts.shiftRaw,
+    at: opts.at,
+    clientSite: opts.clientSite,
+    designation: opts.designation,
+  })
+  const code = String(opts.shiftCode || '').trim().toUpperCase()
+  if (!code) return base
+  if (base.hdfc2fa) {
+    const afternoon = code === 'P' || code === 'G'
+    const startHm = afternoon ? '15:00' : '07:00'
+    return {
+      ...base,
+      code: afternoon ? 'P' : 'M',
+      label: afternoon ? '3:00 PM – 11:00 PM' : '7:00 AM – 3:00 PM',
+      startHm,
+      endHm: afternoon ? '23:00' : '15:00',
+    }
+  }
+  if (base.hours === 12) {
+    const night = code === 'N' || code === 'B' || code === 'C'
+    const startHm = night ? '20:00' : '08:00'
+    return {
+      ...base,
+      code: night ? 'N' : 'D',
+      label: night ? '12 hrs Night' : '12 hrs Day',
+      startHm,
+      endHm: addHoursHm(startHm, 12),
+    }
+  }
+  const letter = code === 'G' || code === 'B' || code === 'C' ? code : 'A'
+  const startHm = letter === 'A' ? '06:00' : letter === 'G' ? '14:00' : '22:00'
+  return { ...base, code: letter, label: `Shift ${letter}`, startHm, endHm: addHoursHm(startHm, 8) }
 }
 
 export function livePersonWeek(opts: {
@@ -160,42 +222,57 @@ export function livePersonWeek(opts: {
   shiftRaw: string
   at?: Date
   offWeekday?: number
+  extras?: LiveWeekExtra[]
 }) {
   const at = opts.at ?? istNow()
   const sun = liveWeekStart(at)
   const todayYmd = istYmd(at)
   const offDow = liveWeeklyOffWeekday(opts.offWeekday)
-  const shift = liveWeekShift({
+  const extraByDate = new Map(
+    (opts.extras || [])
+      .filter((e) => e && e.date)
+      .map((e) => [e.date, e] as const),
+  )
+  const todayExtra = extraByDate.get(todayYmd)
+  const dutySite = String(todayExtra?.clientSite || opts.clientSite || '').trim()
+  const shift = liveShiftForExtra({
     shiftRaw: opts.shiftRaw,
-    at,
-    clientSite: opts.clientSite,
+    clientSite: dutySite,
     designation: opts.designation,
+    shiftCode: todayExtra?.shiftCode,
+    at,
   })
-  const rank = liveRankLabel({ designation: opts.designation, clientSite: opts.clientSite })
+  const rank = liveRankLabel({ designation: opts.designation, clientSite: dutySite })
   const days: LiveWeekDay[] = []
   for (let i = 0; i < 7; i++) {
     const d = new Date(sun)
     d.setDate(sun.getDate() + i)
     const ymd = istYmd(d)
+    const extra = extraByDate.get(ymd)
     days.push({
       ymd,
       dow: DOW[i] || '',
       isToday: ymd === todayYmd,
-      isOff: i === offDow,
+      isOff: i === offDow && !extra,
+      isExtra: Boolean(extra),
     })
   }
   const today = days.find((d) => d.isToday) || days[0]
   const tomAt = new Date(at)
   tomAt.setDate(tomAt.getDate() + 1)
-  const tom = liveWeekShift({
+  const tomYmd = istYmd(tomAt)
+  const tomExtra = extraByDate.get(tomYmd)
+  const tom = liveShiftForExtra({
     shiftRaw: opts.shiftRaw,
-    at: tomAt,
-    clientSite: opts.clientSite,
+    clientSite: tomExtra?.clientSite || opts.clientSite,
     designation: opts.designation,
+    shiftCode: tomExtra?.shiftCode,
+    at: tomAt,
   })
-  const tomOff = tomAt.getDay() === offDow
-  const site = String(opts.clientSite || '').trim()
+  const tomOff = tomAt.getDay() === offDow && !tomExtra
+  const site = dutySite
   const todayOff = Boolean(today?.isOff)
+  const todayIsExtra = Boolean(todayExtra)
   return {
     weekStart: istYmd(sun),
     weekEnd: days[6]?.ymd || '',
@@ -203,20 +280,25 @@ export function livePersonWeek(opts: {
     rank,
     hours: shift.hours,
     shiftCode: shift.code,
-    shiftLabel: todayOff ? 'Off Duty' : shift.label,
+    shiftLabel: todayOff ? 'Off Duty' : todayIsExtra ? `${shift.label} · Extra` : shift.label,
     dutyStart: shift.startHm,
     dutyEnd: shift.endHm,
     hdfc2fa: shift.hdfc2fa,
     clientSite: site,
     todayOff,
+    todayExtra: todayIsExtra,
     tomorrowOff: tomOff,
+    tomorrowExtra: Boolean(tomExtra),
     todayShift: todayOff ? 'Off' : liveShiftLetter(shift.code),
     tomorrowShift: tomOff ? 'Off' : liveShiftLetter(tom.code),
     todayTime: liveDutyTimeLine({ off: todayOff, startHm: shift.startHm, endHm: shift.endHm, label: shift.label }),
     tomorrowTime: liveDutyTimeLine({ off: tomOff, startHm: tom.startHm, endHm: tom.endHm, label: tom.label }),
     todayLine: todayOff
       ? 'Off Duty'
-      : [site, rank, shift.label, `${shift.hours} hrs`].filter(Boolean).join(' · '),
+      : todayIsExtra
+        ? [site, rank, shift.label, 'Extra duty'].filter(Boolean).join(' · ')
+        : [site, rank, shift.label, `${shift.hours} hrs`].filter(Boolean).join(' · '),
     days,
+    upcomingOffs: liveUpcomingOffDates(offDow, todayYmd, 2),
   }
 }

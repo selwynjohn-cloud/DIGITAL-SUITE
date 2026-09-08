@@ -5,7 +5,7 @@ export const RECRUIT_BRAND = {
   product: 'Agile Recruitment',
   tagline: 'Building Teams That Win',
   logoUrl: 'https://www.agilegroup-digital.co.in/agile-logo.png',
-  publicFormUrl: 'https://agile-recruitment.codewords.run/',
+  publicFormUrl: 'https://www.securityjob.co.in',
   securityJobUrl: 'https://www.securityjob.co.in',
   helpline: '18005995599',
   footerSite: 'https://www.agilegroup.co.in',
@@ -63,6 +63,50 @@ export const RECRUIT_REPORT_CSS = `
 .wr-tbl th{background:linear-gradient(180deg,${RECRUIT_SKY_DARK},#0b1220);color:#bae6fd;font-size:10px;padding:8px 6px;border:1px solid #22304f}
 .wr-tbl td{background:#111a30;border:1px solid #22304f;padding:6px}
 .wr-tbl tr:nth-child(even) td{background:#0e1730}
+.sj-process{background:#111a30;border:1px solid #0ea5e9;border-radius:12px;padding:12px 14px;margin:10px 0 12px;font-size:13px;line-height:1.55;color:#e2e8f0}
+.sj-process b{color:#7dd3fc}
+.sj-process ol{margin:8px 0 0 18px;padding:0}
+.sj-process li{margin:4px 0}
+.sj-say{background:#0e1730;border:1px dashed #64748b;border-radius:10px;padding:10px 12px;margin-top:10px;font-size:12px;color:#cbd5e1;line-height:1.5}
+.sj-freeze-wrap{overflow:auto;max-height:min(72vh,680px);border-radius:10px;border:1px solid ${RECRUIT_SKY};-webkit-overflow-scrolling:touch}
+.sj-freeze-wrap table{border-collapse:separate;border-spacing:0;min-width:2200px;width:max-content;font-size:12px}
+.sj-date{font-size:16px;min-width:138px;max-width:160px;padding:7px 6px;border-radius:8px;background:#0b1220;color:#fff;border:1px solid #475569}
+.sj-date-ro{font-size:13px;font-weight:700;color:#e2e8f0}
+.sj-invite-box{position:fixed;inset:0;background:rgba(2,8,23,.72);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:18px 12px;overflow:auto}
+.sj-invite-card{width:min(560px,100%);background:#0f172a;border:1px solid #334155;border-radius:14px;padding:16px;color:#e2e8f0}
+.sj-invite-card select,.sj-invite-card textarea{width:100%;margin-top:6px;padding:10px;border-radius:8px;border:1px solid #475569;background:#020617;color:#e2e8f0;font-size:16px}
+.sj-invite-card textarea{min-height:220px;font-size:14px;line-height:1.45}
+.sj-who{display:block;font-size:9px;font-weight:700;color:#94a3b8;margin-top:3px;text-transform:none;letter-spacing:0}
+.sj-saved-pop{position:fixed;inset:0;z-index:10050;background:rgba(2,8,23,.78);display:flex;align-items:center;justify-content:center;padding:20px}
+.sj-saved-card{background:#14532d;border:3px solid #4ade80;border-radius:16px;padding:28px 22px;max-width:420px;width:100%;text-align:center;color:#fff;box-shadow:0 12px 40px rgba(0,0,0,.45)}
+.sj-saved-card b{display:block;font-size:26px;margin-bottom:10px;color:#bbf7d0}
+.sj-saved-card p{font-size:16px;line-height:1.45;margin:0 0 18px;color:#dcfce7}
+.sj-freeze-wrap th,.sj-freeze-wrap td{border:1px solid #22304f;padding:8px 7px;vertical-align:top;background:#111a30}
+.sj-freeze-wrap thead th{position:sticky;top:0;z-index:5;background:#0b1220;color:#bae6fd;font-size:10px;text-transform:uppercase;white-space:nowrap}
+.sj-freeze-wrap .sj-sl,.sj-freeze-wrap .sj-name,.sj-freeze-wrap .sj-mob,.sj-freeze-wrap .sj-f1,.sj-freeze-wrap .sj-f2,.sj-freeze-wrap .sj-f3,.sj-freeze-wrap .sj-act{position:sticky;z-index:3}
+.sj-freeze-wrap .sj-sl{left:0;min-width:48px;max-width:56px;text-align:center;font-weight:800;color:#fde68a}
+.sj-freeze-wrap .sj-name{left:48px;min-width:170px;max-width:220px}
+.sj-freeze-wrap .sj-mob{left:218px;min-width:132px;font-size:14px;font-weight:800;color:#fff;white-space:nowrap;box-shadow:3px 0 6px rgba(0,0,0,.28)}
+.sj-freeze-wrap .sj-f1{left:0;min-width:180px;max-width:220px}
+.sj-freeze-wrap .sj-f2{left:180px;min-width:108px}
+@media print{
+  .noprint,.side,.bar,.burger,.help-links,.logout,#recruitPortalHint,.savebar{display:none!important}
+  body{background:#fff;color:#111}
+  .main{margin-left:0}
+  .rpt-sheet{box-shadow:none;border:1px solid #ccc}
+  .wr-tbl th,.wr-tbl td{color:#111;background:#fff!important}
+  .ab-act{display:none!important}
+}
+.sj-freeze-wrap .sj-f3{left:288px;min-width:168px;box-shadow:3px 0 6px rgba(0,0,0,.28)}
+.sj-freeze-wrap .sj-act{right:0;min-width:88px;white-space:nowrap;box-shadow:-3px 0 6px rgba(0,0,0,.28)}
+.sj-freeze-wrap thead .sj-sl,.sj-freeze-wrap thead .sj-name,.sj-freeze-wrap thead .sj-mob,
+.sj-freeze-wrap thead .sj-f1,.sj-freeze-wrap thead .sj-f2,.sj-freeze-wrap thead .sj-f3,.sj-freeze-wrap thead .sj-act{z-index:8;background:#0b1220}
+.sj-freeze-wrap tbody tr:nth-child(even) td{background:#0e1730}
+.sj-freeze-wrap tbody tr.sj-overdue td{background:rgba(239,68,68,.16)}
+.sj-freeze-wrap tbody tr.sj-due td{background:rgba(251,146,60,.14)}
+.sj-freeze-wrap tbody tr.sj-joined td{background:rgba(34,197,94,.10)}
+.sj-freeze-wrap tbody tr.sj-closed td{background:rgba(220,38,38,.08)}
+.sj-next{font-size:11px;font-weight:800;color:#fde68a;line-height:1.35;max-width:168px}
 .pipe-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
 .pipe-tab{padding:8px 14px;border-radius:8px;border:1px solid #334155;background:#111a30;color:#cbd5e1;cursor:pointer;font-weight:700;font-size:12px}
 .pipe-tab.active{background:${RECRUIT_PURPLE};color:#fff;border-color:${RECRUIT_PURPLE}}
@@ -71,6 +115,14 @@ export const RECRUIT_REPORT_CSS = `
 .stage-medical{background:#422006;color:#fcd34d}.stage-ready{background:#14532d;color:#86efac}
 .stage-deployed{background:#0f766e;color:#5eead4}.stage-rejected{background:#450a0a;color:#fca5a5}
 .stage-joinback{background:#581c87;color:#e9d5ff}
+@media print{
+  .noprint,.side,.bar,.burger,.help-links,.logout,#recruitPortalHint,.savebar{display:none!important}
+  body{background:#fff;color:#111}
+  .main{margin-left:0}
+  .rpt-sheet{box-shadow:none;border:1px solid #ccc}
+  .wr-tbl th,.wr-tbl td{color:#111;background:#fff!important}
+  .ab-act{display:none!important}
+}
 `
 
 export function recruitReportHeader(title: string, subtitle?: string, badge?: string): string {

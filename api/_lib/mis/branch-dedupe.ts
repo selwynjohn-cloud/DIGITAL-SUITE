@@ -1,13 +1,13 @@
 /**
- * Remove duplicate MIS branch masters and merge data onto one canonical branch per zone.
+ * Remove duplicate MIS branch masters (same city spelled twice).
  *
- * Business rules (Director):
- * - Same city, multiple branches = SEPARATE daily reports (e.g. Hyderabad-A, Hyderabad-B,
- *   Hi-Tech City — three branches, three reports; split by guard headcount).
- * - Small branch + nearby big branch = ONE combined report (e.g. Nellore & Tada,
- *   Tamil Nadu & Pondicherry, Vizag & Kakinada).
- * - Surat (Gujarat state) reports under Mumbai & Surat — no separate Gujarat branch.
+ * Standing rule (Director): every ops city is INDEPENDENT.
+ * Nellore ≠ Tada, Tirupati ≠ Tadipatri, Chennai ≠ Puducherry,
+ * Mumbai ≠ Surat, Visakhapatnam ≠ Kakinada.
+ * Hyderabad-A, Hyderabad-B, Hi-Tech City stay three separate reports.
+ * This function must NEVER fold a neighbour city into another.
  */
+import { suiteBranchPin } from '../suite-credentials.js'
 import {
   getBranches,
   getClients,
@@ -19,6 +19,7 @@ import {
   getReportDates,
   getStaff,
   getUsers,
+  nid,
   saveBranches,
   saveClients,
   saveCollections,
@@ -46,16 +47,109 @@ const PREFERRED_DISPLAY: Record<string, string> = {
   'HYDERABAD-A': 'Hyderabad-A',
   'HYDERABAD-B': 'Hyderabad-B',
   'HI-TECH CITY': 'Hi-Tech City',
-  'TN-PONDICHERRY': 'Chennai & Pondicherry',
-  'VIZAG-KAKINADA': 'Visakhapatnam & Kakinada',
-  'NELLORE-TADA': 'Nellore & Tada',
-  'KARNATAKA': 'Bangalore',
-  'KERALA': 'Kochi',
-  'MUMBAI-SURAT': 'Mumbai & Surat',
-  'BHOPAL-MP': 'Bhopal',
-  'LUCKNOW-UP': 'Lucknow',
-  'VIJAYAWADA': 'Vijayawada',
-  'TIRUPATHI': 'Tirupati & Tadipatri',
+  CHENNAI: 'Chennai',
+  PUDUCHERRY: 'Puducherry',
+  KAKINADA: 'Kakinada',
+  VISAKHAPATNAM: 'Visakhapatnam',
+  NELLORE: 'Nellore',
+  TADA: 'Tada',
+  BANGALORE: 'Bangalore',
+  KOCHI: 'Kochi',
+  MUMBAI: 'Mumbai',
+  SURAT: 'Surat',
+  BHOPAL: 'Bhopal',
+  LUCKNOW: 'Lucknow',
+  VIJAYAWADA: 'Vijayawada',
+  TIRUPATI: 'Tirupati',
+  TADIPATRI: 'Tadipatri',
+}
+
+const LEGACY_COMBINED: Array<{ key: string; prefer: string }> = [
+  { key: 'LEGACY-NELLORE-TADA', prefer: 'Nellore' },
+  { key: 'LEGACY-TIRUPATI-TADIPATRI', prefer: 'Tirupati' },
+  { key: 'LEGACY-CHENNAI-PUDUCHERRY', prefer: 'Chennai' },
+  { key: 'LEGACY-MUMBAI-SURAT', prefer: 'Mumbai' },
+  { key: 'LEGACY-VIZAG-KAKINADA', prefer: 'Visakhapatnam' },
+]
+
+function normName(name: string) {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+}
+
+const REQUIRED_INDEPENDENT_BRANCHES = [
+  'Chennai',
+  'Puducherry',
+  'Kakinada',
+  'Visakhapatnam',
+  'Nellore',
+  'Tada',
+  'Mumbai',
+  'Surat',
+  'Tirupati',
+  'Tadipatri',
+]
+
+/** Create missing independent city branches. Does not merge or delete. */
+export async function ensureIndependentOpsBranches(): Promise<{ created: string[] }> {
+  const all = await getBranches()
+  const created: string[] = []
+  const next = [...all]
+  for (const name of REQUIRED_INDEPENDENT_BRANCHES) {
+    const exists = next.some((b) => b.active !== false && normName(b.name) === normName(name))
+    if (exists) continue
+    next.push({
+      id: nid('br'),
+      name,
+      pin: suiteBranchPin(),
+      active: true,
+    })
+    created.push(name)
+  }
+  if (created.length) await saveBranches(next)
+  return { created }
+}
+
+/**
+ * Combined leftover labels ("Nellore & Tada") must not sit beside independent cities.
+ * If Nellore already exists, turn the combined row off. Otherwise rename it to Nellore.
+ * Never merges Tada/Puducherry/Surat/Tadipatri/Kakinada into the neighbour.
+ */
+export async function splitLegacyCombinedBranchNames(): Promise<{
+  ok: boolean
+  renamed: { id: string; from: string; to: string }[]
+  deactivated: { id: string; name: string }[]
+}> {
+  const all = await getBranches()
+  const renamed: { id: string; from: string; to: string }[] = []
+  const deactivated: { id: string; name: string }[] = []
+  const next = all.map((b) => ({ ...b }))
+
+  for (const spec of LEGACY_COMBINED) {
+    const combined = next.filter(
+      (b) => b.active !== false && misBranchGroupKey(b.name) === spec.key,
+    )
+    if (!combined.length) continue
+    const preferExists = next.some(
+      (b) => b.active !== false && normName(b.name) === normName(spec.prefer),
+    )
+    for (const row of combined) {
+      const i = next.findIndex((x) => x.id === row.id)
+      if (i < 0) continue
+      if (preferExists) {
+        next[i] = { ...next[i], active: false }
+        deactivated.push({ id: row.id, name: row.name })
+      } else {
+        renamed.push({ id: row.id, from: row.name, to: spec.prefer })
+        next[i] = { ...next[i], name: spec.prefer }
+      }
+    }
+  }
+
+  if (renamed.length || deactivated.length) await saveBranches(next)
+  return { ok: true, renamed, deactivated }
 }
 
 function weekStartMonday(dateFor: string): string {
@@ -197,6 +291,10 @@ export async function dedupeMisBranches(): Promise<{
   const keeperById = new Map<string, MisBranch>()
 
   for (const [groupKey, list] of groups) {
+    if (groupKey.startsWith('LEGACY-')) {
+      for (const only of list) keeperById.set(only.id, { ...only, active: only.active !== false })
+      continue
+    }
     if (list.length === 1) {
       const only = list[0]
       const display = PREFERRED_DISPLAY[groupKey] || only.name.trim()

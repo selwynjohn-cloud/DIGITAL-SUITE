@@ -9,6 +9,8 @@ export type SuiteGateOptions = {
   targetUrl: string
   accent?: string
   appNumber?: string
+  staffBranchPin?: boolean
+  branchOptionsHtml?: string
 }
 
 export function gateRoleFromQuery(req: VercelRequest): 'staff' | 'management' {
@@ -41,9 +43,9 @@ label{display:block;font-size:12px;color:#94a3b8;margin:8px 0 4px;font-weight:70
 <body>
 <div id="login">
 <span class="badge">APP ${opts.appNumber ?? ''} · AGILE DIGITAL SUITE</span>
-${otpLoginHtml(opts.title, opts.subtitle)}
+${otpLoginHtml(opts.title, opts.subtitle, Boolean(opts.staffBranchPin), opts.branchOptionsHtml)}
 </div>
-<p class="hint">Same login as MIS, Guards, CRM &amp; Fleet — <b>@agilegroup.co.in</b> email + 6-digit PIN (15 minutes).</p>
+<p class="hint">Same login as MIS, Guards, CRM &amp; Fleet — <b>@agilegroup.co.in</b> email + 6-digit PIN (15 minutes). No shake on Send PIN.</p>
 <p id="hostWarn" style="display:none;max-width:420px;margin:12px auto;padding:10px;border-radius:8px;background:#422006;color:#fbbf24;font-size:13px;text-align:center">Please use <b>www.agilegroup-digital.co.in</b> (not a vercel.app link).</p>
 <script>
 var TARGET_URL=${target};
@@ -54,11 +56,22 @@ if(new URLSearchParams(location.search).get('fresh')==='1'){
   sessionStorage.removeItem('otp_email_${opts.appId}');
 }
 ${otpLoginScript(opts.appId, opts.title, opts.role)}
-function onOtpLogin(j){location.href=TARGET_URL;}
+function suiteDest(){
+  var dest=new URL(TARGET_URL,location.origin);
+  dest.searchParams.set('suite_ok','1');
+  dest.searchParams.set('suite_token',OTP_SESSION||'');
+  dest.searchParams.set('suite_email',OTP_EMAIL||'');
+  dest.searchParams.set('suite_role',OTP_ROLE||'');
+  if(OTP_BRANCH_ID)dest.searchParams.set('suite_branch',OTP_BRANCH_ID);
+  if(OTP_BRANCH_NAME)dest.searchParams.set('suite_branch_name',OTP_BRANCH_NAME);
+  return dest.toString();
+}
+function onOtpLogin(j){location.href=suiteDest();}
 (function(){
   var t=sessionStorage.getItem('otp_${opts.appId}');
   if(!t||new URLSearchParams(location.search).get('fresh')==='1')return;
-  location.replace(TARGET_URL);
+  try{OTP_SESSION=t;OTP_EMAIL=sessionStorage.getItem('otp_email_${opts.appId}')||'';}catch(e){}
+  location.replace(suiteDest());
 })();
 </script>
 </body></html>`

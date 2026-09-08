@@ -1,20 +1,32 @@
 import { misPrintFooterBlock } from './brand.js'
 import { SUITE_MONEY_JS } from '../inr-money.js'
-
+import { SUITE_PAGE_CHROME_CSS, suitePageHeadHtml } from '../suite-page-chrome.js'
+import { SUITE_TAP_FEEDBACK_CSS, suiteTapFeedbackInitScript } from '../suite-tap-feedback.js'
+import { SUITE_DATE_INPUT_CSS, suiteDateInputInitScript } from '../suite-date-input.js'
+/**
+ * Management menu — Daily MIS sits with Incidents near the bottom (same order as HOD).
+ * Locked: Client Complaints → Incident Reporting → Daily MIS Submission → Site Security Assessment (SSA) → Master Directory.
+ * Do not move Daily MIS back to the top unless Selwyn explicitly asks.
+ */
 export const MIS_MENU: [string, string, string][] = [
   ['Dashboard', '📊', '/mis-dashboard'],
-  ['Daily MIS Submission', '🕒', '/mis-submission'],
   ['Consolidated MIS', '📋', '/mis-board'],
   ['MD Sir Report', '📑', '/mis-md'],
   ['Branch Performance', '🏅', '/mis-bpi'],
   ['Client Performance', '🏢', '/mis-client'],
   ['Client Visits', '📍', '/mis-visits'],
-  ['Patrol & Duty Exceptions', '🚶', '/mis-duty'],
-  ['SLA Issue Analysis', '⚠', '/mis-unit-issue'],
+  ['Client Door', '🔗', '/mis-client-door'],
+  ['Site Security Visit Report (Day / Night Check)', '🛡️', '/mis-night-visit'],
+  ['Training (OJT)', '🎓', '/mis-training-ojt'],
+  ['Late Start & Out of Post', '🚶', '/mis-duty'],
+  ['SLA- Analysis & Compliance', '⚠', '/mis-unit-issue'],
   ['Compliance (PVC/MC)', '🛡', '/mis-compliance'],
   ['Collection (DSO)', '₹', '/mis-collection'],
-  ['Register Complaints', '📝', '/mis-register-complaints'],
-  ['Complaints', '⚠', '/mis-complaints'],
+  ['Guards Complaint', '📝', '/mis-register-complaints'],
+  ['Client Complaints', '⚠', '/mis-complaints'],
+  ['Incident Reporting', '🚨', '/mis-incidents'],
+  ['Daily MIS Submission', '🕒', '/mis-submission'],
+  ['Site Security Assessment (SSA)', '🛡️', '/mis-special-survey'],
   ['Master Directory', '🗄', '/mis-admin'],
   ['User Management', '👥', '/mis-users'],
   ['User Manual', '📖', '/mis-manual'],
@@ -84,22 +96,25 @@ select.m-inp option{background:#0b1220;color:#e2e8f0}
 .m-share{display:flex;gap:4px;flex-wrap:wrap}
 .m-share .m-btn{padding:4px 8px;font-size:11px}
 @media print{.mis-side,.mis-bar,.noprint{display:none!important}.mis-main{margin-left:0!important;width:100%!important}body,.mis-content{background:#fff!important;color:#000!important}.m-card{background:#fff;border:1px solid #ccc;color:#000}.m-card h3,.m-card h4,.m-row b{color:#000!important}}
+${SUITE_TAP_FEEDBACK_CSS}
+${SUITE_DATE_INPUT_CSS}
 `
 
 export const MIS_LAYOUT_CSS = `
 body{background:#0b1220;color:#e2e8f0}
 .mis-shell{display:flex;min-height:100vh;background:#0b1220}
-.mis-side{position:fixed;top:0;left:0;bottom:0;width:230px;background:#0e1730;border-right:1px solid #22304f;display:flex;flex-direction:column;overflow-y:auto;z-index:40}
-.mis-main{margin-left:230px;flex:1;min-height:100vh;display:flex;flex-direction:column;width:calc(100% - 230px)}
+.mis-side{position:fixed;top:0;left:0;bottom:0;width:320px;background:#0e1730;border-right:1px solid #22304f;display:flex;flex-direction:column;overflow-y:auto;z-index:40}
+.mis-main{margin-left:320px;flex:1;min-height:100vh;display:flex;flex-direction:column;width:calc(100% - 320px)}
 .mis-bar{background:#111a30;border-bottom:1px solid #22304f;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px}
 .mis-bar b{color:#fff;font-size:16px}
 .mis-bar .co{color:#94a3b8;font-size:12px}
+${SUITE_PAGE_CHROME_CSS}
 .mis-side .brand{padding:18px 16px;text-align:center;border-bottom:1px solid #22304f}
 .mis-side .brand img{height:54px}
 .mis-side .brand b{display:block;color:#fff;font-size:14px;margin-top:8px}
 .mis-side .brand small{color:#c9a84c;font-size:11px}
 .mis-side .menu{padding:8px;flex:1}
-.mis-side .mi{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:9px;color:#cbd5e1;text-decoration:none;font-size:14px;font-weight:600;white-space:nowrap}
+.mis-side .mi{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:9px;color:#cbd5e1;text-decoration:none;font-size:14px;font-weight:600;white-space:normal;line-height:1.35}
 .mis-side .mi:hover{background:#16223f}
 .mis-side .mi.active{background:#c9a84c;color:#14224f}
 .mis-side .mi .ic{width:20px;text-align:center}
@@ -120,7 +135,7 @@ body{background:#0b1220;color:#e2e8f0}
 .mis-burger{display:none;background:#c9a84c;color:#14224f;border:none;border-radius:8px;padding:8px 12px;font-weight:800;cursor:pointer}
 .mis-loading{padding:28px;text-align:center;color:#94a3b8;font-size:15px}
 @media(max-width:820px){
-  .mis-side{transform:translateX(-100%);transition:.2s;width:220px}
+  .mis-side{transform:translateX(-100%);transition:.2s;width:300px}
   .mis-side.open{transform:none}
   .mis-main{margin-left:0;width:100%}
   .mis-burger{display:inline-block}
@@ -133,20 +148,45 @@ export function misSidebarHtml(active: string): string {
       path === '/mis-submission'
         ? '<span class="mis-menu-badge" id="misMenuSubBadge" title="Branches submitted today"></span>'
         : ''
-    return `<a class="mi${path === active ? ' active' : ''}" href="${path}"><span class="ic">${icon}</span><span style="flex:1;min-width:0">${label}</span>${menuBadge}</a>`
+    const on =
+      path === active ||
+      (active === '/mis-periodical-survey' && path === '/mis-special-survey')
+    return `<a class="mi${on ? ' active' : ''}" href="${path}"><span class="ic">${icon}</span><span style="flex:1;min-width:0">${label}</span>${menuBadge}</a>`
   }).join('')
-  return `<aside class="mis-side" id="misSide"><div class="brand"><img src="https://www.agilegroup-digital.co.in/agile-logo.png" alt="Agile"><b>Agile Security Force</b><small>MIS Dashboard</small></div><nav class="menu">${items}</nav><div class="logout" onclick="misLogout()">⎋ Logout</div></aside>`
+  return `<aside class="mis-side" id="misSide"><div class="brand"><img src="https://www.agilegroup-digital.co.in/agile-logo.png" alt="Agile"><b>Agile MIS</b><small>Management Portal</small></div><nav class="menu">${items}</nav><div class="logout" onclick="misLogout()">⎋ Logout</div></aside>`
 }
 
-export function misPageWrap(active: string, title: string, inner: string, actions = ''): string {
+export function misPageWrap(
+  active: string,
+  title: string,
+  inner: string,
+  actions = '',
+  headOpts?: { hideAgileBrand?: boolean; coText?: string; hideOpenedBy?: boolean },
+): string {
   const barActions = actions
       ? `<div class="m-actions noprint" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${actions}</div>`
       : ''
-  return `<div class="mis-shell">${misSidebarHtml(active)}<div class="mis-main"><div class="mis-bar"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><button type="button" class="mis-burger" onclick="document.getElementById('misSide').classList.toggle('open')">☰ Menu</button><div><b>${title}</b><div class="co">Agile Security Force Private Limited</div></div></div>${barActions}</div><div class="mis-content">${inner}${misPrintFooterBlock()}</div></div></div>`
+  const head = suitePageHeadHtml('Agile MIS', title, {
+    coText: headOpts?.coText !== undefined ? headOpts.coText : 'Agile Security Force Private Limited',
+    hideAgileBrand: headOpts?.hideAgileBrand === true,
+    hideOpenedBy: headOpts?.hideOpenedBy === true,
+  })
+  return `<div class="mis-shell">${misSidebarHtml(active)}<div class="mis-main"><div class="mis-bar"><div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><button type="button" class="mis-burger" onclick="document.getElementById('misSide').classList.toggle('open')">☰ Menu</button>${head}</div>${barActions}</div><div class="mis-content">${inner}${misPrintFooterBlock()}</div></div></div>`
 }
 
 export const MIS_SESSION_JS = `
 ${SUITE_MONEY_JS}
+try{var _mh=document.querySelector('.suite-app-name');var _mm=document.querySelector('.suite-menu-name');if(_mh&&_mm)document.title='AGILE · '+String(_mh.textContent||'').trim()+' · '+String(_mm.textContent||'').trim();}catch(e){}
+function misPaintOpenedBy(){
+  var who='';
+  try{if(typeof OTP_EMAIL!=='undefined'&&OTP_EMAIL)who=String(OTP_EMAIL).trim();}catch(e){}
+  if(!who){try{who=sessionStorage.getItem('otp_email_mis')||sessionStorage.getItem('otp_email_mis-report')||'';}catch(e){}}
+  var el=document.getElementById('suiteOpenedBy');
+  if(el&&who)el.textContent='Opened by: '+who;
+}
+misPaintOpenedBy();
+setTimeout(misPaintOpenedBy,500);
+setTimeout(misPaintOpenedBy,1500);
 function misTodayIst(){return new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Kolkata'});}
 function misSubBadgeClass(submitted,total){
   if(!total)return 'warn';
@@ -200,7 +240,73 @@ function misLogout(){
   sessionStorage.removeItem('otp_email_mis');
   sessionStorage.removeItem('otp_mis-report');
   sessionStorage.removeItem('otp_email_mis-report');
+  try{
+    localStorage.removeItem('otp_mis');
+    localStorage.removeItem('otp_email_mis');
+    localStorage.removeItem('otp_mis-report');
+    localStorage.removeItem('otp_email_mis-report');
+  }catch(e){}
   fetch('/api/mis/login',{method:'DELETE',credentials:'same-origin'}).finally(function(){location.href='/mis?fresh=1';});
+}
+function misMgmtToken(){
+  var keys=['otp_mis','otp_fleet','otp_fleets','otp_recruitment','otp_guards','otp_crm','otp_pulse','otp_securityjob','otp_meetings','otp_licences','otp_facilities','otp_assets','otp_audit','otp_control'];
+  for(var i=0;i<keys.length;i++){var t=sessionStorage.getItem(keys[i]);if(t)return t;}
+  return '';
+}
+function misSignInRedirect(){
+  var dest=encodeURIComponent(location.pathname+location.search);
+  location.replace('/mis?fresh=1&dest='+dest);
+}
+function ensureMisCookie(done){
+  function afterCookie(){sessionStorage.removeItem('mis_bridge_try');done();}
+  function tryToken(){
+    var t=misMgmtToken();
+    if(!t){misSignInRedirect();return;}
+    fetch('/api/mis/login',{method:'POST',credentials:'include',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionToken:t})})
+      .then(function(r){return r.json().then(function(x){return{s:r.status,j:x};}).catch(function(){return{s:r.status,j:{}};});})
+      .then(function(res){
+        if(res.s===200)afterCookie();
+        else misSignInRedirect();
+      }).catch(misSignInRedirect);
+  }
+  fetch('/api/mis/login',{method:'GET',credentials:'include',cache:'no-store'})
+    .then(function(r){return r.json().catch(function(){return {ok:false};});})
+    .then(function(j){
+      if(j&&j.ok){afterCookie();return;}
+      tryToken();
+    }).catch(tryToken);
+}
+function misApplyViewerScope(scope){
+  if(!scope||!scope.ok)return;
+  window.__MIS_VIEWER__=scope;
+  if(scope.hideMenus&&scope.hideMenus.length){
+    document.querySelectorAll('.mis-side .mi').forEach(function(a){
+      var href=a.getAttribute('href')||'';
+      if(scope.hideMenus.indexOf(href)>=0)a.style.display='none';
+    });
+  }
+  if(scope.banner&&!document.getElementById('misPresidentBanner')){
+    var bar=document.querySelector('.mis-bar');
+    if(bar){
+      var note=document.createElement('div');
+      note.id='misPresidentBanner';
+      note.style.cssText='flex-basis:100%;margin-top:8px;padding:8px 12px;border-radius:8px;background:rgba(201,168,76,.15);border:1px solid #c9a84c;color:#fde68a;font-size:12px;font-weight:700;line-height:1.4';
+      note.textContent=scope.banner;
+      bar.appendChild(note);
+    }
+  }
+  if(scope.isPresident){
+    var path=location.pathname||'';
+    if(path.indexOf('/mis-users')===0||path.indexOf('/mis-admin')===0){
+      location.replace('/mis-dashboard');
+    }
+  }
+}
+function misLoadViewerScope(done){
+  fetch('/api/mis/admin-data',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'viewerScope'})})
+    .then(function(r){return r.json();})
+    .then(function(d){misApplyViewerScope(d);if(done)done();})
+    .catch(function(){if(done)done();});
 }
 function misStart(){
   misInitSubBadges();
@@ -222,7 +328,13 @@ function misStart(){
   if(!window._misSubBadgeTimer){
     window._misSubBadgeTimer=setInterval(misRefreshSubBadge,180000);
   }
-  if(typeof initPage==='function'){initPage();return;}
-  if(typeof load==='function'){load();return;}
+  ensureMisCookie(function(){
+    misLoadViewerScope(function(){
+      if(typeof initPage==='function'){initPage();return;}
+      if(typeof load==='function'){load();return;}
+    });
+  });
 }
+${suiteTapFeedbackInitScript()}
+${suiteDateInputInitScript()}
 `

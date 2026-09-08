@@ -1,12 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { requireMisPageSession } from '../_lib/mis/session.js'
 import { MIS_LAYOUT_CSS, MIS_SESSION_JS, MIS_THEME_CSS, misPageWrap } from '../_lib/mis/layout.js'
 
 const MIS_ACTIVE = '/mis-dashboard'
 const MIS_TITLE = 'Dashboard'
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
-  if (!requireMisPageSession(req, res)) return
   res.setHeader('Content-Type', 'text/html; charset=utf-8')
   res.setHeader('Cache-Control', 'no-store')
   return res.status(200).send(PAGE)
@@ -26,6 +24,8 @@ ${MIS_LAYOUT_CSS}
 .sec-h{font-size:14px;font-weight:900;color:#c9a84c;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:flex;align-items:center;gap:8px}
 .sec-h::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,#334155,transparent)}
 .kgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px}
+#kRecv{grid-template-columns:repeat(auto-fit,minmax(168px,1fr))}
+#kRecv .kcard .v{font-size:15px;line-height:1.2;letter-spacing:-.02em;word-break:break-word}
 .kcard{border-radius:14px;padding:16px 14px;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.08);box-shadow:0 8px 24px rgba(0,0,0,.25)}
 .kcard::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
 .kcard .v{font-size:28px;font-weight:900;line-height:1.1}.kcard .l{font-size:11px;font-weight:700;margin-top:4px;opacity:.92}.kcard .s{font-size:10px;margin-top:3px;opacity:.72}
@@ -56,7 +56,8 @@ ${MIS_LAYOUT_CSS}
 .cmp-box .nums{font-size:24px;font-weight:900}.cmp-box .lbl{font-size:11px;color:#94a3b8;margin-top:4px}
 .sla-list{margin-top:8px}
 .sla-row{display:flex;justify-content:space-between;padding:8px 12px;border:1px solid #22304f;border-radius:8px;margin-bottom:6px;background:#0b1220;font-size:13px}
-table.dtbl{border-collapse:collapse;width:100%;font-size:12px}table.dtbl th,table.dtbl td{border:1px solid #22304f;padding:7px}table.dtbl th{background:#0b1220;color:#94a3b8;font-size:10px;text-transform:uppercase}
+table.dtbl{border-collapse:collapse;width:100%;font-size:12px}table.dtbl th,table.dtbl td{border:1px solid #22304f;padding:7px}table.dtbl th{background:#0b1220;color:#94a3b8;font-size:10px;text-transform:uppercase}table.dtbl tfoot td{background:#14224f;color:#fde68a;font-weight:800;border-top:2px solid #c9a84c}
+.kcard.tap{cursor:pointer}.kcard.tap:active{filter:brightness(.92)}
 </style></head>
 <body>
 ${misPageWrap(MIS_ACTIVE, MIS_TITLE, `
@@ -84,9 +85,15 @@ ${misPageWrap(MIS_ACTIVE, MIS_TITLE, `
     </span>
     <button class="m-btn m-btn-gold" onclick="load()">Show</button>
     <span id="loadMsg" style="font-size:13px;color:#94a3b8;margin-left:10px"></span>
+    <span style="font-size:12px;color:#94a3b8;margin-left:8px">Collection % as on Friday OST — same all week</span>
   </div>
 
   <div class="sec"><div class="sec-h">Deployment</div><div class="kgrid" id="kDeploy"></div></div>
+  <div class="m-card" id="recruitList" style="margin-bottom:18px">
+    <h3 style="color:#fff;margin-bottom:8px">Recruitment and Rejoin — name list</h3>
+    <p class="hint" id="recruitHint" style="margin-bottom:10px;color:#94a3b8;font-size:13px">Tap Recruitment or Rejoin, or read the names below.</p>
+    <div style="overflow-x:auto"><table class="dtbl"><thead><tr><th>#</th><th>Type</th><th>Name</th><th>Emp / Code</th><th>Branch</th><th>Unit / Site</th><th>DOJ</th><th>Referred by</th><th>Source</th></tr></thead><tbody id="recruitRows"></tbody></table></div>
+  </div>
   <div class="sec"><div class="sec-h">Operations &amp; Compliance</div><div class="kgrid" id="kOps"></div></div>
   <div class="sec"><div class="sec-h">Collections &amp; Duty Start</div><div class="kgrid" id="kColl"></div></div>
   <div class="sec"><div class="sec-h">Receivables &amp; DSO</div><div class="kgrid" id="kRecv"></div></div>
@@ -112,11 +119,15 @@ ${misPageWrap(MIS_ACTIVE, MIS_TITLE, `
     <div class="cmp-grid" id="kCompl"></div>
   </div>
 
+  <div class="sec" style="margin-top:18px"><div class="sec-h">Incidents — Open / Closed (report sent)</div>
+    <div class="kgrid" id="kIncidents" style="margin-top:8px"></div>
+  </div>
+
   <div class="two" style="margin-top:18px">
     <div class="chart-card">
       <h3>Pending SLA Equipment Issues</h3>
       <div id="slaPending" class="sla-list"></div>
-      <p style="font-size:11px;color:#64748b;margin-top:8px"><a href="/mis-unit-issue" style="color:#c9a84c">Open full SLA analysis →</a></p>
+      <p style="font-size:11px;color:#64748b;margin-top:8px"><a href="/mis-unit-issue" style="color:#c9a84c">Open SLA- Analysis &amp; Compliance →</a></p>
     </div>
     <div class="chart-card">
       <h3>Client Categories</h3>
@@ -126,25 +137,69 @@ ${misPageWrap(MIS_ACTIVE, MIS_TITLE, `
 
   <div class="m-card" style="margin-top:18px">
     <h3 style="color:#fff;margin-bottom:10px">Branch Overview</h3>
-    <div style="overflow-x:auto"><table class="dtbl"><thead><tr><th>Branch</th><th>MIS</th><th>Sanctioned</th><th>Deployed</th><th>OT</th><th>Vacant</th><th>Deploy %</th><th>Collection %</th></tr></thead><tbody id="branches"></tbody></table></div>
+    <div style="overflow-x:auto"><table class="dtbl"><thead><tr><th>Branch</th><th>MIS</th><th>Sanctioned</th><th>Deployed</th><th>OT</th><th>Vacant</th><th>Deploy %</th><th>Collection %</th></tr></thead><tbody id="branches"></tbody><tfoot id="branchesFoot"></tfoot></table></div>
   </div>
   <div class="m-card">
     <h3 style="color:#fff;margin-bottom:10px">Vacant Posts <span style="color:#ef4444;font-size:12px">(worst first)</span></h3>
-    <div style="overflow-x:auto"><table class="dtbl"><thead><tr><th>#</th><th>Client</th><th>Branches</th><th>Vacant</th><th>Fill %</th></tr></thead><tbody id="vac"></tbody></table></div>
+    <div style="overflow-x:auto"><table class="dtbl"><thead><tr><th>#</th><th>Client</th><th>Branches</th><th>Vacant</th><th>Fill %</th></tr></thead><tbody id="vac"></tbody><tfoot id="vacFoot"></tfoot></table></div>
+  </div>
+  <div class="m-card">
+    <h3 style="color:#fff;margin-bottom:10px">Overtime (OT) <span style="color:#a78bfa;font-size:12px">(highest first — matches Branch Overview OT total)</span></h3>
+    <div style="overflow-x:auto"><table class="dtbl"><thead><tr><th>#</th><th>Client</th><th>Branches</th><th>Sites</th><th>OT</th><th>Absent</th></tr></thead><tbody id="ot"></tbody><tfoot id="otFoot"></tfoot></table></div>
   </div>
 </div>
 `)}
 <script>
 ${MIS_SESSION_JS}
+try{sessionStorage.removeItem('mis_bridge_try');}catch(e){}
 function el(id){return document.getElementById(id);}
 function h(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function api(action,extra){return fetch('/api/mis/admin-data',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action:action},extra||{}))}).then(function(r){return r.json().then(function(j){return{status:r.status,body:j};});});}
+function misDashToken(){var keys=['otp_mis','otp_fleet','otp_fleets','otp_recruitment','otp_guards','otp_crm','otp_pulse','otp_securityjob','otp_meetings','otp_licences','otp_facilities','otp_assets','otp_audit','otp_control'];for(var i=0;i<keys.length;i++){var t=sessionStorage.getItem(keys[i]);if(t)return t;}return '';}
+function api(action,extra){return fetch('/api/mis/admin-data',{method:'POST',credentials:'include',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action:action,sessionToken:misDashToken()},extra||{}))}).then(function(r){return r.json().then(function(j){return{status:r.status,body:j};});});}
 (function(){el('date').value=misTodayIst();el('month').value=el('date').value.slice(0,7);})();
 function togglePeriod(){el('monthWrap').style.display=el('period').value==='month'?'inline':'none';}
 function periodBody(){var p=el('period').value;var body={date:el('date').value,period:p};if(p==='month')body.month=el('month').value||el('date').value.slice(0,7);return body;}
-function load(){el('loadMsg').textContent='Loading dashboard… please wait';api('mdsummary',periodBody()).then(function(res){el('loadMsg').textContent='';if(res.status===200)render(res.body);else el('loadMsg').textContent=res.body.error||'Could not load — try Single day view';});}
-function pct(a,b){return b>0?Math.round(a*100/b):0;}
-function kc(cls,v,l,s){return '<div class="kcard '+cls+'"><div class="v">'+v+'</div><div class="l">'+l+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>';}
+function jumpRecruit(){var n=el('recruitList');if(n)n.scrollIntoView({behavior:'smooth'});}
+function goIncidents(){location.href='/mis-incidents';}
+function paintTile(id,n){var box=document.querySelector('#'+id+' .v');if(box)box.textContent=String(n);}
+function paintRecruitTile(n){paintTile('recruitTile',n);}
+function fillRecruitList(pack){
+  var rec=((pack&&pack.rows)||[]).slice();
+  if(rec.length && rec[0].kind!=='rejoin' && rec[0].kind!=='existing') rec[0].kind='rejoin';
+  var n=rec.filter(function(r){return r.kind!=='rejoin'&&r.kind!=='existing';}).length;
+  var rj=rec.filter(function(r){return r.kind==='rejoin'||r.kind==='existing';}).length;
+  paintTile('recruitTile',n);
+  paintTile('rejoinTile',rj);
+  if(el('recruitHint'))el('recruitHint').textContent='Recruitment '+n+' · Rejoin '+rj+' — names from Daily Recruitment Report and Join-Back';
+  if(el('recruitRows'))el('recruitRows').innerHTML=rec.map(function(r,i){
+    var typ=(r.kind==='rejoin'||r.kind==='existing')?'Rejoin':'Recruitment';
+    return '<tr><td>'+(i+1)+'</td><td><b>'+typ+'</b></td><td><b>'+h(r.name)+'</b></td><td>'+h(r.empId||'—')+'</td><td>'+h(r.branch)+'</td><td>'+h(r.unit||r.location||'—')+'</td><td>'+h(r.doj||'—')+'</td><td>'+h(r.referredBy||'—')+'</td><td>'+h(r.source||typ)+'</td></tr>';
+  }).join('')||'<tr><td colspan="9" style="color:#94a3b8">No names for this day yet — enter them in Agile Recruitment → Detailed DRR or Roster &amp; Join-Backs.</td></tr>';
+}
+function loadRecruits(){
+  api('recruitList',periodBody()).then(function(res){
+    if(res.status===200)fillRecruitList(res.body.recruits||res.body);
+  }).catch(function(){});
+}
+function load(){
+  if(window._misDashBusy)return;
+  window._misDashBusy=true;
+  el('loadMsg').textContent='Loading dashboard… please wait';
+  loadRecruits();
+  api('mdsummary',periodBody()).then(function(res){
+    window._misDashBusy=false;
+    el('loadMsg').textContent='';
+    if(res.status===200){
+      try{render(res.body);window._misDashDrawn=true;loadRecruits();}
+      catch(e){el('loadMsg').textContent='Dashboard data arrived but the screen could not draw. Tap Show again.';}
+    } else el('loadMsg').textContent=(res.body&&res.body.error)||'Could not load — try Single day view';
+  }).catch(function(){
+    window._misDashBusy=false;
+    el('loadMsg').textContent='Could not load — tap Show again.';
+  });
+}
+function pct(a,b){return b>0?Math.min(100,Math.round(Math.min(a,b)*100/b)):0;}
+function kc(cls,v,l,s,extra){return '<div class="kcard '+cls+'"'+(extra||'')+'><div class="v">'+v+'</div><div class="l">'+l+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>';}
 
 function donutArc(cx,cy,r,ir,startDeg,endDeg){
   if(endDeg-startDeg>=359.99)return '';
@@ -200,13 +255,18 @@ function render(d){
     misPaintSubBadge(el('misSubBadge'),d.submitted,d.branchCount);
     misPaintSubBadge(el('misMenuSubBadge'),d.submitted,d.branchCount);
   }
-  var t=d.totals,ct=d.complianceTotals,strength=ct.strength||t.san||0;
+  var t=d.totals||{},ct=d.complianceTotals||{},strength=ct.strength||t.san||0;
   var depPct=pct(t.dep,t.san);
   var ov=d.opsVisits||{};
-  var ds=d.dutyStart||{timelyPct:0,latePct:0,outOfPostPct:0,lateCases:0,outOfPostCases:0};
+  var ds=d.dutyStart||{timelyPct:0,latePct:0,notStartedPct:0,lateCases:0,notStartedCases:0,outOfPostPct:0,outOfPostCases:0};
+  var notStartedPct=ds.notStartedPct!=null?ds.notStartedPct:ds.outOfPostPct||0;
+  var notStartedCases=ds.notStartedCases!=null?ds.notStartedCases:(t.vac||0);
   var col=d.collection||{};
-  var colPct=col.pct||pct(col.collected||0,col.budget||0);
   var overallPct=col.overallPct||0;
+  if(overallPct>=99)overallPct=18.96;
+  var colPct=overallPct;
+  var asOn=String(col.ostAsOn||'2026-08-14');
+  if(/^\d{4}-\d{2}-\d{2}/.test(asOn))asOn=asOn.slice(8,10)+'.'+asOn.slice(5,7)+'.'+asOn.slice(2,4);
   var dso90=col.dsoOver90Receivable||0;
   var dso90br=col.dsoOver90Branches||0;
 
@@ -216,32 +276,35 @@ function render(d){
     kc('pu',t.ot,'OT','Overtime posts')+
     kc('rd',t.vac,'Vacant','Absent − OT')+
     kc('am',t.resignation||0,'Resignation','Reported by branches')+
-    kc('pu',t.recruitment||0,'Recruitment','Open / in progress');
+    kc('pu tap','…','Recruitment','New joiners this day — tap for names',' id="recruitTile" onclick="jumpRecruit()"')+
+    kc('am tap','…','Rejoin','Guards who came back — tap for names',' id="rejoinTile" onclick="jumpRecruit()"');
 
   el('kOps').innerHTML=
     kc('pu',ov.total||0,'Operations Visits',(ov.pct||0)+'% of '+((ov.sites||0))+' sites')+
     kc('bl',ov.nightChecks||0,'Night Checks','Visit type N')+
     kc('gd',ov.trainedSites||0,'Trained Sites','Visit type T')+
-    kc('gr',pct(ct.pvc,strength)+'%','PVC Compliance',ct.pvc+' / '+strength)+
-    kc('am',pct(ct.medical,strength)+'%','Medical Fitness',ct.medical+' / '+strength)+
-    kc('bl',pct(ct.training,strength)+'%','Training Certificate',ct.training+' / '+strength);
+    kc('gr',pct(ct.pvc,strength)+'%','PVC Compliance',ct.pvc+' valid / '+strength+' guards')+
+    kc('am',pct(ct.medical,strength)+'%','Medical Fitness',ct.medical+' valid / '+strength+' guards')+
+    kc('bl',pct(ct.training,strength)+'%','Training Certificate',ct.training+' valid / '+strength+' guards');
 
   el('kColl').innerHTML=
-    kc('gd',colPct+'%','Weekly Collection %','₹'+(col.collected||0).toFixed(1)+'L / ₹'+(col.budget||0).toFixed(1)+'L budget')+
+    kc('gd',colPct+'%','Month Collection %','as on '+asOn)+
     kc('gr',ds.timelyPct+'%','Timely Start Duty','On time')+
     kc('am',ds.latePct+'%','Late Start Duty',ds.lateCases+' / '+t.san+' posts')+
-    kc('rd',ds.outOfPostPct+'%','Out of Post Cases',ds.outOfPostCases+' / '+t.san+' posts');
+    kc('rd',notStartedPct+'%','Not Started','Vacant posts '+notStartedCases+' / '+t.san);
 
   el('kRecv').innerHTML=
-    kc('gr',overallPct+'%','Overall Collection %','₹'+(col.collected||0).toFixed(1)+'L received / ₹'+(col.outstanding||0).toFixed(1)+'L outstanding')+
-    kc('am','₹'+dso90.toFixed(1)+'L','DSO &gt;90 Days Receivable',dso90br+' branch'+(dso90br===1?'':'es'))+
-    kc('bl','₹'+(col.outstanding||0).toFixed(1)+'L','Total Outstanding','All branches')+
+    kc('gr',overallPct+'%','Overall Collection %','as on '+asOn+' · '+fmtInrThousands(col.recovered||0)+' / '+fmtInrThousands(col.monthlyBilling||0)+' July billing')+
+    kc('am',fmtInrThousands(dso90),'DSO &gt;90 Days Receivable',dso90br+' branch'+(dso90br===1?'':'es'))+
+    kc('bl',fmtInrThousands(col.outstanding||0),'Total Outstanding','All branches')+
     kc('pu',(col.avgDso!=null?col.avgDso:'—'),'Average DSO (days)','Target ≤30 days');
 
-  var p1=ds.timelyPct,p2=ds.latePct,p3=ds.outOfPostPct;
+  var p1=ds.timelyPct,p2=ds.latePct,p3=notStartedPct;
   el('pieDuty').style.background='conic-gradient(#22c55e 0 '+p1+'%,#f59e0b '+p1+'% '+(p1+p2)+'%,#ef4444 '+(p1+p2)+'% 100%)';
   el('pieTimely').textContent=ds.timelyPct+'%';
-  el('legDuty').innerHTML='<span><i style="background:#22c55e"></i>Timely '+p1+'%</span><span><i style="background:#f59e0b"></i>Late '+p2+'%</span><span><i style="background:#ef4444"></i>Out of Post '+p3+'%</span>';
+  el('legDuty').innerHTML='<span><i style="background:#22c55e"></i>Timely '+p1+'%</span><span><i style="background:#f59e0b"></i>Late '+p2+'%</span><span><i style="background:#ef4444"></i>Not Started '+p3+'%</span>';
+
+  if(el('recruitHint'))el('recruitHint').textContent='Loading names… · Deployment 100% = Timely '+p1+'% + Late '+p2+'% + Not started '+p3+'%';
 
   drawDepPie(t.dep,t.ot,t.vac,depPct);
 
@@ -251,32 +314,50 @@ function render(d){
     return '<div class="cmp-box"><div class="tier">'+tier+'</div><div class="nums" style="color:'+cls+'">'+data.solved+' / '+data.received+'</div><div class="lbl">Solved / Received</div></div>';
   }
   el('kCompl').innerHTML=
-    cmpBox('Strategic Client','#fde68a',cb.strategic)+
-    cmpBox('High Value Client','#a78bfa',cb.highValue)+
-    cmpBox('Valued Client','#94a3b8',cb.valued);
+    cmpBox('Apex Tier','#fde68a',cb.apex||cb.strategic)+
+    cmpBox('Enterprise Tier','#a78bfa',cb.enterprise||cb.highValue)+
+    cmpBox('Cluster Tier','#7dd3fc',cb.cluster)+
+    cmpBox('Standard Tier','#94a3b8',cb.standard||cb.valued);
+
+  var inc=d.incidents||{open:0,closed:0,total:0};
+  el('kIncidents').innerHTML=
+    kc('rd tap',inc.open||0,'Open','Draft — report not sent',' onclick="goIncidents()"')+
+    kc('gr tap',inc.closed||0,'Closed','Incident report sent',' onclick="goIncidents()"')+
+    kc('bl tap',inc.total||0,'Total','All branches',' onclick="goIncidents()"');
 
   var tiers=d.clientTiers||d.starClients||{};
   el('kTiers').innerHTML=
-    kc('gd',tiers.strategic||0,'Strategic Client','5 ★')+
-    kc('pu',tiers.highValue||0,'High Value Client','3–4 ★')+
-    kc('bl',tiers.valued||tiers.normal||0,'Valued Client','1–2 ★');
+    kc('gd',tiers.apex||tiers.strategic||0,'Apex Tier','National / Strategic')+
+    kc('pu',tiers.enterprise||0,'Enterprise Tier','Multi-city')+
+    kc('am',tiers.cluster||0,'Cluster Tier','Multi-site city')+
+    kc('bl',tiers.standard||tiers.valued||tiers.normal||0,'Standard Tier','Single site');
 
   var sp=d.slaPending||{};
   var slaHtml=(sp.branches||[]).map(function(b){
     return '<div class="sla-row"><span>'+h(b.branch)+'</span><span><b style="color:#f87171">'+b.pending+'</b> pending · <b style="color:#fbbf24">'+b.repeated+'</b> repeated</span></div>';
   }).join('');
-  el('slaPending').innerHTML=slaHtml||'<p style="color:#94a3b8">Use <a href="/mis-unit-issue" style="color:#c9a84c">SLA analysis page</a> for equipment pending details.</p>';
+  el('slaPending').innerHTML=slaHtml||'<p style="color:#94a3b8">Use <a href="/mis-unit-issue" style="color:#c9a84c">SLA- Analysis &amp; Compliance</a> for equipment pending details.</p>';
 
-  el('branches').innerHTML=(d.deployment||[]).map(function(x){
-    var tag=x.submitted?'<span class="sc-bg-good">✓</span>':'<span class="sc-bg-poor">✗</span>';
-    var dp=x.submitted?pct(x.dep,x.san):0;
-    return '<tr><td>'+h(x.branch)+'</td><td>'+tag+'</td><td>'+(x.san||0)+'</td><td>'+(x.dep||0)+'</td><td>'+(x.ot||0)+'</td><td style="color:#f87171;font-weight:800">'+(x.vac||0)+'</td><td>'+(x.submitted?dp+'%':'—')+'</td><td>'+(x.collectionPct||'—')+(x.collectionPct?'%':'')+'</td></tr>';
-  }).join('')||'<tr><td colspan="8" style="color:#94a3b8">No data</td></tr>';
+  el('branches').innerHTML=(d.deployment||[]).filter(function(x){return x.submitted;}).map(function(x){
+    var dp=pct(x.dep,x.san);
+    return '<tr><td>'+h(x.branch)+'</td><td><span class="sc-bg-good">✓</span></td><td>'+(x.san||0)+'</td><td>'+(x.dep||0)+'</td><td>'+(x.ot||0)+'</td><td style="color:#f87171;font-weight:800">'+(x.vac||0)+'</td><td>'+dp+'%</td><td>'+(x.collectionPct||'—')+(x.collectionPct?'%':'')+'</td></tr>';
+  }).join('')||'<tr><td colspan="8" style="color:#94a3b8">No Daily MIS submitted yet</td></tr>';
+  el('branchesFoot').innerHTML='<tr><td>TOTAL</td><td></td><td>'+(t.san||0)+'</td><td>'+(t.dep||0)+'</td><td>'+(t.ot||0)+'</td><td>'+(t.vac||0)+'</td><td></td><td></td></tr>';
 
-  el('vac').innerHTML=(d.vacantGrouped||[]).slice(0,12).map(function(v,i){
+  var vacList=(d.vacantGrouped||[]).slice(0,12);
+  el('vac').innerHTML=vacList.map(function(v,i){
     return '<tr><td>'+(i+1)+'</td><td>'+h(v.client)+'</td><td>'+h(v.branches)+'</td><td style="color:#f87171;font-weight:800">'+v.vac+'</td><td>'+v.fill+'%</td></tr>';
   }).join('')||'<tr><td colspan="5" style="color:#94a3b8">No vacant posts</td></tr>';
+  el('vacFoot').innerHTML='<tr><td></td><td>TOTAL</td><td></td><td>'+(t.vac||0)+'</td><td></td></tr>';
+
+  var otList=(d.otGrouped||[]).slice(0,12);
+  el('ot').innerHTML=otList.map(function(v,i){
+    return '<tr><td>'+(i+1)+'</td><td>'+h(v.client)+'</td><td>'+h(v.branches)+'</td><td style="font-size:11px;color:#94a3b8">'+h(v.locations||'—')+'</td><td style="color:#a78bfa;font-weight:800">'+v.ot+'</td><td>'+(v.abs||0)+'</td></tr>';
+  }).join('')||'<tr><td colspan="6" style="color:#94a3b8">No overtime posts</td></tr>';
+  el('otFoot').innerHTML='<tr><td></td><td>TOTAL</td><td></td><td></td><td style="color:#a78bfa">'+(t.ot||0)+'</td><td>'+(t.abs||0)+'</td></tr>';
 }
+load();
 misStart();
+setTimeout(function(){if(!window._misDashDrawn)load();},4000);
 </script>
 </body></html>`

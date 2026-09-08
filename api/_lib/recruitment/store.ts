@@ -6,17 +6,37 @@
 import { matchesSuiteAdminPassword, matchesSuiteBranchPin, suiteAdminPassword, suiteBranchPin } from '../suite-credentials.js'
 
 export const RECRUIT_BRANCHES = [
-  'Visakhapatnam',
-  'Nellore',
   'Bangalore',
-  'Gulbarga',
-  'Hyderabad',
-  'Kakinada',
-  'Vijayawada',
+  'Bhopal',
   'Chennai',
+  'Hi-Tech City',
+  'Hyderabad - A',
+  'Hyderabad - B',
+  'Kakinada',
+  'Kochi',
+  'Lucknow',
   'Mumbai',
-  'Corporate Office',
+  'Nellore',
+  'Puducherry',
+  'Surat',
+  'Tada',
+  'Tadipatri',
+  'Tirupati',
+  'Vijayawada',
+  'Visakhapatnam',
 ] as const
+
+/** Recruitment source buckets on Dashboard / DRR (Director order). */
+export const RECRUIT_SOURCE_CHANNELS = [
+  'web',
+  'walkin',
+  'referral',
+  'recruiters',
+  'academy',
+  'others',
+] as const
+
+export type RecruitSourceChannel = (typeof RECRUIT_SOURCE_CHANNELS)[number]
 
 export const SOURCING_CHANNELS = [
   'WhatsApp',
@@ -257,6 +277,7 @@ export const getConfig = () =>
 export const saveConfig = (v: RecruitmentConfig) => setJson(CONFIG_KEY, v)
 
 export const getAttendanceMarks = (date: string) => getJson<GuardAttendanceMark[]>(attendanceKey(date), [])
+export const getAttendanceDates = () => getJson<string[]>(ATTENDANCE_DATES_KEY, [])
 export async function saveAttendanceMarks(date: string, list: GuardAttendanceMark[]): Promise<boolean> {
   const ok = await setJson(attendanceKey(date), list)
   const dates = await getJson<string[]>(ATTENDANCE_DATES_KEY, [])
@@ -278,16 +299,23 @@ export function recruitNum(v: unknown): number {
 }
 
 const BR_ABBR: Record<string, string> = {
-  Visakhapatnam: 'VSK',
-  Nellore: 'NEL',
   Bangalore: 'BLR',
-  Gulbarga: 'GLB',
-  Hyderabad: 'HYD',
-  Kakinada: 'KKD',
-  Vijayawada: 'VJA',
+  Bhopal: 'BPL',
   Chennai: 'CHN',
+  'Hi-Tech City': 'HTC',
+  'Hyderabad - A': 'HYA',
+  'Hyderabad - B': 'HYB',
+  Kakinada: 'KKD',
+  Kochi: 'KOC',
   Mumbai: 'MUM',
-  'Corporate Office': 'CO',
+  Nellore: 'NEL',
+  Puducherry: 'PDY',
+  Surat: 'SRT',
+  Tada: 'TDA',
+  Tadipatri: 'TDP',
+  Tirupati: 'TPT',
+  Vijayawada: 'VJA',
+  Visakhapatnam: 'VSK',
 }
 
 export function drrReportCode(branchId: string, reportDate: string, id?: string): string {
@@ -298,7 +326,7 @@ export function drrReportCode(branchId: string, reportDate: string, id?: string)
 }
 
 export function todayIso(): string {
-  return new Date().toISOString().slice(0, 10)
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
 }
 
 export function normalizeUser(u: Partial<RecruitUser> & { id?: string }): RecruitUser {

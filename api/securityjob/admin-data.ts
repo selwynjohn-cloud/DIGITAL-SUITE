@@ -1,30 +1,50 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { verifyAppSession } from '../_lib/app-session.js'
 import {
+  DEFAULT_SETTINGS,
   deleteApplicant,
+  getAcademyVideos,
+  getAnthems,
   getApplicants,
   getJobs,
   getSettings,
   normalizeApplicant,
   replaceApplicants,
+  saveAcademyVideos,
+  saveAnthems,
   saveJobs,
   saveSettings,
   sjStorageOk,
+  type SjAcademyVideo,
+  type SjAnthem,
   type SjApplicant,
   type SjJob,
   type SjSettings,
 } from '../_lib/securityjob/store.js'
+import { sjToRegisteredCandidate } from '../_lib/recruitment/registration-store.js'
+import {
+  custodyExcelPayload,
+  ensureCandidateCustody,
+  rememberCandidatesInCustody,
+} from '../_lib/recruitment/candidate-custody.js'
 
 function sanitiseSettings(v: unknown): SjSettings {
   const d = (v ?? {}) as Partial<SjSettings>
-  const s = (x: unknown) => String(x ?? '').slice(0, 120)
+  const s = (x: unknown, m = 200) => String(x ?? '').slice(0, m)
+  const show = String(d.adminOpsShow ?? DEFAULT_SETTINGS.adminOpsShow).trim()
   return {
-    guardsPlaced: s(d.guardsPlaced),
-    locations: s(d.locations),
-    states: s(d.states),
-    whatsapp: s(d.whatsapp),
-    email1: s(d.email1),
-    email2: s(d.email2),
+    guardsPlaced: s(d.guardsPlaced, 120),
+    locations: s(d.locations, 120),
+    states: s(d.states, 120),
+    helpline: s(d.helpline, 120) || DEFAULT_SETTINGS.helpline,
+    whatsapp: s(d.whatsapp, 120),
+    email1: s(d.email1, 120),
+    email2: s(d.email2, 120),
+    adminOpsShow: show === 'No' ? 'No' : 'Yes',
+    adminOpsEyebrow: s(d.adminOpsEyebrow, 120) || DEFAULT_SETTINGS.adminOpsEyebrow,
+    adminOpsTitle: s(d.adminOpsTitle, 200) || DEFAULT_SETTINGS.adminOpsTitle,
+    adminOpsText: s(d.adminOpsText, 500) || DEFAULT_SETTINGS.adminOpsText,
+    adminOpsButton: s(d.adminOpsButton, 80) || DEFAULT_SETTINGS.adminOpsButton,
   }
 }
 
@@ -62,8 +82,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (action === 'login' || action === 'load') {
-    const [settings, jobs, applicants] = await Promise.all([getSettings(), getJobs(), getApplicants()])
-    return res.status(200).json({ ok: true, settings, jobs, applicants, storageOk: sjStorageOk() })
+    const [settings, jobs, applicants, anthems, academyVideos] = await Promise.all([
+      getSettings(),
+      getJobs(),
+      getApplicants(),
+      getAnthems(),
+      getAcademyVideos(),
+    ])
+    return res.status(200).json({
+      ok: true,
+      settings,
+      jobs,
+      applicants,
+      anthems,
+      academyVideos,
+      storageOk: sjStorageOk(),
+      blobReady: Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim()),
+    })
   }
 
   if (!sjStorageOk()) return res.status(503).json({ error: 'Storage not connected.' })
@@ -79,6 +114,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({ ok: true, jobs })
   }
 
+  if (action === 'saveAnthems') {
+    const arr = Array.isArray(body.anthems) ? (body.anthems as SjAnthem[]) : []
+    await saveAnthems(arr)
+    const anthems = await getAnthems()
+    return res.status(200).json({ ok: true, anthems })
+  }
+
+  if (action === 'saveAcademyVideos') {
+    const arr = Array.isArray(body.academyVideos) ? (body.academyVideos as SjAcademyVideo[]) : []
+    await saveAcademyVideos(arr)
+    const academyVideos = await getAcademyVideos()
+    return res.status(200).json({ ok: true, academyVideos })
+  }
+
   if (action === 'importApplicants') {
     const arr = Array.isArray(body.applicants) ? body.applicants : []
     const st = (x: unknown, m = 200) => String(x ?? '').slice(0, m)
@@ -88,6 +137,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         regCode: st((a as any)?.regCode, 60),
         name: st((a as any)?.name),
         phone: st((a as any)?.phone, 20),
+        email: st((a as any)?.email, 120).toLowerCase(),
+        dob: st((a as any)?.dob, 20),
         location: st((a as any)?.location),
         role: st((a as any)?.role),
         experience: st((a as any)?.experience, 60),
@@ -98,15 +149,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }),
     )
     const counter = Number(body.counter) || list.length
+    const existing = await getApplicants()
+    await rememberCandidatesInCustody(
+      [...existing, ...list].map((a) => sjToRegisteredCandidate(a)),
+    )
     await replaceApplicants(list, counter)
     const applicants = await getApplicants()
     return res.status(200).json({ ok: true, count: applicants.length })
   }
 
   if (action === 'deleteApplicant') {
-    await deleteApplicant(String(body.id ?? ''))
+    const id = String(body.id ?? '')
+    const current = await getApplicants()
+    const hit = current.find((a) => a.id === id)
+    if (hit) await rememberCandidatesInCustody([sjToRegisteredCandidate(hit)])
+    await deleteApplicant(id)
     const applicants = await getApplicants()
     return res.status(200).json({ ok: true, applicants })
+  }
+
+  if (action === 'downloadCustody') {
+    const file = await custodyExcelPayload()
+    return res.status(200).json({ ok: true, ...file })
+  }
+
+  if (action === 'emailCustody') {
+    const result = await ensureCandidateCustody({ forceMail: true })
+    if (!result.ok) return res.status(500).json({ error: result.error || 'Could not email the safe copy.' })
+    return res.status(200).json({
+      ok: true,
+      count: result.synced,
+      mailed: result.mailed,
+      filename: result.filename,
+    })
   }
 
   return res.status(400).json({ error: 'Unknown action.' })

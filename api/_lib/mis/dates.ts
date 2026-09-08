@@ -16,6 +16,15 @@ export function misYesterdayIst(): string {
   return new Date(Date.now() - 86400000).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
 }
 
+/** Calendar day before `yyyyMmDd` in Asia/Kolkata (YYYY-MM-DD). */
+export function misDayBeforeIst(yyyyMmDd: string): string {
+  const base = String(yyyyMmDd || '').slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(base)) return misYesterdayIst()
+  const d = new Date(`${base}T12:00:00+05:30`)
+  d.setDate(d.getDate() - 1)
+  return d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+}
+
 /** Monday of the week containing `dateFor` (YYYY-MM-DD). */
 export function misWeekStartMonday(dateFor: string): string {
   const d = new Date(`${dateFor}T12:00:00`)

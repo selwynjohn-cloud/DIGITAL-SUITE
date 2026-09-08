@@ -133,7 +133,7 @@ function pie3dDonut(slices,emptyMsg,center,money){
   html+='</svg><div class="chart-legend">';
   active.forEach(function(s){
     var val=Math.max(0,Number(s.value)||0),pct=Math.round(val*100/total);
-    var shown=money?fmtInrLacs(val):String(val);
+    var shown=money?fmtInrThousands(val):String(val);
     html+='<span><i class="dot" style="background:linear-gradient(180deg,'+s.light+','+s.dark+')"></i>'+h(s.label)+' <b>'+h(shown)+'</b> ('+pct+'%)</span>';
   });
   return html+'</div>';
@@ -155,7 +155,7 @@ function pie3dDeploy(san,dep,vac,days){
   return pie3dDonut(slices,'No deployment data',{value:String(s||d+v+gap),label:'Sanctioned Posts'})+depDaysBlock(days,s,d,v);
 }
 function moneyTiles(d){
-  return '<div class="cp-money-grid"><div class="cp-money bl"><b>'+h(fmtInrLacs(d.monthlyBillLacs))+'</b><span>Monthly bill</span></div><div class="cp-money am"><b>'+h(fmtInrLacs(d.collectedLacs))+'</b><span>Collected</span></div><div class="cp-money pu"><b>'+h(fmtInrLacs(d.balanceToPayLacs))+'</b><span>Balance to be paid</span></div></div>';
+  return '<div class="cp-money-grid"><div class="cp-money bl"><b>'+h(fmtInrThousands(d.monthlyBillLacs))+'</b><span>Monthly bill</span></div><div class="cp-money am"><b>'+h(fmtInrThousands(d.collectedLacs))+'</b><span>Collected</span></div><div class="cp-money pu"><b>'+h(fmtInrThousands(d.balanceToPayLacs))+'</b><span>Balance to be paid</span></div></div>';
 }
 function mwBanner(d){
   var raw=String(d.mwCompliant||'').toLowerCase();
@@ -163,12 +163,23 @@ function mwBanner(d){
   if(raw==='no')return '<div class="mw-no">✗ Minimum Wage Compliant — <span style="font-size:17px">NO</span></div>';
   return '<div class="mw-pend">MW Compliant — not entered yet (branch portal)</div>';
 }
+function pctBanner(label,pct){
+  if(pct==null||pct==='')return '<div class="cmp-pend">'+h(label)+'</div>';
+  var p=Math.max(0,Math.min(100,Math.round(Number(pct))));
+  var cls=p>=90?'cmp-ok':(p>=70?'cmp-mid':'cmp-low');
+  return '<div class="'+cls+'">✓ '+h(label)+'</div>';
+}
+function complianceBanners(d){
+  var pvc=d.pvcLabel||(d.pvcPct!=null?'PVC Compliant — '+d.pvcPct+'%':'PVC — Guard Docs not linked for this client yet');
+  var mc=d.medicalLabel||(d.medicalPct!=null?'MC (Medical Fitness) — '+d.medicalPct+'%':'MC (Medical) — Guard Docs not linked for this client yet');
+  return pctBanner(pvc,d.pvcPct)+pctBanner(mc,d.medicalPct)+mwBanner(d);
+}
 function perfText(d){
   var period=periodWords(d);
   return '📊 Unit Performance Report\\n'+d.clientName+'\\nPeriod: '+period+'\\n\\n'+
     'DEPLOYMENT\\nSanctioned: '+d.san+' · Deployed: '+d.dep+' · Vacant: '+d.vac+' · Avg: '+d.avgDeploy+'%\\n\\n'+
     'VISITS & DUTY\\nDay Visits: '+n(d.dayVisits)+' · Night Checks: '+n(d.nightChecks)+' · Training: '+n(d.training)+'\\nLate Start: '+n(d.lateStart)+' · Out of Post: '+n(d.outOfPost)+'\\n\\n'+
-    'COMPLIANCE & BILLING\\nMW Compliant: '+mwLabel(d)+'\\nMonthly bill: '+fmtInrLacs(d.monthlyBillLacs)+'\\nCollected: '+fmtInrLacs(d.collectedLacs)+'\\nBalance to be paid: '+fmtInrLacs(d.balanceToPayLacs)+'\\n\\n'+
+    'COMPLIANCE & BILLING\\nPVC: '+(d.pvcLabel||(d.pvcPct!=null?d.pvcPct+'%':'—'))+'\\nMC (Medical): '+(d.medicalLabel||(d.medicalPct!=null?d.medicalPct+'%':'—'))+'\\nMW Compliant: '+mwLabel(d)+'\\nMonthly bill: '+fmtInrThousands(d.monthlyBillLacs)+'\\nCollected: '+fmtInrThousands(d.collectedLacs)+'\\nBalance to be paid: '+fmtInrThousands(d.balanceToPayLacs)+'\\n\\n'+
     '— Agile Security Force Private Limited\\nwww.agilegroup.co.in'+__SHARE_FOOTER__;
 }
 function shareMail(){
@@ -220,10 +231,13 @@ function render(d){
         '<div class="m-kpi p"><b>'+h(n(d.outOfPost))+'</b><span>Out of Post</span></div>'+
       '</div></div>'+
     '<div class="m-card"><div class="sec-h">3. Compliance &amp; Billing</div>'+
-      mwBanner(d)+moneyTiles(d)+
-      '<p class="hint" style="text-align:center;margin-top:10px">All amounts in ₹ Lakhs (two decimals) · Collected = Monthly bill − Balance · Branch enters MW / Bill / Balance</p></div>';
+      (d.san||d.complianceSan?'<div class="cmp-ok" style="background:linear-gradient(135deg,#1d4ed8,#3b82f6);box-shadow:0 4px 14px rgba(37,99,235,.35)">Unit sanctioned strength: '+h(String(d.complianceSan||d.san))+' posts — PVC &amp; MC cannot exceed this</div>':'')+
+      complianceBanners(d)+
+      (d.accuracyNote?'<p class="hint" style="text-align:center;margin:8px 0 4px;color:#cbd5e1">'+h(d.accuracyNote)+'</p>':'')+
+      moneyTiles(d)+
+      '<p class="hint" style="text-align:center;margin-top:10px">Amounts in ₹ thousands · Branch enters MW / Bill / Balance</p></div>';
 }
-function initPage(){api('clientList').then(function(res){if(res.status!==200)return;el('client').innerHTML=(res.body.clients||[]).map(function(c){return '<option>'+h(c)+'</option>';}).join('');});}
+function initPage(){api('clientList').then(function(res){if(res.status!==200)return;el('client').innerHTML=(res.body.clients||[]).map(function(c){var name=typeof c==='string'?c:(c.name||'');var tier=typeof c==='string'?'':(c.businessTierLabel||'');return '<option value="'+h(name)+'">'+h(name)+(tier?' — '+h(tier):'')+'</option>';}).join('');});}
 misStart();
 </script>
 </body></html>`

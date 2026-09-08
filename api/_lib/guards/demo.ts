@@ -98,6 +98,7 @@ function baseComplaint(
     isDelayed: Boolean(partial.isDelayed),
     delayedAt: partial.delayedAt || '',
     delayedNotifiedAt: partial.delayedNotifiedAt || '',
+    delayedGuardNotifiedAt: (partial as { delayedGuardNotifiedAt?: string }).delayedGuardNotifiedAt || '',
     opsResolution: partial.opsResolution || '',
     deptResolution: partial.deptResolution || '',
     assuranceNote: partial.assuranceNote || '',

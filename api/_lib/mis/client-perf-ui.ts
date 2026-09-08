@@ -21,6 +21,10 @@ export const CLIENT_PERF_DASHBOARD_CSS = `
 .mw-yes{margin:14px 0;padding:14px 20px;border-radius:10px;text-align:center;font-weight:800;font-size:15px;background:linear-gradient(135deg,#15803d,#22c55e);color:#fff;box-shadow:0 4px 14px rgba(22,163,74,.35)}
 .mw-no{margin:14px 0;padding:14px 20px;border-radius:10px;text-align:center;font-weight:800;font-size:15px;background:linear-gradient(135deg,#b91c1c,#ef4444);color:#fff;box-shadow:0 4px 14px rgba(239,68,68,.35)}
 .mw-pend{margin:14px 0;padding:12px 16px;border-radius:10px;text-align:center;font-weight:700;font-size:13px;background:rgba(30,58,138,.22);color:#94a3b8;border:1px dashed #334155}
+.cmp-ok{margin:10px 0;padding:14px 18px;border-radius:10px;text-align:center;font-weight:800;font-size:15px;background:linear-gradient(135deg,#15803d,#22c55e);color:#fff;box-shadow:0 4px 14px rgba(22,163,74,.35)}
+.cmp-mid{margin:10px 0;padding:14px 18px;border-radius:10px;text-align:center;font-weight:800;font-size:15px;background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff;box-shadow:0 4px 14px rgba(245,158,11,.35)}
+.cmp-low{margin:10px 0;padding:14px 18px;border-radius:10px;text-align:center;font-weight:800;font-size:15px;background:linear-gradient(135deg,#b91c1c,#ef4444);color:#fff;box-shadow:0 4px 14px rgba(239,68,68,.35)}
+.cmp-pend{margin:10px 0;padding:12px 16px;border-radius:10px;text-align:center;font-weight:700;font-size:13px;background:rgba(30,58,138,.22);color:#94a3b8;border:1px dashed #334155}
 .chart-legend{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;font-size:11px;margin-top:8px}
 .dot{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle}
 .branch-fin{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:10px 0 12px}
@@ -62,6 +66,10 @@ export const CLIENT_PERF_LETTER_CSS = `
 .mw-yes{margin:14px 0;padding:14px 20px;border-radius:10px;text-align:center;font-weight:800;font-size:15px;background:linear-gradient(135deg,#15803d,#22c55e);color:#fff;box-shadow:0 4px 14px rgba(22,163,74,.35)}
 .mw-no{margin:14px 0;padding:14px 20px;border-radius:10px;text-align:center;font-weight:800;font-size:15px;background:linear-gradient(135deg,#b91c1c,#ef4444);color:#fff;box-shadow:0 4px 14px rgba(239,68,68,.35)}
 .mw-pend{margin:14px 0;padding:12px 16px;border-radius:10px;text-align:center;font-weight:700;font-size:13px;background:#f1f5f9;color:#64748b;border:1px dashed #cbd5e1}
+.cmp-ok{margin:10px 0;padding:14px 18px;border-radius:10px;text-align:center;font-weight:800;font-size:15px;background:linear-gradient(135deg,#15803d,#22c55e);color:#fff;box-shadow:0 4px 14px rgba(22,163,74,.35)}
+.cmp-mid{margin:10px 0;padding:14px 18px;border-radius:10px;text-align:center;font-weight:800;font-size:15px;background:linear-gradient(135deg,#b45309,#f59e0b);color:#fff;box-shadow:0 4px 14px rgba(245,158,11,.35)}
+.cmp-low{margin:10px 0;padding:14px 18px;border-radius:10px;text-align:center;font-weight:800;font-size:15px;background:linear-gradient(135deg,#b91c1c,#ef4444);color:#fff;box-shadow:0 4px 14px rgba(239,68,68,.35)}
+.cmp-pend{margin:10px 0;padding:12px 16px;border-radius:10px;text-align:center;font-weight:700;font-size:13px;background:#f1f5f9;color:#64748b;border:1px dashed #cbd5e1}
 .bill-kgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:8px 0 14px}
 .bill-kpi{border-radius:12px;padding:14px 10px;text-align:center;color:#fff;box-shadow:0 4px 12px rgba(0,0,0,.14)}
 .bill-kpi b{display:block;font-size:22px;font-weight:800;line-height:1.1}

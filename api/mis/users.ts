@@ -42,9 +42,12 @@ label{display:block;font-size:12px;color:#94a3b8;margin:8px 0 3px}
 .users-tbl th:nth-child(6),.users-tbl td:nth-child(6){width:155px;min-width:155px}
 .users-tbl th:nth-child(7),.users-tbl td:nth-child(7){width:200px;min-width:200px}
 .users-tbl th:nth-child(8),.users-tbl td:nth-child(8){width:72px;min-width:72px;text-align:center}
-.users-tbl th:nth-child(9),.users-tbl td:nth-child(9){width:88px;min-width:88px}
+.users-tbl th:nth-child(9),.users-tbl td:nth-child(9){width:100px;min-width:100px;text-align:center}
+.btn-del{background:#7f1d1d;color:#fecaca;border:1px solid #b91c1c;padding:6px 12px;border-radius:8px;font-weight:800;cursor:pointer;font-size:13px}
+.btn-del:hover{background:#991b1b}
 .inact{opacity:.5}
-.savebar{position:sticky;bottom:0;background:#111a30;border-top:1px solid #22304f;padding:12px;display:flex;gap:10px;justify-content:center}
+.savebar{position:sticky;bottom:0;background:#111a30;border-top:1px solid #22304f;padding:12px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;align-items:center}
+.savebar .hint{color:#94a3b8;font-size:13px;margin:0}
 .switch{position:relative;display:inline-block;width:46px;height:26px;vertical-align:middle}
 .switch input{opacity:0;width:0;height:0;position:absolute}
 .slider{position:absolute;cursor:pointer;inset:0;background:#334155;transition:.2s;border-radius:26px;border:1px solid #475569}
@@ -60,22 +63,28 @@ ${misPageWrap(MIS_ACTIVE, MIS_TITLE, `
 <div id="app"><div class="wrap">
   <div class="kgrid" id="kpis"></div>
   <div class="card"><div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px"><b style="color:#fff">Registered Users</b><button class="btn grey" onclick="addU()">+ Add User</button></div>
-  <div style="font-size:12px;color:#94a3b8;margin-bottom:8px">Director and Admin only. Users are never deleted — use the <b>Active</b> switch to deactivate. <b>Operations</b> = branch MIS submitters. <b>Support</b> (Stores, HR, Recruitment, Payroll) cannot submit MIS.</div>
-  <div class="tblwrap"><table class="users-tbl"><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Team</th><th>Dept</th><th>Branch</th><th>Active</th><th></th></tr></thead><tbody id="rows"></tbody></table></div></div>
+  <div style="font-size:12px;color:#94a3b8;margin-bottom:8px">Director and Admin only. Wrong entry? Tap <b style="color:#fecaca">Delete</b> on that row, then <b>Save &amp; Publish</b>. Or turn <b>Active</b> off to keep the row but block login.<br><b style="color:#fde68a">President</b> — Management email PIN (all suite apps). Branch reports view only: Hyderabad-A, Hyderabad-B, Hi-Tech City, Mumbai, Surat, Bhopal, Lucknow, Visakhapatnam, Kakinada, Nellore, Tada, Tirupati, Tadipatri. Branch column can stay blank for President.</div>
+  <div class="tblwrap"><table class="users-tbl"><thead><tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Team</th><th>Dept</th><th>Branch</th><th>Active</th><th>Delete</th></tr></thead><tbody id="rows"></tbody></table></div></div>
 </div>
-  <div class="savebar"><button class="btn green" onclick="save()">✅ Save &amp; Publish</button></div>
+  <div class="savebar"><button class="btn green" onclick="save()">✅ Save &amp; Publish</button><span class="hint">Delete only becomes permanent after Save.</span></div>
 </div>
 `)}
 <script>
 ${MIS_SESSION_JS}
 U=[],B=[];
-var ROLES=['Director','Admin','CGM','Vice President (VP)','AVP','General Manager (GM)','Regional Manager (RM)','Branch Manager','Operations Manager','Area Manager','Field Officer','Sales Executive','Training Team','Accounts','HR'];
+var ROLES=['Director','President','Admin','CGM','Vice President (VP)','AVP','General Manager (GM)','Regional Manager (RM)','Branch Manager','Operations Manager','Area Manager','Field Officer','Sales Executive','Training Team','Accounts','HR'];
 var TEAMS=['operations','support'];
-var DEPTS=['','Stores','HR','Recruitment','Payroll'];
+var DEPTS=['','HR','RECRUITMENT','PAYROLL','STORES','CONTROL','SALES','IT','CORPORATE OFFICE','TRAINING (OJT)','TRAINING ACADEMY'];
 function teamLbl(t){return t==='support'?'Support':'Operations';}
 function setTeam(i,v){U[i].team=v;if(v==='support'&&!U[i].department)U[i].department='HR';if(v==='operations')U[i].department='';render();}
 function addU(){U.push({id:nid(),name:'',email:'',phone:'',role:'Field Officer',branchId:'',team:'operations',department:'',active:true});render();}
-function delU(i){if(!confirm('Remove '+((U[i]&&U[i].name)||'this user')+' from the list?'))return;U.splice(i,1);render();}
+function delU(i){
+  var u=U[i];if(!u)return;
+  var label=(u.name||u.email||'this user').trim()||'this user';
+  if(!confirm('Delete '+label+' from User Management?\\n\\nThis removes the person completely.\\nAfter Delete, tap Save & Publish to confirm.'))return;
+  U.splice(i,1);
+  render();
+}
 function el(id){return document.getElementById(id);}
 function h(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function a(s){return h(s).replace(/"/g,'&quot;');}
@@ -91,12 +100,12 @@ function render(){
     '<td><input value="'+a(u.name)+'" oninput="U['+i+'].name=this.value"></td>'+
     '<td><input value="'+a(u.email)+'" oninput="U['+i+'].email=this.value"></td>'+
     '<td><input value="'+a(u.phone)+'" oninput="U['+i+'].phone=this.value"></td>'+
-    '<td><select onchange="U['+i+'].role=this.value">'+opt(u.role,ROLES)+'</select></td>'+
+    '<td><select onchange="U['+i+'].role=this.value;if(this.value===\'President\')U['+i+'].branchId=\'\';render()">'+opt(u.role,ROLES)+'</select></td>'+
     '<td><select onchange="setTeam('+i+',this.value)">'+TEAMS.map(function(t){return '<option value="'+t+'"'+(tm===t?' selected':'')+'>'+teamLbl(t)+'</option>';}).join('')+'</select></td>'+
     '<td>'+(tm==='support'?'<select onchange="U['+i+'].department=this.value">'+DEPTS.filter(function(d){return d;}).map(function(d){return '<option'+(u.department===d?' selected':'')+'>'+h(d)+'</option>';}).join('')+'</select>':'<span style="color:#64748b">—</span>')+'</td>'+
-    '<td><select onchange="U['+i+'].branchId=this.value">'+bopt(u.branchId)+'</select></td>'+
+    '<td>'+(u.role==='President'?'<span style="color:#fde68a;font-size:12px;font-weight:700">Regional set (fixed)</span>':'<select onchange="U['+i+'].branchId=this.value">'+bopt(u.branchId)+'</select>')+'</td>'+
     '<td style="white-space:nowrap"><label class="switch"><input type="checkbox" '+(u.active!==false?'checked':'')+' onchange="U['+i+'].active=this.checked;render()"><span class="slider"></span></label></td>'+
-    '<td><button class="btn grey" style="padding:4px 10px" onclick="delU('+i+')">Remove</button></td></tr>';}).join('');
+    '<td><button type="button" class="btn-del" onclick="delU('+i+')">Delete</button></td></tr>';}).join('');
 }
 function save(){
   for(var i=0;i<U.length;i++){
@@ -114,7 +123,7 @@ function initPage(){
     if(res.s===403){alert(res.j.error||'Only Director and Admin can open User Management.');location.href='/mis-dashboard';return;}
     if(res.s===401){alert('Session expired — please sign in again.');location.href='/mis';return;}
     if(res.s!==200){alert((res.j&&res.j.error)||'Could not load users.');return;}
-    U=res.j.users||[];B=res.j.branches||[];render();
+    U=res.j.users||[];B=res.j.branches||[];if(res.j.supportDepartments&&res.j.supportDepartments.length)DEPTS=[''].concat(res.j.supportDepartments);render();
   }).catch(function(){alert('Network error loading users.');});
 }
 misStart();

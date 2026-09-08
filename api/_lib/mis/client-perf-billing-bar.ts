@@ -203,7 +203,7 @@ function billingCoinStacks(bill,coll,bal){
   svg+='</svg><div class="chart-legend">';
   for(i=0;i<cols.length;i++){
     col=cols[i];pct=cpBillingPct(b,col.value,i===0);
-    legend+='<span><i class="dot" style="background:linear-gradient(180deg,'+col.light+','+col.dark+');border:1px solid '+col.dark+'"></i>'+h(col.label)+' '+(i===0?'<b>'+h(fmtLacs(col.value))+'</b>':'<b>'+h(fmtInrLacs(col.value))+'</b> ('+pct+'%)')+'</span>';
+    legend+='<span><i class="dot" style="background:linear-gradient(180deg,'+col.light+','+col.dark+');border:1px solid '+col.dark+'"></i>'+h(col.label)+' '+(i===0?'<b>'+h(fmtInrThousands(col.value))+'</b>':'<b>'+h(fmtInrThousands(col.value))+'</b> ('+pct+'%)')+'</span>';
   }
   return svg+legend+'</div>';
 }

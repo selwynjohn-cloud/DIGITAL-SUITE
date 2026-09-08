@@ -48,6 +48,8 @@ input[type=text],select{width:100%;padding:11px 13px;border:1px solid #cbd5e1;bo
 .g{background:#14224f;color:#fff}.b{background:#1d4ed8;color:#fff}.r{background:#dc2626;color:#fff}.grey{background:#e2e8f0;color:#334155}.gold{background:#c9a84c;color:#14224f}.green{background:#16a34a;color:#fff}
 .item{border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:14px;background:#f8fafc}
 .bengrid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.bengroup{margin-top:12px;padding:10px 12px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc}
+.bengroup h4{margin:0 0 8px;font-size:13px;font-weight:800;color:#14224f;letter-spacing:.2px}
 @media(max-width:620px){.bengrid{grid-template-columns:1fr}.login-feats{grid-template-columns:1fr}}
 .tgl{display:flex;align-items:center;gap:11px;font-size:15px;font-weight:600;margin:0;padding:7px 6px;cursor:pointer;border-radius:8px}
 .tgl:hover{background:#eef2ff}
@@ -93,8 +95,27 @@ th{color:#64748b;font-size:12.5px;text-transform:uppercase}
       <label>States Covered</label><input type="text" id="s_states">
     </div>
     <div class="card"><div class="sec">Contact Information</div>
+      <label>Help Line</label><input type="text" id="s_helpline" placeholder="+91 8500915599">
       <label>WhatsApp Number</label><input type="text" id="s_wa">
       <div class="row2"><div><label>Recruitment Email 1</label><input type="text" id="s_e1"></div><div><label>Recruitment Email 2</label><input type="text" id="s_e2"></div></div>
+    </div>
+    <div class="card"><div class="sec">Administrative &amp; Operations Banner</div>
+      <label>Show banner on website</label>
+      <select id="s_ops_show"><option value="Yes">Yes — show banner</option><option value="No">No — hide banner</option></select>
+      <label>Small top line</label><input type="text" id="s_ops_eyebrow" placeholder="Office &amp; Operations — Pan India">
+      <label>Main heading</label><input type="text" id="s_ops_title" placeholder="We Are Hiring: Operations &amp; Administrative Staff">
+      <label>Short message</label><input type="text" id="s_ops_text" placeholder="Hiring for HR, Admin, Accounts…">
+      <label>Button text</label><input type="text" id="s_ops_btn" placeholder="Register Now — It's Free">
+    </div>
+    <div class="card"><div class="sec">Agile Recruitment Anthem (MP3 — multi language)</div>
+      <p style="font-size:13px;color:#64748b;margin:0 0 10px;line-height:1.45">Add songs by language. Paste an MP3 link, or upload an MP3 file. Tap Save &amp; Publish when finished.</p>
+      <div id="anthemList"></div>
+      <button class="btn grey" type="button" onclick="addAnthem()">+ Add language / song</button>
+    </div>
+    <div class="card"><div class="sec">Our Academy Videos (MP4)</div>
+      <p style="font-size:13px;color:#64748b;margin:0 0 10px;line-height:1.45">Easiest: paste a <b>YouTube</b> link. Or upload an MP4 (up to about 100 MB). After upload, tap <b>Save &amp; Publish</b>.</p>
+      <div id="videoList"></div>
+      <button class="btn grey" type="button" onclick="addVideo()">+ Add academy video</button>
     </div>
     <div class="card"><div class="sec">Security Job Postings</div>
       <div id="jobs"></div>
@@ -110,18 +131,78 @@ th{color:#64748b;font-size:12.5px;text-transform:uppercase}
 </div>
 
 <script>
+window.sjBlobUpload = function(file, kind, onProgress){
+  syncOtpWindow();
+  var safe = String(file.name || (kind === 'academy' ? 'video.mp4' : 'song.mp3')).replace(/[^\\w.\\-]+/g, '_').slice(0, 80);
+  return fetch('/api/securityjob/media-upload', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sessionToken: window.OTP_SESSION || (typeof OTP_SESSION !== 'undefined' ? OTP_SESSION : ''),
+      kind: kind,
+      filename: safe
+    })
+  }).then(function(r){
+    return r.json().then(function(j){ return { ok: r.ok, status: r.status, body: j }; });
+  }).then(function(res){
+    if(!res.ok || !res.body.clientToken || !res.body.pathname){
+      throw new Error((res.body && res.body.error) || 'Could not start upload. Please sign in again.');
+    }
+    return new Promise(function(resolve, reject){
+      var url = 'https://vercel.com/api/blob/?pathname=' + encodeURIComponent(res.body.pathname);
+      var xhr = new XMLHttpRequest();
+      xhr.open('PUT', url);
+      xhr.setRequestHeader('authorization', 'Bearer ' + res.body.clientToken);
+      xhr.setRequestHeader('x-api-version', '12');
+      xhr.setRequestHeader('x-vercel-blob-access', 'public');
+      if(res.body.storeId) xhr.setRequestHeader('x-vercel-blob-store-id', res.body.storeId);
+      xhr.setRequestHeader('x-content-type', res.body.contentType || (kind === 'academy' ? 'video/mp4' : 'audio/mpeg'));
+      xhr.upload.onprogress = function(ev){
+        if(!onProgress || !ev.lengthComputable) return;
+        onProgress(Math.max(1, Math.min(99, Math.round(ev.loaded / ev.total * 100))));
+      };
+      xhr.onload = function(){
+        if(xhr.status < 200 || xhr.status >= 300){
+          var errMsg = 'Upload failed (' + xhr.status + ').';
+          try {
+            var j = JSON.parse(xhr.responseText || '{}');
+            if(j.error && j.error.message) errMsg = j.error.message;
+            else if(j.message) errMsg = j.message;
+          } catch(e) {}
+          reject(new Error(errMsg + ' You can paste a YouTube / MP4 link instead.'));
+          return;
+        }
+        try {
+          var out = JSON.parse(xhr.responseText || '{}');
+          if(!out.url) throw new Error('missing url');
+          resolve(out.url);
+        } catch(e) {
+          reject(new Error('Upload finished but no video link came back. Please try again.'));
+        }
+      };
+      xhr.onerror = function(){
+        reject(new Error('Network problem while sending the file. Check internet, or paste a YouTube / MP4 link.'));
+      };
+      var ctype = res.body.contentType || (kind === 'academy' ? 'video/mp4' : 'audio/mpeg');
+      xhr.send(file.type === ctype ? file : new Blob([file], { type: ctype }));
+    });
+  });
+};
+</script>
+<script>
 if(new URLSearchParams(location.search).get('fresh')==='1'){
   sessionStorage.removeItem('otp_securityjob');
   sessionStorage.removeItem('otp_email_securityjob');
 }
 ${otpLoginScript('securityjob', 'SecurityJob Admin', 'management')}
-var settings={},jobs=[],applicants=[];
+var settings={},jobs=[],applicants=[],anthems=[],academyVideos=[];
 var BEN=${JSON.stringify(BENEFIT_OPTIONS)};
 function h(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function a(s){return h(s).replace(/"/g,'&quot;');}
 function el(id){return document.getElementById(id);}
 function nid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
-function api(action,extra){return fetch('/api/securityjob/admin-data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action:action,sessionToken:OTP_SESSION},extra||{}))}).then(function(r){return r.json().then(function(j){return{status:r.status,body:j};});});}
+function syncOtpWindow(){try{window.OTP_SESSION=typeof OTP_SESSION!=='undefined'?OTP_SESSION:(sessionStorage.getItem('otp_securityjob')||'');}catch(e){}}
+function api(action,extra){syncOtpWindow();return fetch('/api/securityjob/admin-data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action:action,sessionToken:OTP_SESSION},extra||{}))}).then(function(r){return r.json().then(function(j){return{status:r.status,body:j};});});}
 
 function showDashboard(){
   el('loginShell').classList.add('hidden');
@@ -129,32 +210,130 @@ function showDashboard(){
   document.body.classList.remove('login-mode');
 }
 function onOtpLogin(j){
+  syncOtpWindow();
   api('load').then(function(res){
     if(res.status!==200){otpMsg(res.body.error||'Could not sign in.',false);return;}
     settings=res.body.settings||{};jobs=res.body.jobs||[];applicants=res.body.applicants||[];
+    anthems=res.body.anthems||[];academyVideos=res.body.academyVideos||[];
     showDashboard();
-    fillSettings();renderJobs();renderApplicants();
+    fillSettings();renderJobs();renderApplicants();renderAnthems();renderVideos();
   }).catch(function(){otpMsg('Network error. Please try again.',false);});
 }
 
-function fillSettings(){el('s_guards').value=settings.guardsPlaced||'';el('s_loc').value=settings.locations||'';el('s_states').value=settings.states||'';el('s_wa').value=settings.whatsapp||'';el('s_e1').value=settings.email1||'';el('s_e2').value=settings.email2||'';}
-function readSettings(){return{guardsPlaced:el('s_guards').value,locations:el('s_loc').value,states:el('s_states').value,whatsapp:el('s_wa').value,email1:el('s_e1').value,email2:el('s_e2').value};}
+function fillSettings(){
+  el('s_guards').value=settings.guardsPlaced||'';
+  el('s_loc').value=settings.locations||'';
+  el('s_states').value=settings.states||'';
+  el('s_helpline').value=settings.helpline||'+91 8500915599';
+  el('s_wa').value=settings.whatsapp||'';
+  el('s_e1').value=settings.email1||'';
+  el('s_e2').value=settings.email2||'';
+  el('s_ops_show').value=settings.adminOpsShow==='No'?'No':'Yes';
+  el('s_ops_eyebrow').value=settings.adminOpsEyebrow||'';
+  el('s_ops_title').value=settings.adminOpsTitle||'';
+  el('s_ops_text').value=settings.adminOpsText||'';
+  el('s_ops_btn').value=settings.adminOpsButton||'';
+}
+function readSettings(){
+  return{
+    guardsPlaced:el('s_guards').value,
+    locations:el('s_loc').value,
+    states:el('s_states').value,
+    helpline:el('s_helpline').value,
+    whatsapp:el('s_wa').value,
+    email1:el('s_e1').value,
+    email2:el('s_e2').value,
+    adminOpsShow:el('s_ops_show').value,
+    adminOpsEyebrow:el('s_ops_eyebrow').value,
+    adminOpsTitle:el('s_ops_title').value,
+    adminOpsText:el('s_ops_text').value,
+    adminOpsButton:el('s_ops_btn').value
+  };
+}
 
 function addJob(){jobs.push({id:nid(),title:'Security Guard',status:'Active',locations:'',eligibility:'',wages:'',closingDate:'',benefits:[]});renderJobs();}
 function delJob(i){if(confirm('Delete this job posting?')){jobs.splice(i,1);renderJobs();}}
 function upJob(i,f,v){jobs[i][f]=v;}
 function toggleBen(i,ben,on){var arr=jobs[i].benefits||[];if(on){if(arr.indexOf(ben)<0)arr.push(ben);}else{arr=arr.filter(function(x){return x!==ben;});}jobs[i].benefits=arr;}
-function renderJobs(){var c=el('jobs');c.innerHTML='';jobs.forEach(function(j,i){var opts=['Active','Upcoming','Closed'].map(function(s){return '<option'+(j.status===s?' selected':'')+'>'+s+'</option>';}).join('');var bens=BEN.map(function(b){var on=(j.benefits||[]).indexOf(b)>=0;return '<label class="tgl"><input type="checkbox" '+(on?'checked':'')+' onchange="toggleBen('+i+',\\''+b.replace(/'/g,"\\\\'")+'\\',this.checked)"><span class="tsw"></span> '+h(b)+'</label>';}).join('');c.innerHTML+='<div class="item"><div class="row2"><div><label>Job Title</label><input type="text" value="'+a(j.title)+'" oninput="upJob('+i+',\\'title\\',this.value)"></div><div><label>Hiring Status</label><select onchange="upJob('+i+',\\'status\\',this.value)">'+opts+'</select></div></div><label>Posting Locations</label><input type="text" value="'+a(j.locations)+'" oninput="upJob('+i+',\\'locations\\',this.value)"><div class="row2"><div><label>Eligibility</label><input type="text" value="'+a(j.eligibility)+'" oninput="upJob('+i+',\\'eligibility\\',this.value)"></div><div><label>Take-home Wages</label><input type="text" value="'+a(j.wages)+'" oninput="upJob('+i+',\\'wages\\',this.value)"></div></div><label>Closing Date</label><input type="text" value="'+a(j.closingDate)+'" oninput="upJob('+i+',\\'closingDate\\',this.value)" placeholder="e.g. 31/07/2026"><label>Benefits &amp; Perks</label><div class="bengrid">'+bens+'</div><div style="margin-top:8px"><button class="btn r" onclick="delJob('+i+')">Delete this job</button></div></div>';});}
+function renderJobs(){var c=el('jobs');c.innerHTML='';jobs.forEach(function(j,i){var opts=['Active','Upcoming','Closed'].map(function(s){return '<option'+(j.status===s?' selected':'')+'>'+s+'</option>';}).join('');var bens=BEN.map(function(b){var on=(j.benefits||[]).indexOf(b)>=0;return '<label class="tgl"><input type="checkbox" '+(on?'checked':'')+' onchange="toggleBen('+i+',\\''+b.replace(/'/g,"\\\\'")+'\\',this.checked)"><span class="tsw"></span> '+h(b)+'</label>';}).join('');c.innerHTML+='<div class="item"><div class="row2"><div><label>Job Title</label><input type="text" value="'+a(j.title)+'" oninput="upJob('+i+',\\'title\\',this.value)"></div><div><label>Hiring Status</label><select onchange="upJob('+i+',\\'status\\',this.value)">'+opts+'</select></div></div><label>Posting Locations</label><input type="text" value="'+a(j.locations)+'" oninput="upJob('+i+',\\'locations\\',this.value)"><div class="row2"><div><label>Eligibility</label><input type="text" value="'+a(j.eligibility)+'" oninput="upJob('+i+',\\'eligibility\\',this.value)"></div><div><label>Gross Wages</label><input type="text" value="'+a(j.wages)+'" oninput="upJob('+i+',\\'wages\\',this.value)"></div></div><label>Closing Date</label><input type="text" value="'+a(j.closingDate)+'" oninput="upJob('+i+',\\'closingDate\\',this.value)" placeholder="e.g. 31/07/2026"><label>Benefits &amp; Perks</label><div class="bengrid">'+bens+'</div><div style="margin-top:8px"><button class="btn r" onclick="delJob('+i+')">Delete this job</button></div></div>';});}
+
+function addAnthem(){anthems.push({id:nid(),language:'',title:'',url:'',active:true});renderAnthems();}
+function delAnthem(i){if(confirm('Remove this song?')){anthems.splice(i,1);renderAnthems();}}
+function upAnthem(i,f,v){anthems[i][f]=v;}
+function toggleAnthem(i,on){anthems[i].active=!!on;}
+function renderAnthems(){
+  var c=el('anthemList');if(!c)return;c.innerHTML='';
+  anthems.forEach(function(x,i){
+    c.innerHTML+='<div class="item"><div class="row2"><div><label>Language</label><input type="text" value="'+a(x.language)+'" oninput="upAnthem('+i+',\\'language\\',this.value)" placeholder="English / Tamil / Hindi…"></div><div><label>Song title</label><input type="text" value="'+a(x.title)+'" oninput="upAnthem('+i+',\\'title\\',this.value)" placeholder="Song name"></div></div><label>MP3 link / path</label><input type="text" value="'+a(x.url)+'" oninput="upAnthem('+i+',\\'url\\',this.value)" placeholder="/securityjob/song-english.mp3 or https://…"><div class="row2" style="margin-top:8px;align-items:center"><div><label class="tgl"><input type="checkbox" '+(x.active!==false?'checked':'')+' onchange="toggleAnthem('+i+',this.checked)"><span class="tsw"></span> Show on website</label></div><div><button class="btn grey" type="button" onclick="uploadMedia(\\''+i+'\\',\\'anthem\\')">⬆ Upload MP3</button> <button class="btn r" type="button" onclick="delAnthem('+i+')">Delete</button></div></div></div>';
+  });
+}
+
+function addVideo(){academyVideos.push({id:nid(),title:'',url:'',active:true});renderVideos();}
+function delVideo(i){if(confirm('Remove this video?')){academyVideos.splice(i,1);renderVideos();}}
+function upVideo(i,f,v){academyVideos[i][f]=v;}
+function toggleVideo(i,on){academyVideos[i].active=!!on;}
+function renderVideos(){
+  var c=el('videoList');if(!c)return;c.innerHTML='';
+  academyVideos.forEach(function(x,i){
+    c.innerHTML+='<div class="item"><label>Video title</label><input type="text" value="'+a(x.title)+'" oninput="upVideo('+i+',\\'title\\',this.value)" placeholder="Academy video title"><label>MP4 / YouTube link</label><input type="text" value="'+a(x.url)+'" oninput="upVideo('+i+',\\'url\\',this.value)" placeholder="https://…mp4 or YouTube link"><div class="row2" style="margin-top:8px;align-items:center"><div><label class="tgl"><input type="checkbox" '+(x.active!==false?'checked':'')+' onchange="toggleVideo('+i+',this.checked)"><span class="tsw"></span> Show on website</label></div><div><button class="btn grey" type="button" onclick="uploadMedia(\\''+i+'\\',\\'academy\\')">⬆ Upload MP4</button> <button class="btn r" type="button" onclick="delVideo('+i+')">Delete</button></div></div></div>';
+  });
+}
+
+function uploadMedia(index,kind){
+  var inp=document.createElement('input');inp.type='file';inp.accept=kind==='anthem'?'audio/mpeg,.mp3':'video/mp4,.mp4';
+  inp.onchange=async function(){
+    var f=inp.files&&inp.files[0];if(!f)return;
+    var maxMb=kind==='academy'?100:15;
+    if(f.size>maxMb*1024*1024){
+      var m0=el('saveMsg');m0.style.display='block';m0.style.background='#fef2f2';m0.style.color='#991b1b';
+      m0.textContent='This file is too large (max '+maxMb+' MB). Use a smaller file, or paste a YouTube / MP4 link.';
+      return;
+    }
+    var m=el('saveMsg');m.style.display='block';m.style.background='#dcfce7';m.style.color='#166534';
+    m.textContent='Uploading '+f.name+'… 0%';
+    syncOtpWindow();
+    try{
+      if(typeof window.sjBlobUpload!=='function'){
+        throw new Error('Upload tool not ready. Refresh the page and try again, or paste a YouTube / MP4 link.');
+      }
+      var url=await window.sjBlobUpload(f, kind, function(pct){ m.textContent='Uploading '+f.name+'… '+pct+'%'; });
+      var i=Number(index);
+      if(kind==='anthem'){anthems[i].url=url;if(!anthems[i].title)anthems[i].title=f.name.replace(/\\.mp3$/i,'');renderAnthems();}
+      else{academyVideos[i].url=url;if(!academyVideos[i].title)academyVideos[i].title=f.name.replace(/\\.mp4$/i,'');renderVideos();}
+      m.style.background='#dcfce7';m.style.color='#166534';
+      m.textContent='Uploaded. Tap Save & Publish to keep it.';
+    }catch(err){
+      m.style.background='#fef2f2';m.style.color='#991b1b';
+      m.textContent=(err&&err.message)||'Upload failed. Paste a YouTube or MP4 link instead, then Save.';
+    }
+  };
+  inp.click();
+}
 
 function uniqueApplicants(){return applicants;}
 function renderApplicants(){var loc=(el('filterLoc').value||'').toLowerCase();var role=(el('filterRole').value||'').toLowerCase();var list=applicants.filter(function(x){return(!loc||(x.location||'').toLowerCase().indexOf(loc)>=0)&&(!role||(x.role||'').toLowerCase().indexOf(role)>=0);});el('appCount').textContent=applicants.length;var t=el('applicants');t.innerHTML='';list.forEach(function(x){var img=x.photoId?'<img class="av" src="/api/securityjob/image?id='+a(x.photoId)+'">':'<div class="av"></div>';t.innerHTML+='<tr><td>'+img+'</td><td>'+h(x.regCode)+'</td><td>'+h(x.name)+'</td><td>'+h(x.phone)+'</td><td>'+h(x.location)+'</td><td>'+h(x.role)+'</td><td style="white-space:nowrap;font-size:12px">'+h(x.createdAt||'—')+'</td><td><button class="btn r" style="padding:5px 9px" onclick="delApp(\\''+x.id+'\\')">✕</button></td></tr>';});}
 function delApp(id){if(!confirm('Delete this applicant?'))return;api('deleteApplicant',{id:id}).then(function(res){if(res.status===200){applicants=res.body.applicants||[];renderApplicants();}});}
 
-function downloadCSV(){var rows=[['Reg Code','Name','Phone','Location','Role','Experience','Education','Language','Registered']];applicants.forEach(function(x){rows.push([x.regCode,x.name,x.phone,x.location,x.role,x.experience,x.education,x.language,x.createdAt]);});var csv=rows.map(function(r){return r.map(function(c){return '"'+String(c==null?'':c).replace(/"/g,'""')+'"';}).join(',');}).join('\\n');var blob=new Blob([csv],{type:'text/csv'});var url=URL.createObjectURL(blob);var link=document.createElement('a');link.href=url;link.download='securityjob-applicants.csv';link.click();}
+function downloadCSV(){var rows=[['Reg Code','Name','Phone','Email','Date of Birth','Location','Role','Experience','Education','Language','Registered']];applicants.forEach(function(x){rows.push([x.regCode,x.name,x.phone,x.email||'',x.dob||'',x.location,x.role,x.experience,x.education,x.language,x.createdAt]);});var csv=rows.map(function(r){return r.map(function(c){return '"'+String(c==null?'':c).replace(/"/g,'""')+'"';}).join(',');}).join('\\n');var blob=new Blob([csv],{type:'text/csv'});var url=URL.createObjectURL(blob);var link=document.createElement('a');link.href=url;link.download='securityjob-applicants.csv';link.click();}
 
-function saveAll(){var m=el('saveMsg');m.style.display='block';m.style.background='#dcfce7';m.style.color='#166534';m.textContent='Saving...';api('saveSettings',{settings:readSettings()}).then(function(){return api('saveJobs',{jobs:jobs});}).then(function(res){if(res.status===200){if(res.body.jobs)jobs=res.body.jobs;m.style.background='#dcfce7';m.style.color='#166534';m.textContent='Saved &amp; published!';renderJobs();}else{m.style.background='#fef2f2';m.style.color='#991b1b';m.textContent=(res.body.error||'Could not save.');}}).catch(function(){m.style.background='#fef2f2';m.style.color='#991b1b';m.textContent='Network error.';});}
+function saveAll(){
+  var m=el('saveMsg');m.style.display='block';m.style.background='#dcfce7';m.style.color='#166534';m.textContent='Saving...';
+  api('saveSettings',{settings:readSettings()})
+    .then(function(){return api('saveJobs',{jobs:jobs});})
+    .then(function(res){if(res.status===200&&res.body.jobs)jobs=res.body.jobs;return api('saveAnthems',{anthems:anthems});})
+    .then(function(res){if(res.status===200&&res.body.anthems)anthems=res.body.anthems;return api('saveAcademyVideos',{academyVideos:academyVideos});})
+    .then(function(res){
+      if(res.status===200){
+        if(res.body.academyVideos)academyVideos=res.body.academyVideos;
+        m.style.background='#dcfce7';m.style.color='#166534';m.textContent='Saved &amp; published!';
+        renderJobs();renderAnthems();renderVideos();
+      }else{
+        m.style.background='#fef2f2';m.style.color='#991b1b';m.textContent=(res.body.error||'Could not save.');
+      }
+    }).catch(function(){m.style.background='#fef2f2';m.style.color='#991b1b';m.textContent='Network error.';});
+}
 
-function loadData(){api('load').then(function(res){if(res.status===200){settings=res.body.settings||{};jobs=res.body.jobs||[];applicants=res.body.applicants||[];fillSettings();renderJobs();renderApplicants();}});}
+function loadData(){api('load').then(function(res){if(res.status===200){settings=res.body.settings||{};jobs=res.body.jobs||[];applicants=res.body.applicants||[];anthems=res.body.anthems||[];academyVideos=res.body.academyVideos||[];fillSettings();renderJobs();renderApplicants();renderAnthems();renderVideos();}});}
 if(otpRestoreSession())onOtpLogin({});
 </script>
 </body></html>`

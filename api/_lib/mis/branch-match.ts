@@ -1,7 +1,7 @@
 /**
  * Match branch daily reports when Master Directory has duplicate / legacy branch names.
  * Does NOT combine Hyderabad-A, Hyderabad-B, or Hi-Tech City — each keeps its own report.
- * Does combine small+large pairs (Tada→Nellore, Pondicherry→TN, Kakinada→Vizag).
+ * Does NOT combine neighbouring cities (Tada stays Tada, Pondicherry stays Pondicherry).
  */
 import type { MisBranch, MisReport } from './store.js'
 import { misBranchGroupKey } from './branch-dedupe.js'
@@ -11,26 +11,36 @@ function reportGroupKey(report: MisReport, branches: MisBranch[]): string {
   return misBranchGroupKey(name) || report.branchId
 }
 
+export function isSubmitted(r: MisReport | null | undefined): r is MisReport {
+  return Boolean(r && String(r.submittedAt ?? '').trim())
+}
+
+/** Prefer a submitted report over an empty draft on a newer branch id. */
+function preferReport(direct: MisReport | undefined, grouped: MisReport | undefined): MisReport | null {
+  if (isSubmitted(direct) && isSubmitted(grouped)) {
+    return String(grouped!.submittedAt) > String(direct!.submittedAt) ? grouped! : direct!
+  }
+  if (isSubmitted(direct)) return direct!
+  if (isSubmitted(grouped)) return grouped!
+  return direct ?? grouped ?? null
+}
+
 /** Latest report per branch id, plus one report per branch group (for alias rows). */
 export function buildBranchReportMap(branches: MisBranch[], reports: MisReport[]): Map<string, MisReport | null> {
   const byId = new Map<string, MisReport>()
   const byGroup = new Map<string, MisReport>()
   for (const r of reports) {
-    byId.set(r.branchId, r)
+    const prevId = byId.get(r.branchId)
+    if (!prevId || String(r.submittedAt ?? '') >= String(prevId.submittedAt ?? '')) byId.set(r.branchId, r)
     const gk = reportGroupKey(r, branches)
     const prev = byGroup.get(gk)
-    if (!prev || String(r.submittedAt) > String(prev.submittedAt)) byGroup.set(gk, r)
+    if (!prev || String(r.submittedAt ?? '') > String(prev.submittedAt ?? '')) byGroup.set(gk, r)
   }
 
   const out = new Map<string, MisReport | null>()
   for (const b of branches) {
-    const direct = byId.get(b.id)
-    if (direct) {
-      out.set(b.id, direct)
-      continue
-    }
     const gk = misBranchGroupKey(b.name)
-    out.set(b.id, gk ? byGroup.get(gk) ?? null : null)
+    out.set(b.id, preferReport(byId.get(b.id), gk ? byGroup.get(gk) : undefined))
   }
   return out
 }

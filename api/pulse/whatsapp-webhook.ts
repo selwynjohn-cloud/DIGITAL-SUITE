@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { clearPending, getPending, waSendText } from '../_lib/pulse/whatsapp.js'
 import { fetchNewsSections, totalNewsItems } from '../_lib/pulse/news.js'
+import { handleSjJoinOrderReply } from '../_lib/recruitment/sj-join-order.js'
+import { handleSjRegAskDateReply } from '../_lib/recruitment/sj-reg-ask-date.js'
 
 /**
  * Inbound webhook from Whapi.cloud.
@@ -16,14 +18,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const admin = (process.env.ADMIN_WHATSAPP ?? '').replace(/\D/g, '')
 
     for (const m of messages) {
-      const text = String(m?.text?.body ?? m?.body ?? '').trim().toUpperCase()
-      if (text !== 'OK' && text !== 'SEND') continue
+      const from = String(m?.from ?? '').replace(/\D/g, '')
+      const chat = String(m?.chat_id ?? '').replace(/\D/g, '')
+      const textRaw = String(
+        m?.text?.body ??
+          m?.body ??
+          m?.button?.text ??
+          m?.reply?.title ??
+          m?.interactive?.button_reply?.title ??
+          '',
+      ).trim()
+      const text = textRaw.toUpperCase()
+      const buttonId = String(m?.reply?.id ?? m?.button?.id ?? m?.interactive?.button_reply?.id ?? '')
+      const isAdmin = (v: string) => Boolean(v && admin && (v.endsWith(admin) || admin.endsWith(v)))
+
+      if (text !== 'OK' && text !== 'SEND') {
+        const joinFrom = from || chat
+        if (joinFrom) {
+          const handled = await handleSjJoinOrderReply({
+            from: joinFrom,
+            text: textRaw,
+            buttonId,
+            messageId: String(m?.id ?? ''),
+          })
+          if (handled) continue
+          const asked = await handleSjRegAskDateReply({
+            from: joinFrom,
+            text: textRaw,
+            buttonId,
+            messageId: String(m?.id ?? ''),
+          })
+          if (asked) continue
+        }
+        continue
+      }
 
       // Accept the OK only from the Director's own chat (works even when the
       // Director messages the connected number itself, i.e. "message yourself").
-      const from = String(m?.from ?? '').replace(/\D/g, '')
-      const chat = String(m?.chat_id ?? '').replace(/\D/g, '')
-      const isAdmin = (v: string) => Boolean(v && admin && (v.endsWith(admin) || admin.endsWith(v)))
       if (admin && !(isAdmin(from) || isAdmin(chat))) continue
 
       const pending = await getPending()

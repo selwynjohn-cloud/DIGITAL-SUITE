@@ -1,6 +1,7 @@
 /**
  * Dashboard period helpers — day, week, or specific month.
  */
+import { buildBranchReportMap } from './branch-match.js'
 import { misWeekStartMonday } from './dates.js'
 import type { MisBranch, MisReport } from './store.js'
 
@@ -117,22 +118,21 @@ export function mondaysInMonth(monthKey: string): string[] {
   return mondays
 }
 
-/** Latest submitted report per branch within a date range. */
+/** Latest submitted report per branch within a date range (legacy Hyderabad ids included). Drafts are ignored. */
 export function pickLatestBranchReports(
   branches: MisBranch[],
   reportsByDate: Map<string, MisReport[]>,
   dates: string[],
 ): Map<string, MisReport> {
   const out = new Map<string, MisReport>()
-  for (const b of branches) {
-    let best: MisReport | null = null
-    for (const d of dates) {
-      const list = reportsByDate.get(d) ?? []
-      const r = list.find((x) => x.branchId === b.id)
-      if (!r) continue
-      if (!best || String(r.submittedAt ?? '') > String(best.submittedAt ?? '')) best = r
+  for (const d of dates) {
+    const mapped = buildBranchReportMap(branches, reportsByDate.get(d) ?? [])
+    for (const b of branches) {
+      const r = mapped.get(b.id)
+      if (!r || !String(r.submittedAt ?? '').trim()) continue
+      const prev = out.get(b.id)
+      if (!prev || String(r.submittedAt ?? '') > String(prev.submittedAt ?? '')) out.set(b.id, r)
     }
-    if (best) out.set(b.id, best)
   }
   return out
 }
@@ -142,18 +142,23 @@ export function aggregateBranchPeriodStats(
   branchId: string,
   reportsByDate: Map<string, MisReport[]>,
   dates: string[],
+  branches: MisBranch[] = [],
 ): { daysSubmitted: number; resignation: number; recruitment: number; complaints: number } {
   let daysSubmitted = 0
   let resignation = 0
   let recruitment = 0
   let complaints = 0
+  const branch = branches.find((b) => b.id === branchId)
   for (const d of dates) {
-    const r = (reportsByDate.get(d) ?? []).find((x) => x.branchId === branchId)
-    if (!r) continue
+    const list = reportsByDate.get(d) ?? []
+    const r = branch
+      ? buildBranchReportMap(branches, list).get(branchId)
+      : list.find((x) => x.branchId === branchId)
+    if (!r || !String(r.submittedAt ?? '').trim()) continue
     daysSubmitted++
     const s = r.summary ?? {}
     resignation += Number(s.resignation ?? s.mobileMentionedPct) || 0
-    recruitment += Number(s.recruitment ?? s.mobileActualPct) || 0
+    recruitment += Number(s.recruitment) || 0
     complaints += Number(s.complaints) || 0
   }
   return { daysSubmitted, resignation, recruitment, complaints }

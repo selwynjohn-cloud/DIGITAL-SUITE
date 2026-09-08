@@ -3,6 +3,7 @@ import { hodLoginHtml, otpLoginScript } from '../_lib/embedded-otp.js'
 import { hodBootFromRequest, hodBootScriptJson } from '../_lib/hod-session.js'
 import { MIS_STAFF_CSS } from '../_lib/mis/staff-theme.js'
 import { MIS_STAFF_LAYOUT_CSS, misStaffSidebarHtml, MIS_STAFF_SESSION_JS } from '../_lib/mis/staff-layout.js'
+import { suitePageHeadHtml } from '../_lib/suite-page-chrome.js'
 import { UNIT_ISSUE_ITEMS } from '../_lib/mis/unit-issue.js'
 import { misFooterText, misPrintFooterBlock } from '../_lib/mis/brand.js'
 
@@ -22,7 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 const PAGE = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Agile MIS — Daily Branch Report</title>
-<script>window.__HOD_BOOT__=__HOD_BOOT_JSON__;if(window.__HOD_BOOT__&&window.__HOD_BOOT__.sessionToken){document.documentElement.classList.add('hod-signed-in');}</script>
+<script>window.__HOD_BOOT__=__HOD_BOOT_JSON__;</script>
 <style>
 ${MIS_STAFF_CSS}
 ${MIS_STAFF_LAYOUT_CSS}
@@ -47,7 +48,6 @@ html.report-embed .staff-main{margin-left:0!important;width:100%!important}
 html.report-embed .staff-shell .wrap{max-width:100%}
 </style></head>
 <body>
-<script>try{var t=sessionStorage.getItem('otp_mis-report');if(t&&!document.documentElement.classList.contains('hod-signed-in'))document.documentElement.classList.add('hod-signed-in');}catch(e){}</script>
 <p style="max-width:640px;margin:10px auto 0;padding:12px 14px;border-radius:10px;background:#0e1730;border:1px solid #22c55e;text-align:center;font-size:13px;color:#cbd5e1;line-height:1.55">
   <b style="color:#4ade80">Official MIS only</b> — Old <b>Manus / Railway</b> system is <b style="color:#f87171">CLOSED</b>. Open App <b>05</b> → white button <b>HODs / Staff</b> · Select branch · Enter your <b>branch password</b>.
   <br><a href="/mis-staff?fresh=1" style="color:#fde68a;font-weight:800">Open HOD Portal (fresh sign-in)</a>
@@ -76,7 +76,7 @@ ${hodLoginHtml('Agile MIS', 'Daily Branch Report — branch HOD sign in')}
 <div id="staffShell" class="staff-shell hidden">
 ${misStaffSidebarHtml('/mis-report')}
 <div class="staff-main">
-<div class="staff-bar noprint"><div style="display:flex;align-items:center;gap:12px"><button type="button" class="staff-burger" onclick="document.getElementById('staffSide').classList.toggle('open')">☰ Menu</button><div><b>Daily MIS Submission</b><div class="co">Submit your branch report — feeds Management consolidated MIS</div></div></div><span class="staff-branch-tag" id="staffBranchTag">Branch</span></div>
+<div class="staff-bar noprint"><div style="display:flex;align-items:center;gap:12px;min-width:0;flex:1"><button type="button" class="staff-burger" onclick="document.getElementById('staffSide').classList.toggle('open')">☰ Menu</button>${suitePageHeadHtml('Agile MIS', 'Daily MIS Submission', { coText: 'Submit your branch report — feeds Management consolidated MIS' })}</div><span class="staff-branch-tag" id="staffBranchTag">Branch</span></div>
 <div class="staff-content">
 <div id="reportLoading" class="hod-load-panel hidden">
   <div class="hod-spinner" aria-hidden="true"></div>
@@ -150,7 +150,7 @@ ${misStaffSidebarHtml('/mis-report')}
       <h3>Your Sites — Add / Edit / Deactivate</h3>
       <div class="hint">Manage deployment <b>sites</b> for your branch (one client may have many sites). Inactive sites are hidden from today's entry table.</div>
       <div style="margin:10px 0;display:flex;gap:8px;flex-wrap:wrap"><button class="btn g btn-sm" onclick="openClientModal()">+ Add Site</button><button class="btn gold btn-sm" onclick="toggleUnitIssue()">📦 Unit Issue Register</button></div>
-      <p class="hint" style="margin-bottom:10px">You may change <b>Sanctioned</b> posts when the client changes security need — saved to Master Directory when you submit. <b>Absent</b> and <b>OT</b> carry forward to tomorrow's report.</p>
+      <p class="hint" style="margin-bottom:10px">You may change <b>Sanctioned</b> posts when the client changes security need — saved to Master Directory when you submit. <b>Absent and OT</b> are pre-filled from your last submission where available — please update for today.</p>
     <div class="tblwrap"><table style="min-width:1000px;font-size:13px">
         <thead><tr>
           <th>Client</th><th>Site / Unit</th><th>Ops Staff</th><th>San A/G/B/C</th><th>SLA Day</th><th>SLA Night</th><th>Stars</th><th>Status</th><th>Actions</th>
@@ -172,7 +172,7 @@ ${misStaffSidebarHtml('/mis-report')}
     </div>
 
     <div id="collectionBlock">
-    <h3 id="summaryBlockStart" style="color:#fde68a;margin:18px 0 4px">Weekly Collection Plan <small style="font-weight:600;color:#94a3b8">(₹ Lakhs)</small></h3>
+    <h3 id="summaryBlockStart" style="color:#fde68a;margin:18px 0 4px">Weekly Collection Plan <small style="font-weight:600;color:#94a3b8">(₹ thousands)</small></h3>
     <div class="hint" style="margin-bottom:10px"><b>Weekly Budget</b> is your collection target for this week (from the outstanding statement — branch total only). Enter what you <b>collected each day</b> (Mon–Sat). This is saved automatically when you <b>Submit Daily Report</b>. <b>Client-wise outstanding</b> is uploaded separately by Management — not here.</div>
     <div class="sumgrid">
       <div><label>Weekly Budget (L)</label><input id="colBudget" inputmode="decimal" placeholder="Target for this week" oninput="fillCollectionPct()"></div>
@@ -197,7 +197,7 @@ ${misStaffSidebarHtml('/mis-report')}
     <div style="color:#fde68a;font-weight:700;font-size:13px;margin:12px 0 8px;border-bottom:1px solid #334155;padding-bottom:6px">Operations Visits — Agile Mobile / Work360</div>
     <div class="sumgrid">
       <div><label>Operations Visits (Day)</label><input id="dayVisits" inputmode="numeric" placeholder="Day patrol visits" oninput="updateDashCheck()"><div id="hint-dayVisits" class="field-hint field-manual">Agile Mobile / Work360</div></div>
-      <div><label>Night Checks</label><input id="nightChecks" inputmode="numeric" placeholder="Night check visits" oninput="updateDashCheck()"><div id="hint-nightChecks" class="field-hint field-manual">Agile Mobile / Work360</div></div>
+      <div><label>Night Checks</label><input id="nightChecks" inputmode="numeric" placeholder="Night check visits" oninput="updateDashCheck()"><div id="hint-nightChecks" class="field-hint field-manual">Night Visit (check) report today</div></div>
       <div><label>Trained Sites</label><input id="trainedSites" inputmode="numeric" placeholder="Training visits" oninput="updateDashCheck()"><div id="hint-trainedSites" class="field-hint field-manual">Agile Mobile / Work360</div></div>
     </div>
     <div style="color:#fde68a;font-weight:700;font-size:13px;margin:16px 0 8px;border-bottom:1px solid #334155;padding-bottom:6px">Duty Discipline — separate fields (Agile Mobile / Work360)</div>
@@ -214,7 +214,7 @@ ${misStaffSidebarHtml('/mis-report')}
     <div style="color:#fde68a;font-weight:700;font-size:13px;margin:16px 0 8px;border-bottom:1px solid #334155;padding-bottom:6px">HR, Collection &amp; Complaints</div>
     <div class="sumgrid">
       <div><label>Weekly Collection %</label><input id="weeklyCollectionPct" inputmode="decimal" oninput="syncCollectionPct();updateDashCheck()"><div id="hint-weeklyCollectionPct" class="field-hint field-manual">Mon–Sat collected ÷ weekly budget</div></div>
-      <div><label>Consolidated Collection %</label><input id="consolidatedCollectionPct" inputmode="decimal" oninput="updateDashCheck()"><div id="hint-consolidatedCollectionPct" class="field-hint field-manual">Finance upload — billing vs outstanding</div></div>
+      <div><label>Consolidated Collection %</label><input id="consolidatedCollectionPct" inputmode="decimal" oninput="updateDashCheck()"><div id="hint-consolidatedCollectionPct" class="field-hint field-manual">Friday OST current-month billing (10th–10th). Weekly does not change this.</div></div>
       <div><label>Resignation (cases)</label><input id="resignation" inputmode="numeric" placeholder="Guards resigned" oninput="updateDashCheck()"><div id="hint-resignation" class="field-hint field-manual">Recruitment / Guard Docs</div></div>
       <div><label>Recruitment (open)</label><input id="recruitment" inputmode="numeric" placeholder="Open positions" oninput="updateDashCheck()"><div id="hint-recruitment" class="field-hint field-manual">Recruitment app</div></div>
       <div><label>Guard Complaints</label><input id="guardComplaints" inputmode="text" placeholder="solved / registered e.g. 2/5" oninput="updateDashCheck()"><div id="hint-guardComplaints" class="field-hint field-manual">Agile Guards — solved / registered (running)</div></div>
@@ -226,6 +226,10 @@ ${misStaffSidebarHtml('/mis-report')}
 
     <div id="submitBlock">
     <div id="dashCheck" class="hint" style="margin-bottom:10px;padding:10px 12px;border:1px solid #334155;border-radius:8px;background:#0e1730;line-height:1.55"></div>
+    <label for="misCertified" style="display:flex;gap:12px;align-items:flex-start;margin:0 0 12px;padding:12px 14px;border:1px solid #c9a84c;border-radius:10px;background:#1a2438;cursor:pointer">
+      <input type="checkbox" id="misCertified" style="margin-top:3px;width:20px;height:20px;flex-shrink:0;accent-color:#c9a84c">
+      <span style="color:#fde68a;line-height:1.55;font-size:13px"><b>I certify:</b> I have reviewed today’s Daily MIS. All figures and remarks are verified and found correct. I take responsibility for this submission.</span>
+    </label>
     <div id="saveMsg" class="msg"></div>
     <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
       <button id="btnSubmitReport" class="btn green" onclick="submitReport()">✅ Submit Daily Report</button>
@@ -261,11 +265,11 @@ ${PRINT_FOOTER_HTML}
     </div>
     <label>Client Priority (Stars)</label>
     <select id="cmStars" style="font-size:17px">
-      <option value="1">★☆☆☆☆ — Valued Client (1)</option>
-      <option value="2">★★☆☆☆ — Valued Client (2)</option>
-      <option value="3">★★★☆☆ — High Value Client (3)</option>
-      <option value="4">★★★★☆ — High Value Client (4)</option>
-      <option value="5">★★★★★ — Strategic Client (5)</option>
+      <option value="1">★☆☆☆☆ — SLA star 1</option>
+      <option value="2">★★☆☆☆ — SLA star 2</option>
+      <option value="3">★★★☆☆ — SLA star 3</option>
+      <option value="4">★★★★☆ — SLA star 4</option>
+      <option value="5">★★★★★ — Apex / Strategic (5)</option>
     </select>
     <div class="hint">Equipment &amp; SLA issues per unit — use <b>Unit Issue Register</b> button above (on this page).</div>
     <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
@@ -300,10 +304,6 @@ function el(id){return document.getElementById(id);}
 function ensureSession(){
   if(OTP_SESSION)return true;
   if(typeof otpRestoreSession==='function') otpRestoreSession();
-  if(!OTP_SESSION){
-    var alt=sessionStorage.getItem('otp_mis');
-    if(alt){OTP_SESSION=alt;OTP_EMAIL=sessionStorage.getItem('otp_email_mis')||'';return true;}
-  }
   return !!OTP_SESSION;
 }
 var OPEN_REPORT_BUSY=false;
@@ -403,12 +403,22 @@ function reportBoot(){
     if(REPORT_EMBED){setTimeout(function(){location.replace('/mis-staff?fresh=1');},800);}
     return;
   }
-  CTX.branchId=reportBranchId()||'';
-  if(el('branch')&&CTX.branchId)el('branch').value=CTX.branchId;
-  staffPortalEnter('loginWrap');
-  showReportLoading('Opening your Daily MIS report…',REPORT_SECTION==='deploy'?'Step 1 — Deployment':REPORT_SECTION==='summary'?'Step 2 — Summary':REPORT_SECTION==='submit'?'Step 3 — Submit':'Please wait');
-  AUTO_OPEN_AFTER_LOAD=true;
-  tryOpenReportWhenReady();
+  staffApi('ping').then(function(res){
+    if(res.status!==200){
+      showLoginAgain(res.body&&res.body.error?res.body.error:'Please sign in again with your branch and password.');
+      return;
+    }
+    if(res.body&&res.body.branch)OTP_BRANCH_NAME=res.body.branch;
+    if(typeof hodPersistSession==='function')hodPersistSession();
+    CTX.branchId=reportBranchId()||'';
+    if(el('branch')&&CTX.branchId)el('branch').value=CTX.branchId;
+    staffPortalEnter('loginWrap');
+    showReportLoading('Opening your Daily MIS report…',REPORT_SECTION==='deploy'?'Step 1 — Deployment':REPORT_SECTION==='summary'?'Step 3 — Summary':REPORT_SECTION==='submit'?'Step 4 — Submit':'Please wait');
+    AUTO_OPEN_AFTER_LOAD=true;
+    tryOpenReportWhenReady();
+  }).catch(function(){
+    showLoginAgain('Could not verify sign-in. Please enter your branch password again.');
+  });
 }
 
 (function init(){
@@ -417,7 +427,7 @@ function reportBoot(){
     var promo=document.querySelector('body>p');if(promo)promo.style.display='none';
     var topBanner=document.querySelector('.top');if(topBanner)topBanner.style.display='none';
     if(document.documentElement.classList.contains('hod-signed-in')){
-      showReportLoading('Opening Daily MIS…',REPORT_SECTION==='deploy'?'Step 1 — Deployment':REPORT_SECTION==='summary'?'Step 2 — Summary':REPORT_SECTION==='submit'?'Step 3 — Submit':'Please wait');
+      showReportLoading('Opening Daily MIS…',REPORT_SECTION==='deploy'?'Step 1 — Deployment':REPORT_SECTION==='summary'?'Step 3 — Summary':REPORT_SECTION==='submit'?'Step 4 — Submit':'Please wait');
     }
   }
   fetch('/api/mis/report-data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'branches'})}).then(function(r){return r.json();}).then(function(j){
@@ -465,10 +475,14 @@ function applySummaryFromLogin(res){
   if(res.body.collection){
     var c=res.body.collection;
     CTX.collection=c;
+    window.COL_BILLING=+c.monthlyBilling||0;
+    window.COL_MTD_OTHER=+c.mtdExceptThisWeek||0;
     var colMap={colBudget:'budget',colMon:'mon',colTue:'tue',colWed:'wed',colThu:'thu',colFri:'fri',colSat:'sat'};
     Object.keys(colMap).forEach(function(id){var e=el(id);if(e)e.value=c[colMap[id]]||'';});
     var hint=el('colHint');
     if(hint)hint.textContent='Week from '+(res.body.weekStart||'')+' · Collected '+(res.body.collectionCollected||0)+' L';
+    if(res.body.consolidatedPct&&el('consolidatedCollectionPct'))el('consolidatedCollectionPct').value=res.body.consolidatedPct;
+    fillCollectionPct();
   }
   var hint=el('mobileHint');
   var dutyBox=el('dutyStats');
@@ -606,7 +620,16 @@ function loadClientMgmt(){
 }
 
 function starStr(n){n=Math.min(5,Math.max(1,Math.round(Number(n)||2)));return '★'.repeat(n);}
-function tierLabel(n){n=Math.round(Number(n)||2);if(n>=5)return 'Strategic Client';if(n>=3)return 'High Value Client';return 'Valued Client';}
+function tierLabel(c){
+  if(c&&c.businessTierLabel)return c.businessTierLabel;
+  if(c&&c.businessTier){
+    var m={standard:'Standard Tier',cluster:'Cluster Tier',enterprise:'Enterprise Tier',apex:'Apex Tier'};
+    return m[c.businessTier]||c.businessTier;
+  }
+  var n=Math.round(Number(c&&c.starRating!=null?c.starRating:c)||2);
+  if(n>=5)return 'Apex Tier';
+  return 'Standard Tier';
+}
 function renderClientMgmt(){
   var tb=el('clientMgmt');if(!tb)return;tb.innerHTML='';
   if(!CTX.clients.length){tb.innerHTML='<tr><td colspan="9" style="padding:12px;color:#94a3b8">No sites yet — tap <b>+ Add Site</b> above.</td></tr>';return;}
@@ -619,7 +642,7 @@ function renderClientMgmt(){
     tr.innerHTML=
       '<td class="txt">'+h(c.name)+'</td><td class="txt">'+h(c.location)+'</td><td class="txt">'+h(c.staffName)+'</td>'+
       '<td>'+san+'</td><td class="txt">'+h(c.slaDayVisit||'—')+'</td><td class="txt">'+h(c.slaNightCheck||'—')+'</td>'+
-      '<td><span style="color:#fde68a;font-size:15px">'+starStr(stars)+'</span> <small>'+tierLabel(stars)+'</small></td>'+
+      '<td><span style="color:#fde68a;font-size:15px">'+starStr(stars)+'</span> <small>'+tierLabel(c)+'</small></td>'+
       '<td><b style="color:'+(act?'#4ade80':'#f87171')+'">'+(act?'Active':'Inactive')+'</b></td>'+
       '<td class="cl-actions" style="white-space:nowrap">'+
       '<button type="button" class="btn sm" onclick="openClientModal(\\''+c.id+'\\')">Edit</button> '+
@@ -655,7 +678,8 @@ function saveClientModal(){
     sanA:+el('cmA').value||0,sanG:+el('cmG').value||0,sanB:+el('cmB').value||0,sanC:+el('cmC').value||0,
     slaDayVisit:el('cmSlaDay').value,slaNightCheck:el('cmSlaNight').value,starRating:+el('cmStars').value||2,active:true};
   if(!payload.name.trim()){m.style.background='#fef2f2';m.style.color='#991b1b';m.textContent='Please enter client name.';return;}
-  api('saveClient',{client:payload}).then(function(res){
+  if(!confirm('RECONFIRM: Change Master Directory client list? This affects Daily MIS. Tap OK only if intentional.')){m.style.display='none';return;}
+  api('saveClient',{confirmed:true,client:payload}).then(function(res){
     if(res.status!==200){m.style.background='#fef2f2';m.style.color='#991b1b';m.textContent=res.body.error||'Could not save.';return;}
     closeClientModal();
     refreshRowsAfterClientChange();
@@ -666,7 +690,8 @@ function toggleClient(id,active){
   var label=active?'activate':'deactivate';
   if(!id){alert('This client has no id — please refresh the page and try again.');return;}
   if(!confirm('Are you sure you want to '+label+' this site?'))return;
-  api('toggleClient',{clientId:id,active:active===true}).then(function(res){
+  if(!confirm('RECONFIRM: Change Master Directory client list? This affects Daily MIS. Tap OK only if intentional.'))return;
+  api('toggleClient',{confirmed:true,clientId:id,active:active===true}).then(function(res){
     if(res.status===200) refreshRowsAfterClientChange();
     else alert(res.body.error||'Could not update.');
   });
@@ -709,7 +734,8 @@ function renderRows(){
 }
 
 function upd(i,f,v){CTX.rows[i][f]=Number(v)||0;recompute();}
-function shiftCalc(san,abs,ot){san=Number(san)||0;abs=Number(abs)||0;ot=Number(ot)||0;var vac=Math.max(0,abs-ot);var dep=Math.min(san,Math.max(0,san-vac));return {dep:dep,vac:vac};}
+function clampOt(san,abs,ot){san=Number(san)||0;abs=Number(abs)||0;ot=Number(ot)||0;if(san<=0)return 0;return Math.min(Math.max(0,ot),Math.max(0,abs),san);}
+function shiftCalc(san,abs,ot){san=Number(san)||0;abs=Number(abs)||0;ot=clampOt(san,abs,ot);var vac=Math.max(0,abs-ot);var dep=Math.min(san,Math.max(0,san-vac));return {dep:dep,vac:vac,ot:ot};}
 function recompute(){
   CTX.rows.forEach(function(r,i){
     var totAbs=0,totOt=0;
@@ -717,8 +743,9 @@ function recompute(){
     SH.forEach(function(sh,idx){
       var s=sh[0];
       var c=shiftCalc(r['san'+s],r['abs'+s],r['ot'+s]);
+      r['ot'+s]=c.ot;
       r['dep'+s]=c.dep;
-      totAbs+=(r['abs'+s]||0);totOt+=(r['ot'+s]||0);
+      if((r['san'+s]||0)>0){totAbs+=(r['abs'+s]||0);totOt+=c.ot;}
       if(el('v'+i+s))el('v'+i+s).textContent=c.vac;
       if(tr){var depInp=tr.cells[4+idx*5+3]&&tr.cells[4+idx*5+3].querySelector('input');if(depInp)depInp.value=c.dep;}
     });
@@ -729,7 +756,7 @@ function recompute(){
 function updateTotals(){
   var san=0,abs=0,ot=0;
   CTX.rows.forEach(function(r){
-    SH.forEach(function(sh){var s=sh[0];san+=(r['san'+s]||0);abs+=(r['abs'+s]||0);ot+=(r['ot'+s]||0);});
+    SH.forEach(function(sh){var s=sh[0];var shiftSan=r['san'+s]||0;san+=shiftSan;if(shiftSan>0){abs+=(r['abs'+s]||0);ot+=clampOt(shiftSan,r['abs'+s],r['ot'+s]);}});
   });
   var vac=Math.max(0,abs-ot);
   var dep=Math.min(san,Math.max(0,san-vac));
@@ -755,16 +782,17 @@ function showAck(share,ack){
   if(st){
     function tile(v,l){return '<div style="flex:1;min-width:72px;padding:10px 6px;background:#0e1730;border:1px solid #334155;border-radius:8px;text-align:center"><b style="display:block;color:#fde68a;font-size:18px">'+v+'</b><span style="font-size:10px;color:#94a3b8;line-height:1.3">'+l+'</span></div>';}
     var gc=st.guardComplaints||{};var cc=st.clientComplaints||{};
+    var pvcDen=st.sanctionedStrength||st.guardsTotal||0;
     statsHtml='<div style="margin:14px 0;text-align:left"><div style="color:#fde68a;font-weight:700;font-size:13px;margin-bottom:8px;border-bottom:2px solid #c9a84c;padding-bottom:6px">Branch Status Dashboard</div>'+
       '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px">'+
-      tile((st.pvcValid||0)+'/'+(st.guardsTotal||0),'PVC valid/total')+
-      tile((st.medicalValid||0)+'/'+(st.guardsTotal||0),'Medical valid/total')+
+      tile((st.pvcValid||0)+'/'+pvcDen,'PVC valid/sanctioned')+
+      tile((st.medicalValid||0)+'/'+pvcDen,'Medical valid/sanctioned')+
       tile(String(st.dayVisits||0),'Day visits')+
       tile(String(st.srMgmtVisits||0),'Sr Mgmt visits')+
       '</div><div style="display:flex;flex-wrap:wrap;gap:8px">'+
       tile(String(st.resigned||0),'Resigned')+
       tile(String(st.recruitmentOpen||0),'Recruitment open')+
-      tile((st.weeklyCollected||0)+' / '+(st.weeklyBudget||0),'Weekly ₹ Lakhs')+
+      tile(fmtInrThousands(st.weeklyCollected||0)+' / '+fmtInrThousands(st.weeklyBudget||0),'Weekly collection')+
       tile((gc.solved||0)+' / '+(gc.received||0),'Guard complaints')+
       tile((cc.solved||0)+' / '+(cc.received||0),'Client complaints')+
       '</div></div>';
@@ -820,9 +848,11 @@ function syncCollectionPct(){
 }
 function fillCollectionPct(){
   var budget=+el('colBudget').value||0;
-  if(!budget)return;
   var wk=(+el('colMon').value||0)+(+el('colTue').value||0)+(+el('colWed').value||0)+(+el('colThu').value||0)+(+el('colFri').value||0)+(+el('colSat').value||0);
-  if(wk>=0&&el('weeklyCollectionPct'))el('weeklyCollectionPct').value=String(Math.round(wk*100/budget));
+  if(budget>0&&wk>=0&&el('weeklyCollectionPct'))el('weeklyCollectionPct').value=String(Math.round(wk*100/budget));
+  var bill=+(window.COL_BILLING||0);
+  var other=+(window.COL_MTD_OTHER||0);
+  /* Month collection % is Friday OST only — do not add Mon–Sat weekly cash. */
   syncCollectionPct();
   updateDashCheck();
 }
@@ -875,7 +905,7 @@ function saveDraftStep1(){
   var btn=el('stepNavAction');if(btn){btn.disabled=true;btn.textContent='Saving…';}
   api('saveDraft',{dateFor:el('dateFor').value,submittedBy:el('submittedBy').value,rows:CTX.rows}).then(function(res){
     if(res.status!==200){alert(res.body.error||'Could not save. Please try again.');return;}
-    location.href='/mis-staff-daily-summary';
+    location.href='/mis-staff-daily-shortage';
   }).catch(function(){alert('Network error — please try again.');}).finally(function(){if(btn){btn.disabled=false;btn.textContent='Save & go to Step 2 →';}});
 }
 function saveDraftStep2(){
@@ -903,6 +933,8 @@ function submitReport(){
     if(!confirm('WARNING: Report date is '+df+' but TODAY is '+today+'.\\n\\nManagement will count this under '+df+', not today.\\n\\nPress OK only if you mean to submit for '+df+'.\\nPress Cancel, then tap "Use Today\\'s Date".'))return;
   }
   if(!el('submittedBy').value.trim()){alert('Please enter your name before submitting.');return;}
+  var cert=el('misCertified');
+  if(!cert||!cert.checked){alert('Please tick the certification box before submit.\\n\\nI certify: I have reviewed today\\'s Daily MIS. All figures and remarks are verified and found correct.');return;}
   if(!CTX.rows.length){alert('No deployment sites loaded. Contact Head Office or add sites first.');return;}
   fillCollectionPct();
   var missing=collectMissingSummary();
@@ -913,6 +945,7 @@ function submitReport(){
   }
   var san=+el('tSan').textContent||0;
   if(!san){if(!confirm('Deployment shows 0 sanctioned posts. Submit anyway?'))return;}
+  if(!confirm('CERTIFICATION\\nI have reviewed today\\'s Daily MIS. All figures and remarks are verified and found correct.\\n\\nSubmit Daily MIS to Management now?'))return;
   var m=el('saveMsg');m.style.display='block';m.style.background='#14532d';m.style.color='#86efac';m.textContent='Submitting...';
   var submitBtn=el('btnSubmitReport');if(submitBtn)submitBtn.disabled=true;
   var summary=collectSummaryPayload();
@@ -926,6 +959,7 @@ function submitReport(){
     autoSync:false,
     dateFor:el('dateFor').value,
     submittedBy:el('submittedBy').value,
+    certified:true,
     submitterEmail:(typeof OTP_EMAIL!=='undefined'?OTP_EMAIL:'')||sessionStorage.getItem('otp_email_mis-report')||'',
     rows:CTX.rows,
     summary:summary,

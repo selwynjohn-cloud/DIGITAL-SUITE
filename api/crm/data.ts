@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { verifyAppSession } from '../_lib/app-session.js'
-import { isSuperAdminEmail } from '../_lib/auth.js'
+import { isSuiteAdminEmail } from '../_lib/auth.js'
 import {
   crmNid,
   crmNum,
@@ -38,6 +38,7 @@ import {
 import { generateSurveyAiReport } from '../_lib/crm/survey-ai.js'
 import { generateLeadAiResearch } from '../_lib/crm/lead-ai.js'
 import { generateLostOpportunityRca } from '../_lib/crm/rca-ai.js'
+import { notifyCrmDirectorAlerts } from '../_lib/crm/alerts.js'
 import { compareTenderDocuments, extractTenderNotice, prepareTenderWorkingText, tenderRecordToText } from '../_lib/crm/tender-ai.js'
 import { textFromTenderFile } from '../_lib/crm/tender-docs.js'
 import { pinMailFrom, pinMailReplyTo, sendSuiteEmail } from '../_lib/suite-mail.js'
@@ -54,10 +55,13 @@ const MIS_BRANCH_TO_CRM: Record<string, string> = {
   Kerala: 'Kochi',
   'Madhya Pradesh': 'Bhopal',
   Maharashtra: 'Mumbai',
-  Nellore: 'Nellore & Tada',
-  Puducherry: 'Chennai & Pondicherry',
-  'Tamil Nadu': 'Chennai & Pondicherry',
-  Tirupati: 'Tirupati & Tadipatri',
+  Nellore: 'Nellore',
+  Tada: 'Tada',
+  Puducherry: 'Puducherry',
+  'Tamil Nadu': 'Chennai',
+  Chennai: 'Chennai',
+  Tirupati: 'Tirupati',
+  Tadipatri: 'Tadipatri',
   Vijayawada: 'Vijayawada',
   Visakhapatnam: 'Visakhapatnam',
   Kakinada: 'Kakinada',
@@ -92,6 +96,17 @@ async function crmRoleFromOtp(session: {
 }): Promise<CrmAuth> {
   const email = session.email.trim().toLowerCase()
 
+  if (session.role === 'management' && isSuiteAdminEmail(email)) {
+    return { role: 'admin', branch: null }
+  }
+  if (session.role === 'management') return { role: 'admin', branch: null }
+
+  if (session.role === 'staff' && isSuiteAdminEmail(email) && session.branchId) {
+    const adminBranch = await misBranchIdToCrm(session.branchId)
+    if (adminBranch) return { role: 'branch', branch: adminBranch }
+  }
+  if (session.role === 'staff' && isSuiteAdminEmail(email)) return { role: 'admin', branch: null }
+
   if (session.role === 'staff' && session.branchId) {
     const branch = await misBranchIdToCrm(session.branchId)
     if (branch) return { role: 'branch', branch }
@@ -112,10 +127,6 @@ async function crmRoleFromOtp(session: {
       return { role: 'staff', branch: null }
     }
   }
-  if (session.role === 'management' && isSuperAdminEmail(email)) {
-    return { role: 'admin', branch: null }
-  }
-  if (session.role === 'management') return { role: 'admin', branch: null }
   return { role: 'staff', branch: null }
 }
 
@@ -176,9 +187,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return false
       })
     }
+    let td = tenders
+    if (role === 'branch' && branch) {
+      td = tenders.filter((t) => !t.branch || t.branch === branch)
+    }
     return res.status(200).json({
       ok: true, role, branch,
-      leads: vis.map(stripIntel), tenders: [], activities: act, contracts: [], docs: [], followUps: fu, surveys: sv, lostArchives: ar, surveyTemplate,
+      leads: vis.map(stripIntel), tenders: td, activities: act, contracts: [], docs: [], followUps: fu, surveys: sv, lostArchives: ar, surveyTemplate,
     })
   }
 
@@ -198,9 +213,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const s = (v: unknown, n = 200) => String(v ?? '').slice(0, n)
 
   if (action === 'readTenderText') {
-    if (role !== 'admin' && role !== 'coordinator') {
-      return res.status(403).json({ error: 'Only Director/Admin or Tender Cell can use tender notice reader.' })
-    }
     try {
       let text = String(body.text ?? '').slice(0, 50000)
       let readMethod = 'paste'
@@ -241,9 +253,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (action === 'extractTenderNotice') {
-    if (role !== 'admin' && role !== 'coordinator') {
-      return res.status(403).json({ error: 'Only Director/Admin or Tender Cell can use tender notice reader.' })
-    }
     try {
       let text = String(body.text ?? '').slice(0, 50000)
       let readMethod = 'paste'
@@ -281,9 +290,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (action === 'compareTenderDocs') {
-    if (role !== 'admin' && role !== 'coordinator') {
-      return res.status(403).json({ error: 'Only Director/Admin or Tender Cell can compare tender documents.' })
-    }
     try {
       let oldText = String(body.oldText ?? '').slice(0, 25000)
       const oldFileB64 = String(body.oldFileBase64 ?? '').trim()
@@ -507,10 +513,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   if (action === 'saveLeads') {
     const arr = Array.isArray(body.leads) ? body.leads : []
+    const stored = await getLeadsNormalized()
     // Non-admin cannot see/edit sensitive intel — preserve it from stored leads.
-    const prev = role !== 'admin' ? await getLeads() : []
     const prevById: Record<string, CrmLead> = {}
-    for (const p of prev) prevById[p.id] = p
+    for (const p of stored) prevById[p.id] = p
     const list: CrmLead[] = arr.slice(0, 5000).map((l: any) => {
       const keep = role !== 'admin' ? prevById[String(l.id)] : undefined
       if (keep) {
@@ -546,6 +552,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         assignedTo: s(l.assignedTo, 80),
         stage: s(l.stage, 40) || 'New/RFQ',
         nextFollowUp: s(l.nextFollowUp, 20),
+        nextFollowUpTime: s(l.nextFollowUpTime, 8),
         surveyDone: l.surveyDone === true,
         lossReason: s(l.lossReason, 200),
         remarks: s(l.remarks, 500),
@@ -564,8 +571,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       })
     })
     // Branch users only submit their own branch's leads — keep every other branch's leads untouched.
-    const finalList = role === 'branch' ? list.concat(prev.filter((p) => p.branch !== branch)) : list
+    const finalList = role === 'branch' ? list.concat(stored.filter((p) => p.branch !== branch)) : list
     await saveLeads(finalList)
+    try {
+      await notifyCrmDirectorAlerts({ leadsPrev: stored, leadsNext: finalList })
+    } catch (err) {
+      console.error('[crm] director lead alert', err)
+    }
     return res.status(200).json({ ok: true, count: finalList.length })
   }
 
@@ -637,7 +649,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         createdAt: s(t.createdAt, 40) || new Date().toISOString(),
       }),
     )
+    const storedTenders = await getTendersNormalized()
     await saveTenders(list)
+    try {
+      await notifyCrmDirectorAlerts({ tendersPrev: storedTenders, tendersNext: list })
+    } catch (err) {
+      console.error('[crm] director tender alert', err)
+    }
     return res.status(200).json({ ok: true, count: list.length })
   }
 
@@ -650,6 +668,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       company: s(a.company),
       type: s(a.type, 40) || 'Follow-up',
       date: s(a.date, 20),
+      time: s(a.time, 8),
       location: s(a.location, 500),
       notes: s(a.notes, 400),
       done: a.done === true,

@@ -11,21 +11,40 @@ type ConfirmSlot = {
   label: string
 }
 
-/** One daily WhatsApp confirmation per edition — sent after each slot ends. */
+/** Confirm windows — keep trying the same IST day until 11:45 PM if that edition has not gone. */
 export function confirmSlot(now = istNow()): ConfirmSlot | null {
   const h = now.getHours()
   const m = now.getMinutes()
+  const mins = h * 60 + m
 
-  if (h === 7 && m < 30) {
+  if (mins >= 10 * 60 + 30 && mins < 23 * 60 + 45) {
     return { edition: 'Morning Edition', label: 'Morning' }
   }
-  if (h === 14 && m < 30) {
+  if (mins >= 17 * 60 && mins < 23 * 60 + 45) {
     return { edition: 'Afternoon Edition', label: 'Afternoon' }
   }
-  if ((h === 19 && m >= 45) || (h === 20 && m < 15)) {
-    return { edition: 'Evening Edition', label: 'Evening' }
+  if ((h === 22 && m >= 10) || (h === 23 && m < 50)) {
+    return { edition: '10:00 PM Edition', label: '10:00 PM' }
   }
   return null
+}
+
+/** Oldest unpublished confirm slot still open today. */
+export function confirmSlotsDue(now = istNow()): ConfirmSlot[] {
+  const h = now.getHours()
+  const m = now.getMinutes()
+  const mins = h * 60 + m
+  const due: ConfirmSlot[] = []
+  if (mins >= 10 * 60 + 30 && mins < 23 * 60 + 45) {
+    due.push({ edition: 'Morning Edition', label: 'Morning' })
+  }
+  if (mins >= 17 * 60 && mins < 23 * 60 + 45) {
+    due.push({ edition: 'Afternoon Edition', label: 'Afternoon' })
+  }
+  if ((h === 22 && m >= 10) || (h === 23 && m < 50)) {
+    due.push({ edition: '10:00 PM Edition', label: '10:00 PM' })
+  }
+  return due
 }
 
 function todayIst(): string {
@@ -79,11 +98,17 @@ export async function sendSlotConfirmation(): Promise<{
   status?: string
   recovered?: boolean
 }> {
-  const slot = confirmSlot()
-  if (!slot) return { sent: false }
-
-  if (await alreadyConfirmed(slot.edition)) {
-    return { sent: false, edition: slot.edition, status: 'already-confirmed' }
+  const due = confirmSlotsDue()
+  let slot: ConfirmSlot | null = null
+  for (const row of due) {
+    if (await alreadyConfirmed(row.edition)) continue
+    slot = row
+    break
+  }
+  if (!slot) {
+    return due.length
+      ? { sent: false, edition: due[due.length - 1].edition, status: 'already-confirmed' }
+      : { sent: false }
   }
 
   const admin = process.env.ADMIN_WHATSAPP?.trim()
@@ -115,15 +140,20 @@ export async function sendSlotConfirmation(): Promise<{
     return { sent: true, edition: slot.edition, status: 'confirmed-ok', recovered }
   }
 
-  const approveSecret = process.env.PULSE_APPROVE_SECRET?.trim() ?? ''
-  const rescueLink = approveSecret
-    ? `https://www.agilegroup-digital.co.in/api/pulse/cron?job=publish&token=${encodeURIComponent(approveSecret)}`
-    : SHARE_URL
-
-  await waSendText(
-    admin,
-    `🚨 *${slot.label} Bulletin — NOT SENT*\n\n${dLabel}\nAutomatic send failed after all retries.\n\nTap to send now:\n${rescueLink}`,
-  )
-  await markConfirmed(slot.edition)
-  return { sent: true, edition: slot.edition, status: 'confirmed-failed' }
+  // Do not ask the Director to tap Send. The machine keeps retrying until the window closes.
+  const now2 = istNow()
+  const hh = now2.getHours()
+  const mm = now2.getMinutes()
+  const firstWindowNotice =
+    (slot.edition === 'Morning Edition' && hh === 10 && mm >= 30) ||
+    (slot.edition === 'Afternoon Edition' && hh === 17 && mm < 30) ||
+    (slot.edition === '10:00 PM Edition' && ((hh === 22 && mm >= 10) || (hh === 23 && mm < 50)))
+  if (firstWindowNotice) {
+    await waSendText(
+      admin,
+      `⚠️ *${slot.label} Bulletin — still sending*\n\n${dLabel}\nAutomatic send is still trying. You do not need to tap Send.`,
+    )
+    return { sent: true, edition: slot.edition, status: 'confirmed-retrying' }
+  }
+  return { sent: false, edition: slot.edition, status: 'confirmed-retrying' }
 }

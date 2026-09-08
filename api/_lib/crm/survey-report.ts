@@ -32,8 +32,127 @@ function photoHeading(p: { heading?: string; label?: string; type?: string }): s
   return PHOTO_TYPE_LABELS[String(p.type)] || 'Site location'
 }
 
+export function htmlToBase64Attachment(filename: string, html: string): {
+  filename: string
+  content: string
+  contentType: string
+} {
+  return {
+    filename,
+    content: Buffer.from(html, 'utf8').toString('base64'),
+    contentType: 'text/html',
+  }
+}
+
+function reportShell(title: string, inner: string): string {
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title>
+<style>
+@page{margin:16mm 12mm}
+*{box-sizing:border-box}body{font-family:'Segoe UI',Georgia,serif;color:#1e293b;font-size:13px;line-height:1.55;margin:0;background:#fff}
+.wrap{max-width:820px;margin:0 auto;padding:8px 0 40px}
+.cover{background:linear-gradient(135deg,#14224f,#1e3a8a);color:#fff;padding:22px 20px;border-radius:12px;margin-bottom:20px;text-align:center}
+.cover img{height:48px;margin-bottom:10px}
+.cover h1{font-size:20px;color:#fde68a;margin:0 0 6px;font-weight:900}
+.sec{margin-bottom:18px}
+.sec h2{font-size:14px;color:#14224f;border-bottom:2px solid #c9a84c;padding-bottom:6px;margin-bottom:10px;text-transform:uppercase}
+.body-text{color:#334155}
+.muted{color:#64748b;font-size:12px}
+.input-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;margin-bottom:8px}
+.input-box b{display:block;font-size:10px;color:#64748b;text-transform:uppercase;margin-bottom:4px}
+.photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}
+.photo-card{margin:0;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden}
+.photo-card img{width:100%;height:160px;object-fit:cover;display:block}
+table.score{width:100%;border-collapse:collapse;font-size:12px}
+table.score th,table.score td{border:1px solid #cbd5e1;padding:8px}
+table.score th{background:#f1f5f9;color:#475569;font-size:10px;text-transform:uppercase}
+@media print{.noprint{display:none}}
+</style></head>
+<body><div class="wrap">${inner}</div>
+<button class="noprint" onclick="window.print()" style="position:fixed;bottom:20px;right:20px;padding:12px 20px;background:#c9a84c;border:none;border-radius:8px;font-weight:800;cursor:pointer">⬇ Print / Save PDF</button>
+</body></html>`
+}
+
+/** Site Inputs & Photos — same pages as Agile CRM survey attachments. */
+export function buildSiteInputsPhotosHtml(sv: CrmSecuritySurvey): string {
+  const inp: CrmSiteInputs = sv.siteInputs ?? {
+    clientBrief: '',
+    scopeOfWork: '',
+    existingSecurity: '',
+    proposedShifts: '',
+    sanctionedStrength: '',
+    criticalAssets: '',
+    accessPoints: '',
+    vulnerableAreas: '',
+    clientExpectations: '',
+  }
+  const interviews = (sv.interviews ?? defaultSurveyInterviews()).filter(
+    (iv) => iv.personName?.trim() || iv.designation?.trim() || iv.notes?.trim(),
+  )
+  const photos = (sv.photos ?? []).filter((p) => p.dataUrl && p.active !== false)
+  const photoGrid = photos.length
+    ? `<div class="photo-grid">${photos
+        .map((p) => {
+          const title = photoHeading(p)
+          return `<figure class="photo-card"><div style="background:#14224f;color:#fde68a;font-weight:800;padding:8px 10px">${esc(title)}</div><img src="${p.dataUrl}" alt="${esc(title)}"><figcaption style="padding:8px;font-size:11px;color:#475569">${esc(p.caption || '')}</figcaption></figure>`
+        })
+        .join('')}</div>`
+    : '<p class="muted">No site photographs attached.</p>'
+  const interviewBlock = interviews.length
+    ? interviews
+        .map(
+          (iv, i) =>
+            `<div class="input-box"><b>Interview ${i + 1}: ${esc(iv.personName || '—')}</b>${iv.designation ? ` · ${esc(iv.designation)}` : ''}<div class="body-text" style="margin-top:8px">${nl2br(iv.notes || '—')}</div></div>`,
+        )
+        .join('')
+    : '<p class="muted">No interviews recorded.</p>'
+  return reportShell(
+    `Site Inputs & Photos — ${sv.company || 'Site'}`,
+    `<div class="cover"><img src="${MIS_BRAND.logoUrl}" alt="Agile"><h1>Site Inputs &amp; Photos</h1><div>${esc(sv.company || '')} · ${esc(sv.locationName || sv.address || '')}</div></div>
+    <div class="sec"><h2>Site Brief</h2>
+      <div class="input-box"><b>Client Brief</b>${nl2br(inp.clientBrief || '—')}</div>
+      <div class="input-box"><b>Scope of Work</b>${nl2br(inp.scopeOfWork || '—')}</div>
+      <div class="input-box"><b>Existing Security</b>${nl2br(inp.existingSecurity || '—')}</div>
+      <div class="input-box"><b>Proposed Shifts</b>${nl2br(inp.proposedShifts || '—')}</div>
+      <div class="input-box"><b>Sanctioned Strength</b>${nl2br(inp.sanctionedStrength || '—')}</div>
+      <div class="input-box"><b>Critical Assets</b>${nl2br(inp.criticalAssets || '—')}</div>
+      <div class="input-box"><b>Access Points</b>${nl2br(inp.accessPoints || '—')}</div>
+      <div class="input-box"><b>Vulnerable Areas</b>${nl2br(inp.vulnerableAreas || '—')}</div>
+      <div class="input-box"><b>Client Expectations</b>${nl2br(inp.clientExpectations || '—')}</div>
+    </div>
+    <div class="sec"><h2>Site Observations</h2><div class="body-text">${nl2br(sv.siteObservations || '—')}</div></div>
+    <div class="sec"><h2>Interviews</h2>${interviewBlock}</div>
+    <div class="sec"><h2>Photographs</h2>${photoGrid}</div>`,
+  )
+}
+
+/** Risk checklist scores — same attachment as Agile CRM survey mail. */
+export function buildRiskAssessmentHtml(sv: CrmSecuritySurvey): string {
+  const total = surveyGrandTotal(sv.scores)
+  const band = riskBand(total)
+  const parts = SURVEY_PARTS.map((p) => {
+    const pt = surveyPartTotal(sv.scores, p)
+    const rows = p.items
+      .map((it) => {
+        const sc = Number(sv.scores[it.id]) || 0
+        const note = sv.scoreNotes[it.id] ? ` — ${esc(sv.scoreNotes[it.id])}` : ''
+        return `<tr><td>${esc(it.label)}</td><td style="text-align:center">${sc}</td><td>${note}</td></tr>`
+      })
+      .join('')
+    return `<div class="sec"><h2>${esc(p.title)} (${pt}/${p.maxTotal})</h2><table class="score"><thead><tr><th>Item</th><th>Score</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table></div>`
+  }).join('')
+  return reportShell(
+    `Risk Assessment — ${sv.company || 'Site'}`,
+    `<div class="cover"><img src="${MIS_BRAND.logoUrl}" alt="Agile"><h1>Risk Assessment (0–180)</h1><div>${esc(sv.company || '')} · Score ${total}/180 — ${esc(band.level)}</div></div>${parts}`,
+  )
+}
+
 /** Client-facing printable Security Survey & Risk Assessment report. */
-export function buildClientSurveyReportHtml(sv: CrmSecuritySurvey): string {
+export function buildClientSurveyReportHtml(
+  sv: CrmSecuritySurvey,
+  opts?: { title?: string },
+): string {
+  const reportTitle = opts?.title || 'Security Survey &amp; Risk Assessment Report'
   const total = surveyGrandTotal(sv.scores)
   const band = riskBand(total)
   const inp: CrmSiteInputs = sv.siteInputs ?? {
@@ -136,7 +255,7 @@ table.score th{background:#f1f5f9;color:#475569;font-size:10px;text-transform:up
 <div class="wrap">
   <div class="cover">
     <img src="${MIS_BRAND.logoUrl}" alt="Agile">
-    <h1>Security Survey &amp; Risk Assessment Report</h1>
+    <h1>${reportTitle}</h1>
     <div class="sub">Prepared for <b>${esc(sv.company)}</b></div>
     <div class="meta">${esc(sv.locationName || sv.address || '')} · Survey Date: ${esc(sv.surveyDate || '—')} · Surveyed by: ${esc(sv.surveyedBy || 'Agile Security Force')}</div>
     <div class="badge">Risk Score ${total} / 180 — ${band.level} Risk</div>

@@ -29,6 +29,14 @@ export function inferVisitType(raw: Record<string, unknown>): 'D' | 'N' | 'T' | 
   return ''
 }
 
+/** Client Visit report — day/patrol only; night & training have separate menus. */
+export function dayVisitsOnly(visits: MisVisit[]): MisVisit[] {
+  return visits.filter((v) => {
+    const t = (v.visitType || 'D').toUpperCase()
+    return t !== 'N' && t !== 'T'
+  })
+}
+
 function pick(raw: Record<string, unknown>, keys: string[]): string {
   for (const k of keys) {
     const v = raw[k]
@@ -155,9 +163,8 @@ export function branchAliases(): Record<string, string> {
   return aliases
 }
 
-const DEFAULT_BRANCH_ALIASES = [
-  { id: 'br15', mobileName: 'Hi-Tech City' },
-]
+/** Do not hardcode br15 — live Data Bank uses br15 for Mumbai, not Hi-Tech. */
+const DEFAULT_BRANCH_ALIASES: { id: string; mobileName: string }[] = []
 
 export async function buildVisitAnalysis(date: string, visits: MisVisit[]) {
   const branches = await getBranches()

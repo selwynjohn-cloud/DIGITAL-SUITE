@@ -2,9 +2,11 @@
  * Known branch HOD emails — merged into User Management on each reminder run.
  */
 import { normaliseEmail } from '../auth.js'
-import { getBranches, getUsers, nid, saveUsers, type MisBranch, type MisUser } from './store.js'
+import { getMisReportBranches, getUsers, nid, saveUsers, type MisBranch, type MisUser } from './store.js'
 
-const TELANGANA_HODS: { email: string; name: string; branchMatch: RegExp; role: string }[] = [
+type HodSeed = { email: string; name: string; branchMatch: RegExp; role: string }
+
+const TELANGANA_HODS: HodSeed[] = [
   {
     email: 'aashish@agilegroup.co.in',
     name: 'Aashish',
@@ -31,17 +33,70 @@ const TELANGANA_HODS: { email: string; name: string; branchMatch: RegExp; role: 
   },
 ]
 
+const OTHER_HOD_SEEDS: HodSeed[] = [
+  {
+    email: 'maha.admin@agilegroup.co.in',
+    name: 'Vikram',
+    branchMatch: /^mumbai$/i,
+    role: 'Branch Manager',
+  },
+  {
+    email: 'cochin@agilegroup.co.in',
+    name: 'Joykumar',
+    branchMatch: /^kochi$/i,
+    role: 'Branch Manager',
+  },
+  {
+    email: 'vp.blr@agilegroup.co.in',
+    name: 'Prathap Kumar',
+    branchMatch: /^bangalore$|^bengaluru$/i,
+    role: 'Branch Manager',
+  },
+  {
+    email: 'ahmad.salman@agilegroup.co.in',
+    name: 'Ahmad Salman',
+    branchMatch: /^bhopal/i,
+    role: 'Branch Manager',
+  },
+  {
+    email: 'selvam.k@agilegroup.co.in',
+    name: 'Col. Selvam',
+    branchMatch: /^chennai$/i,
+    role: 'Branch Manager',
+  },
+  {
+    email: 'sid@agilegroup.co.in',
+    name: 'Siddharth',
+    branchMatch: /^vijayawada$/i,
+    role: 'Branch Manager',
+  },
+  {
+    email: 'sanjay.singh@agilegroup.co.in',
+    name: 'Sanjay Singh',
+    branchMatch: /^surat$/i,
+    role: 'Branch Manager',
+  },
+  {
+    email: 'cgm.vizag@agilegroup.co.in',
+    name: 'Raghu Ram Raju',
+    branchMatch: /^visakhapatnam$|^vizag$/i,
+    role: 'Chief General Manager',
+  },
+]
+
+const KNOWN_HOD_SEEDS: HodSeed[] = [...TELANGANA_HODS, ...OTHER_HOD_SEEDS]
+
 function findBranch(branches: MisBranch[], pattern: RegExp): MisBranch | undefined {
   return branches.find((b) => pattern.test(b.name))
 }
 
-/** Upsert Telangana HOD emails into MIS User Management (idempotent). */
-export async function ensureTelanganaHodUsers(): Promise<{ ok: boolean; updated: string[] }> {
-  const [branches, users] = await Promise.all([getBranches(true), getUsers()])
+/** Upsert known branch HOD emails into MIS User Management (idempotent). */
+export async function ensureKnownHodUsers(): Promise<{ ok: boolean; updated: string[] }> {
+  const [branches, users] = await Promise.all([getMisReportBranches(true), getUsers()])
   const updated: string[] = []
   let list = [...users]
 
-  for (const seed of TELANGANA_HODS) {
+  for (const seed of KNOWN_HOD_SEEDS) {
     const branch = findBranch(branches, seed.branchMatch)
     if (!branch) continue
     const email = normaliseEmail(seed.email)
@@ -74,3 +129,6 @@ export async function ensureTelanganaHodUsers(): Promise<{ ok: boolean; updated:
   if (updated.length) await saveUsers(list)
   return { ok: true, updated }
 }
+
+/** @deprecated use ensureKnownHodUsers */
+export const ensureTelanganaHodUsers = ensureKnownHodUsers

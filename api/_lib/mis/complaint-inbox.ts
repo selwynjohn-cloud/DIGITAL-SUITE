@@ -1,10 +1,12 @@
 /**
- * Import client complaints from Director inbox (Gmail API or Apps Script webhook).
+ * Import client complaints / incidents from Director inbox (Gmail API or Apps Script webhook).
+ * Only client-origin mail (not @agilegroup.co.in) with incident keywords.
  */
 
 import {
   COMPLAINT_NATURES,
   getBranches,
+  getMisReportBranches,
   getClients,
   getComplaints,
   getDirectorInboxComplaints,
@@ -26,6 +28,7 @@ export type InboxEmailPayload = {
   body: string
   date?: string
   to?: string
+  cc?: string
 }
 
 const DIRECTOR_INBOX =
@@ -34,34 +37,160 @@ const DIRECTOR_INBOX =
 /** Only import mail delivered to Agile Group director inbox — not personal Gmail. */
 export function isAllowedDirectorInboxEmail(item: InboxEmailPayload): boolean {
   const to = String(item.to ?? '').toLowerCase()
-  const cc = String((item as { cc?: string }).cc ?? '').toLowerCase()
+  const cc = String(item.cc ?? '').toLowerCase()
   const hay = `${to} ${cc}`
   if (hay.includes(DIRECTOR_INBOX)) return true
   if (hay.includes('@agilegroup.co.in')) return true
   return false
 }
 
-const COMPLAINT_HINTS = [
-  'complaint',
-  'complaints',
+/** Client mail only — reject internal Agile / personal Selwyn Gmail / noreply senders. */
+export function isFromClientSender(from: string): boolean {
+  const f = String(from ?? '').toLowerCase()
+  if (!f.includes('@')) return false
+  if (f.includes('@agilegroup.co.in')) return false
+  if (f.includes('selwyn.john@gmail.com')) return false
+  if (/noreply|no-reply|mailer-daemon|notifications@|donotreply/i.test(f)) return false
+  return true
+}
+
+/** Remove already-imported non-client rows (e.g. selwyn.john@gmail.com) from Director inbox. */
+export async function purgeNonClientInboxComplaints(): Promise<number> {
+  const inbox = await getDirectorInboxComplaints()
+  const kept = inbox.filter((c) => isFromClientSender(c.fromEmail || c.reportedBy || ''))
+  const removed = inbox.length - kept.length
+  if (removed > 0) await saveDirectorInboxComplaints(kept)
+  return removed
+}
+
+/** Repair Nature = mail subject (or NIL) on inbox + all branch complaint stores. */
+export async function repairComplaintNatureSubjects(): Promise<number> {
+  let fixed = 0
+  const inbox = await getDirectorInboxComplaints()
+  let inboxChanged = false
+  const nextInbox = inbox.map((c) => {
+    const n = syncNatureWithMailSubject(c)
+    if (n.nature !== c.nature || n.subject !== c.subject) {
+      fixed++
+      inboxChanged = true
+    }
+    return n
+  })
+  if (inboxChanged) await saveDirectorInboxComplaints(nextInbox)
+
+  const branches = await getMisReportBranches(true)
+  for (const b of branches) {
+    const list = await getComplaints(b.id)
+    let changed = false
+    const next = list.map((c) => {
+      const n = syncNatureWithMailSubject(c)
+      if (n.nature !== c.nature || n.subject !== c.subject) {
+        fixed++
+        changed = true
+      }
+      return n
+    })
+    if (changed) await saveComplaints(b.id, next)
+  }
+  return fixed
+}
+
+/** Subject/body keywords for client complaints & incidents. */
+export const CLIENT_COMPLAINT_HINTS = [
+  'fire',
   'incident',
-  'grievance',
-  'grievances',
-  'unhappy',
-  'dissatisfied',
-  'escalat',
-  'issue',
-  'feedback',
-  'unsatisfactory',
-  'deficien',
   'shortage',
-  'absent',
-  'misconduct',
-]
+  'shortages',
+  'theft',
+  'left the post',
+  'left post',
+  'missing',
+  'sleeping',
+  'accident',
+] as const
 
 export function looksLikeComplaintEmail(subject: string, body: string): boolean {
   const hay = `${subject} ${body}`.toLowerCase()
-  return COMPLAINT_HINTS.some((h) => hay.includes(h))
+  return CLIENT_COMPLAINT_HINTS.some((h) => hay.includes(h))
+}
+
+export function detectNatureFromText(subject: string, body: string): string {
+  const hay = `${subject} ${body}`.toLowerCase()
+  if (/left\s+the\s+post|left\s+post/.test(hay)) return 'Left the post'
+  if (/\bfire\b/.test(hay)) return 'Fire'
+  if (/\btheft\b/.test(hay)) return 'Theft'
+  if (/\bsleeping\b/.test(hay)) return 'Sleeping'
+  if (/\baccident\b/.test(hay)) return 'Accident'
+  if (/\bshortage/.test(hay)) return 'Shortage of Manpower'
+  if (/\bmissing\b/.test(hay)) return 'Missing'
+  if (/\bincident\b/.test(hay)) return 'Incident'
+  return ''
+}
+
+/** Decode RFC 2047 encoded-words in Gmail Subject headers (=?UTF-8?B?...?=). */
+export function decodeMimeWords(raw: string): string {
+  const input = String(raw ?? '')
+  if (!/=\?/.test(input)) return input
+  return input.replace(/=\?([^?]+)\?([bBqQ])\?([^?]*)\?=/g, (_m, _charset, enc, data) => {
+    try {
+      if (String(enc).toUpperCase() === 'B') {
+        return Buffer.from(String(data).replace(/\s/g, ''), 'base64').toString('utf8')
+      }
+      const q = String(data).replace(/_/g, ' ')
+      const bytes: number[] = []
+      for (let i = 0; i < q.length; i++) {
+        if (q[i] === '=' && /^[0-9A-Fa-f]{2}$/.test(q.slice(i + 1, i + 3))) {
+          bytes.push(parseInt(q.slice(i + 1, i + 3), 16))
+          i += 2
+        } else {
+          bytes.push(q.charCodeAt(i) & 0xff)
+        }
+      }
+      return Buffer.from(bytes).toString('utf8')
+    } catch {
+      return String(data ?? '')
+    }
+  })
+}
+
+/** Clean mail subject for Nature column. Empty / placeholder → ''. */
+export function normalizeMailSubject(raw: string): string {
+  let s = decodeMimeWords(String(raw ?? ''))
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!s) return ''
+  if (/^(nil|null|n\/a|none|undefined|-|—|–)$/i.test(s)) return ''
+  return s.slice(0, 300)
+}
+
+/** Nature (subject) column value — exact mail subject, or NIL if none. */
+export function natureFromMailSubject(subject: string): string {
+  return normalizeMailSubject(subject) || 'NIL'
+}
+
+const KEYWORD_NATURES = new Set<string>([...COMPLAINT_NATURES, 'NIL', '—', '-'])
+
+/**
+ * For mail-sourced complaints: Nature must equal mail subject (or NIL).
+ * Fixes older rows where Nature was a keyword or truncated on save.
+ */
+export function syncNatureWithMailSubject(c: MisComplaint): MisComplaint {
+  const channel = String(c.channel ?? '').toLowerCase()
+  const isMail = c.source === 'inbox' || channel === 'email' || channel === 'mail' || !!c.emailId
+  if (!isMail) {
+    const n = String(c.nature ?? '').trim()
+    if (!n) return { ...c, nature: 'NIL' }
+    return c
+  }
+
+  let subject = normalizeMailSubject(c.subject || '')
+  const curNature = String(c.nature ?? '').trim()
+  // If subject missing but Nature holds a full subject (not a short keyword), recover it
+  if (!subject && curNature && curNature !== 'NIL' && !KEYWORD_NATURES.has(curNature) && curNature.length > 2) {
+    subject = normalizeMailSubject(curNature)
+  }
+  const nature = subject || 'NIL'
+  return { ...c, subject: subject || '', nature }
 }
 
 function extractClientName(subject: string, body: string, clients: MisClient[]): string {
@@ -77,10 +206,9 @@ function extractClientName(subject: string, body: string, clients: MisClient[]):
   return sub.slice(0, 120) || 'Client (from email)'
 }
 
-function guessBranchId(clientName: string, clients: MisClient[]): string {
+function guessClient(clientName: string, clients: MisClient[]): MisClient | null {
   const norm = clientName.trim().toUpperCase()
-  const hit = clients.find((c) => c.name.trim().toUpperCase() === norm)
-  return hit?.branchId || ''
+  return clients.find((c) => c.name.trim().toUpperCase() === norm) || null
 }
 
 function parseEmailDate(raw?: string): string {
@@ -88,6 +216,34 @@ function parseEmailDate(raw?: string): string {
   const d = new Date(raw)
   if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10)
   return new Date().toISOString().slice(0, 10)
+}
+
+function parseEmailDateTime(raw?: string): string {
+  if (!raw) return new Date().toISOString()
+  const d = new Date(raw)
+  if (!Number.isNaN(d.getTime())) return d.toISOString()
+  return new Date().toISOString()
+}
+
+function reportedByFromSignature(from: string, body: string): string {
+  const fromName = String(from ?? '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/"/g, '')
+    .trim()
+  const lines = String(body ?? '')
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean)
+  // Prefer last non-empty lines that look like a sign-off name
+  for (let i = lines.length - 1; i >= Math.max(0, lines.length - 8); i--) {
+    const line = lines[i]
+    if (/^(regards|thanks|thank you|sincerely|best|warm regards)[,!.]?$/i.test(line)) continue
+    if (/^--/.test(line)) continue
+    if (line.length >= 3 && line.length <= 60 && !/@/.test(line) && !/https?:/i.test(line)) {
+      return line.slice(0, 80)
+    }
+  }
+  return fromName.slice(0, 80) || 'Client email'
 }
 
 export async function ingestComplaintEmail(item: InboxEmailPayload): Promise<{
@@ -103,42 +259,57 @@ export async function ingestComplaintEmail(item: InboxEmailPayload): Promise<{
     return { ok: true, skipped: true, reason: 'Already imported' }
   }
 
-  const subject = String(item.subject ?? '').slice(0, 300)
-  const body = String(item.body ?? '').slice(0, 2000)
+  const subject = normalizeMailSubject(item.subject ?? '')
+  const body = String(item.body ?? '').slice(0, 4000)
   if (!looksLikeComplaintEmail(subject, body)) {
-    return { ok: true, skipped: true, reason: 'Not a complaint email' }
+    return { ok: true, skipped: true, reason: 'Not a client complaint/incident email' }
   }
 
   if (!isAllowedDirectorInboxEmail(item)) {
     return { ok: true, skipped: true, reason: 'Not addressed to director@agilegroup.co.in' }
   }
 
+  if (!isFromClientSender(item.from)) {
+    return { ok: true, skipped: true, reason: 'Not from a client (internal / system mail skipped)' }
+  }
+
   const [clients, branches] = await Promise.all([getClients(), getBranches()])
   const clientName = extractClientName(subject, body, clients)
-  const branchId = guessBranchId(clientName, clients)
+  const matched = guessClient(clientName, clients)
+  const branchId = matched?.branchId || ''
+  const location = matched?.location || ''
+  const mailReceivedAt = parseEmailDateTime(item.date)
   const now = new Date().toISOString()
-  const code = await nextComplaintCode()
+  const code = await nextComplaintCode(clientName || 'XXX', mailReceivedAt)
+  /** Nature column = exact mail subject; empty subject → NIL */
+  const nature = natureFromMailSubject(subject)
 
   const complaint: MisComplaint = {
     id: nid('cmp'),
     code,
     branchId: branchId || '',
     clientName,
-    location: '',
+    location,
     incidentDate: parseEmailDate(item.date),
     type: 'Client',
-    description: `Subject: ${subject}\n\n${body}`.slice(0, 500),
+    nature,
+    description: body.slice(0, 2000),
     actionTaken: '',
+    assignedTo: '',
+    resolvedOn: '',
+    completionReportSentOn: '',
     momWithin24h: false,
     status: 'Open',
-    reportedBy: String(item.from ?? '').slice(0, 80),
+    reportedBy: reportedByFromSignature(item.from, body),
     source: 'inbox',
     channel: 'Email',
     emailId,
     fromEmail: String(item.from ?? '').slice(0, 120),
     subject,
     importedAt: now,
-    registeredAt: now,
+    registeredAt: mailReceivedAt,
+    mailReceivedAt,
+    active: true,
   }
 
   if (branchId && branches.some((b) => b.id === branchId)) {
@@ -215,6 +386,17 @@ function decodeGmailBody(part: { body?: { data?: string }; parts?: unknown[] }):
   return ''
 }
 
+function defaultClientComplaintGmailQuery(): string {
+  return [
+    `newer_than:60d`,
+    `to:${DIRECTOR_INBOX}`,
+    `(`,
+    `fire OR incident OR shortage OR shortages OR theft OR missing OR sleeping OR accident`,
+    `OR "left the post" OR "left post"`,
+    `)`,
+  ].join(' ')
+}
+
 export async function syncComplaintsFromGmail(): Promise<{
   ok: boolean
   skipped?: boolean
@@ -224,14 +406,17 @@ export async function syncComplaintsFromGmail(): Promise<{
   skippedPersonal?: number
 }> {
   const token = await gmailAccessToken()
-  if (!token) return { ok: false, skipped: true, error: 'Gmail not configured (set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN)' }
+  if (!token) {
+    return {
+      ok: false,
+      skipped: true,
+      error: 'Gmail not configured (set GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN)',
+    }
+  }
 
-  const q = encodeURIComponent(
-    process.env.MIS_COMPLAINT_GMAIL_QUERY?.trim() ||
-      `newer_than:14d to:${DIRECTOR_INBOX} (complaint OR incident OR grievance OR unhappy OR escalation OR feedback OR issue)`,
-  )
+  const q = encodeURIComponent(process.env.MIS_COMPLAINT_GMAIL_QUERY?.trim() || defaultClientComplaintGmailQuery())
   const listRes = await fetch(
-    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${q}&maxResults=40`,
+    `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${q}&maxResults=80`,
     { headers: { Authorization: `Bearer ${token}` } },
   )
   if (!listRes.ok) return { ok: false, error: `Gmail list failed (${listRes.status})` }
@@ -257,17 +442,99 @@ export async function syncComplaintsFromGmail(): Promise<{
     payloads.push({
       emailId: msg.id,
       from: getH('From').slice(0, 120),
-      subject: getH('Subject').slice(0, 300),
-      body: decodeGmailBody(msg.payload || {}).slice(0, 2000),
+      subject: normalizeMailSubject(getH('Subject')),
+      body: decodeGmailBody(msg.payload || {}).slice(0, 4000),
       date: internal,
       to: getH('To'),
       cc: getH('Cc'),
-    } as InboxEmailPayload & { cc?: string })
+    })
   }
 
-  const allowed = payloads.filter(isAllowedDirectorInboxEmail)
+  const allowed = payloads.filter((p) => isAllowedDirectorInboxEmail(p) && isFromClientSender(p.from))
   const result = await ingestComplaintEmails(allowed)
-  return { ok: true, imported: result.imported, scanned: allowed.length, skippedPersonal: payloads.length - allowed.length }
+  return {
+    ok: true,
+    imported: result.imported,
+    scanned: allowed.length,
+    skippedPersonal: payloads.length - allowed.length,
+  }
+}
+
+/** Like Fleet expense refresh — Apps Script webapp first, then Gmail OAuth. */
+export async function refreshClientComplaintInbox(): Promise<{
+  ok: boolean
+  imported: number
+  scanned: number
+  skipped?: boolean
+  purged?: number
+  error?: string
+  natureFixed?: number
+  mode?: 'webapp' | 'oauth' | 'ingest-only'
+}> {
+  const url = process.env.MIS_COMPLAINT_SYNC_WEBAPP_URL?.trim()
+  if (url) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(28000) })
+      const text = await res.text()
+      try {
+        const j = JSON.parse(text) as { ok?: boolean; imported?: number; scanned?: number; error?: string }
+        if (j.ok !== false) {
+          const purged = await purgeNonClientInboxComplaints()
+          const natureFixed = await repairComplaintNatureSubjects()
+          return {
+            ok: true,
+            imported: j.imported || 0,
+            scanned: j.scanned || 0,
+            purged,
+            natureFixed,
+            mode: 'webapp',
+          }
+        }
+      } catch {
+        if (res.ok) {
+          const purged = await purgeNonClientInboxComplaints()
+          const natureFixed = await repairComplaintNatureSubjects()
+          return { ok: true, imported: 0, scanned: 0, purged, natureFixed, mode: 'webapp' }
+        }
+      }
+    } catch {
+      /* fall through to OAuth */
+    }
+  }
+
+  const oauth = await syncComplaintsFromGmail()
+  if (oauth.ok) {
+    const purged = await purgeNonClientInboxComplaints()
+    const natureFixed = await repairComplaintNatureSubjects()
+    return {
+      ok: true,
+      imported: oauth.imported || 0,
+      scanned: oauth.scanned || 0,
+      purged,
+      natureFixed,
+      mode: 'oauth',
+    }
+  }
+
+  if (process.env.MIS_COMPLAINT_INGEST_SECRET?.trim()) {
+    return {
+      ok: false,
+      imported: 0,
+      scanned: 0,
+      mode: 'ingest-only',
+      skipped: true,
+      error: oauth.error || 'Director Google script runs every 30 min — tap Mail sync again after it runs',
+    }
+  }
+
+  return {
+    ok: false,
+    imported: 0,
+    scanned: 0,
+    skipped: true,
+    mode: 'ingest-only',
+    error: oauth.error || 'Director inbox not linked — Gmail OAuth or Google script needed',
+  }
 }
 
 export async function assignInboxComplaintToBranch(complaintId: string, branchId: string): Promise<boolean> {
@@ -276,7 +543,12 @@ export async function assignInboxComplaintToBranch(complaintId: string, branchId
   if (idx < 0) return false
   const [item] = inbox.splice(idx, 1)
   item.branchId = branchId
-  if (!item.code) item.code = await nextComplaintCode()
+  if (!item.code) {
+    item.code = await nextComplaintCode(
+      item.clientName || 'XXX',
+      item.mailReceivedAt || item.registeredAt || item.incidentDate,
+    )
+  }
   if (!item.registeredAt) item.registeredAt = new Date().toISOString()
   await saveDirectorInboxComplaints(inbox)
   const branchList = await getComplaints(branchId)
@@ -327,7 +599,7 @@ export async function registerOperationalComplaint(
 ): Promise<{ ok: boolean; error?: string; complaint?: MisComplaint; branchName?: string }> {
   const branchId = String(input.branchId ?? '').trim()
   if (!branchId) return { ok: false, error: 'Please select a branch' }
-  const branches = await getBranches(true)
+  const branches = await getMisReportBranches(true)
   if (!branches.some((b) => b.id === branchId)) return { ok: false, error: 'Invalid branch' }
 
   const description = String(input.description ?? '').trim()
@@ -339,7 +611,8 @@ export async function registerOperationalComplaint(
   }
 
   const now = new Date().toISOString()
-  const code = await nextComplaintCode()
+  const clientName = String(input.clientName ?? '').slice(0, 160) || 'Client'
+  const code = await nextComplaintCode(clientName, now)
   const phone = String(input.phone ?? '').trim()
   const email = String(input.email ?? '').trim()
   const reportedBy = String(input.reportedBy ?? '').trim() || (phone ? `Tel: ${phone}` : 'Web form')
@@ -348,12 +621,12 @@ export async function registerOperationalComplaint(
     id: nid('cmp'),
     code,
     branchId,
-    clientName: String(input.clientName ?? '').slice(0, 160) || 'Client',
+    clientName,
     location: String(input.location ?? '').slice(0, 160),
     incidentDate: now.slice(0, 10),
     type: String(input.type ?? 'Client').slice(0, 20),
     nature,
-    description: description.slice(0, 500),
+    description: description.slice(0, 2000),
     actionTaken: '',
     momWithin24h: false,
     status: 'Open',
@@ -364,6 +637,7 @@ export async function registerOperationalComplaint(
     source: 'web',
     channel: String(input.channel ?? 'Web').slice(0, 20),
     registeredAt: now,
+    mailReceivedAt: now,
     importedAt: now,
     active: true,
   }

@@ -9,6 +9,27 @@ import { matchesSuiteAdminPassword, matchesSuiteBranchPin, suiteAdminPassword, s
 export type FleetUserRole = 'admin' | 'branch'
 export type FleetUserType = 'director' | 'admin' | 'hod' | 'staff'
 
+/** Same company designations as MIS / Control User Management. */
+export const FLEET_DESIGNATIONS = [
+  'Director',
+  'President',
+  'Admin',
+  'CGM',
+  'Vice President (VP)',
+  'AVP',
+  'General Manager (GM)',
+  'Regional Manager (RM)',
+  'Branch Manager',
+  'Operations Manager',
+  'Area Manager',
+  'Field Officer',
+  'Sales Executive',
+  'Training Team',
+  'Accounts',
+  'HR',
+  'Control Operator',
+] as const
+
 /** Login accounts — management (admin) or branch HOD/staff portal. */
 export type FleetUser = {
   id: string
@@ -18,6 +39,8 @@ export type FleetUser = {
   role: FleetUserRole
   /** Director / Admin → management portal; HOD / Staff → branch portal */
   userType: FleetUserType
+  /** Company designation (Director, RM, Branch Manager…) */
+  designation: string
   /** Branch name for HOD/Staff; empty for Director/Admin */
   branchId: string
   /** Admin password or branch PIN */
@@ -26,6 +49,25 @@ export type FleetUser = {
   deactivateReason: string
   remarks: string
   createdAt: string
+}
+
+export function fleetDesignationToUserType(designation: string): FleetUserType {
+  const s = String(designation || '').trim().toLowerCase()
+  if (!s) return 'hod'
+  if (s === 'director' || s === 'president') return 'director'
+  if (s === 'admin' || s === 'cgm' || s.startsWith('vice president') || s === 'avp') return 'admin'
+  if (s.startsWith('general manager')) return 'admin'
+  if (
+    s === 'regional manager (rm)' ||
+    s === 'rm' ||
+    s === 'hod' ||
+    s === 'branch manager' ||
+    s === 'operations manager' ||
+    s === 'area manager'
+  )
+    return 'hod'
+  if (s === 'staff' || s === 'field officer' || s === 'control operator') return 'staff'
+  return 'hod'
 }
 
 export type FleetDriver = {
@@ -140,34 +182,107 @@ export type FleetInspectionItem = { item: string; status: string; remarks: strin
 export type FleetInspection = {
   id: string
   branchId: string
-  formType: string // pre-trip-4w | post-trip-4w | pre-trip-2w | daily
+  formType: string // daily-trip | pre-trip-4w | post-trip-4w | pre-trip-2w | daily
   date: string
   regNo: string
   location: string
   riderName: string
   licenseNo: string
   shift: string
+  /** 1, 2 or 3 — one vehicle can do up to three trips in a day */
+  tripNo?: string
   odoStart: string
   odoEnd: string
   battery: string
   items: FleetInspectionItem[]
+  /** Post-trip checklist when formType is daily-trip */
+  postItems?: FleetInspectionItem[]
   checkedBy: string
+  driverMobile?: string
+  startTime?: string
+  endTime?: string
+  destination?: string
+  purpose?: string
+  kmRun?: string
+  fuelQty?: string
+  fuelAmount?: string
+  incident?: string
+  tripRemarks?: string
+  licenseValid?: string
+  dieselLevel?: string
+  /** Branch trip report code — CHE/0001/29-08-2026 */
+  tripCode?: string
   active: boolean
   createdAt: string
 }
 
+/** All Fleet / MIS branch labels for dropdowns (aligned with Master Directory). */
 export const FLEET_BRANCHES = [
-  'Visakhapatnam',
-  'Nellore',
   'Bangalore',
-  'Gulbarga',
-  'Hyderabad',
-  'Kakinada',
-  'Vijayawada',
+  'Bhopal',
   'Chennai',
-  'Mumbai',
   'Corporate Office',
+  'Gulbarga',
+  'Hi-Tech City',
+  'Hyderabad-A',
+  'Hyderabad-B',
+  'Kakinada',
+  'Kochi',
+  'Mumbai',
+  'Nellore',
+  'Puducherry',
+  'Surat',
+  'Tada',
+  'Tadipatri',
+  'Tirupati',
+  'Training Academy',
+  'Vijayawada',
+  'Visakhapatnam',
 ] as const
+
+/** Hyderabad ops books — Corporate Office allots the vehicles, so they are not on the weekly pending list. */
+export function isHyderabadFleetBranch(name: string): boolean {
+  const n = String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '')
+  if (n === 'hitechcity' || n === 'hi-techcity') return true
+  return n === 'hyderabad' || n.startsWith('hyderabad')
+}
+
+export function branchesWithActiveVehicles(vehicles: { branchId?: string; active?: boolean }[]): string[] {
+  const have = new Set(
+    vehicles
+      .filter((v) => v.active !== false && String(v.branchId || '').trim())
+      .map((v) => String(v.branchId).trim()),
+  )
+  return FLEET_BRANCHES.filter((b) => have.has(b) && !isHyderabadFleetBranch(b))
+}
+
+export async function claimFleetNotice(kind: string, branchId: string, driverName: string, ymd: string): Promise<boolean> {
+  const key =
+    'fleet:' +
+    String(kind || 'notice').trim() +
+    ':' +
+    String(branchId || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '') +
+    ':' +
+    String(driverName || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '') +
+    ':' +
+    String(ymd || '').trim()
+  const r = await redis(['SET', key, '1', 'EX', 172800, 'NX'])
+  if (!r) return true
+  return r.result === 'OK'
+}
+
+export async function claimFleetLicenseAlert(branchId: string, driverName: string, ymd: string): Promise<boolean> {
+  return claimFleetNotice('lic-alert', branchId, driverName, ymd)
+}
 
 export const VEHICLE_TYPES = ['4-Wheeler', '2-Wheeler', 'EV'] as const
 export const FUEL_TYPES = ['Diesel', 'Petrol', 'Electric', 'CNG'] as const
@@ -469,12 +584,22 @@ export function normalizeDriver(d: Partial<FleetDriver> & { id?: string }): Flee
 
 export function normalizeUser(u: Partial<FleetUser> & { id?: string }): FleetUser {
   const rawType = String(u.userType || '')
+  let designation = String(u.designation || '').trim()
+  if (!designation) {
+    if (rawType === 'director') designation = 'Director'
+    else if (rawType === 'admin') designation = 'Admin'
+    else if (rawType === 'staff') designation = 'Field Officer'
+    else if (rawType === 'hod') designation = 'Regional Manager (RM)'
+    else if (u.role === 'admin') designation = 'Admin'
+    else designation = 'Regional Manager (RM)'
+  }
+  const mapped = fleetDesignationToUserType(designation)
   let userType: FleetUserType =
     rawType === 'director' || rawType === 'admin' || rawType === 'hod' || rawType === 'staff'
       ? (rawType as FleetUserType)
-      : u.role === 'admin'
-        ? 'admin'
-        : 'hod'
+      : mapped
+  // Prefer designation mapping when designation is set (company role list)
+  if (String(u.designation || '').trim()) userType = mapped
   const role: FleetUserRole = userType === 'director' || userType === 'admin' ? 'admin' : 'branch'
   return {
     id: String(u.id || fleetNid('us')),
@@ -483,6 +608,7 @@ export function normalizeUser(u: Partial<FleetUser> & { id?: string }): FleetUse
     mobile: String(u.mobile || ''),
     role,
     userType,
+    designation,
     branchId: role === 'branch' ? String(u.branchId || '') : '',
     password: String(u.password || ''),
     active: u.active !== false,

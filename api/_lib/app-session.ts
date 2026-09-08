@@ -1,6 +1,8 @@
 import { canLoginWithEmail, normaliseEmail, verifySessionToken } from './auth.js'
+import { isPulseAdminEmail, isPulseAppId } from './pulse/admin-auth.js'
 import { pinAliasIds } from './pin-aliases.js'
 import { getActiveBranch } from './mis/store.js'
+import { isRecruitDepartmentLoginId } from './recruitment/department-auth.js'
 
 export type AppSession = {
   email: string
@@ -19,10 +21,24 @@ export async function verifyAppSession(
   const allowed = pinAliasIds(expectedAppId)
   if (!payload || !allowed.includes(payload.appId)) return null
   if (!canLoginWithEmail(payload.email)) return null
+  if (allowed.some(isPulseAppId) && !isPulseAdminEmail(payload.email)) return null
 
+  /**
+   * Trust a valid JWT. Branch active checks happen at bind-branch / app gates.
+   * Do not drop the session when branch master is briefly unavailable — that
+   * was kicking HODs back to login after a few clicks or refreshes.
+   */
   if (payload.role === 'staff' && payload.branchId) {
-    const branch = await getActiveBranch(payload.branchId)
-    if (!branch) return null
+    const isRecruitDept =
+      allowed.includes('recruitment') && isRecruitDepartmentLoginId(payload.branchId)
+    if (!isRecruitDept) {
+      try {
+        const branch = await getActiveBranch(payload.branchId)
+        if (branch && branch.active === false) return null
+      } catch {
+        /* keep session */
+      }
+    }
   }
 
   return {

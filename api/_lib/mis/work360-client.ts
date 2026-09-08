@@ -113,13 +113,31 @@ export async function work360FetchJson<T>(
   }
 }
 
-export type Work360Client = { id: number | string; name?: string }
+export type Work360Client = {
+  id: number | string
+  name?: string
+  code?: string
+  clientCode?: string
+  clientName?: string
+}
+
+function normalizeWork360Client(raw: Record<string, unknown>): Work360Client {
+  return {
+    id: (raw.id ?? raw.clientId ?? '') as string | number,
+    name: String(raw.name ?? raw.clientName ?? raw.client ?? '').trim() || undefined,
+    code: String(raw.code ?? raw.clientCode ?? raw.clientcode ?? '').trim() || undefined,
+    clientCode: String(raw.clientCode ?? raw.code ?? '').trim() || undefined,
+    clientName: String(raw.clientName ?? raw.name ?? '').trim() || undefined,
+  }
+}
 
 export async function work360ListClients(cfg: Work360Config): Promise<Work360Client[]> {
-  const data = await work360FetchJson<Work360Client[] | { data?: Work360Client[] }>(cfg, '/v1/clients')
-  if (Array.isArray(data)) return data
-  if (data && Array.isArray(data.data)) return data.data
-  return []
+  const data = await work360FetchJson<unknown[] | { data?: unknown[] }>(cfg, '/v1/clients')
+  const list = Array.isArray(data) ? data : data && Array.isArray(data.data) ? data.data : []
+  return list
+    .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === 'object')
+    .map((x) => normalizeWork360Client(x))
+    .filter((c) => String(c.id ?? '').trim() && String(c.id) !== '-1' && String(c.id) !== '0')
 }
 
 export async function work360ListUnits(cfg: Work360Config, clientId: string): Promise<Work360Client[]> {

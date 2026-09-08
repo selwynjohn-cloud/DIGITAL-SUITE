@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
+import { loadBranchLoginOptionsHtml } from '../_lib/branch-login-options.js'
 import { hodLoginHtml, otpLoginHtml, otpLoginScript } from '../_lib/embedded-otp.js'
 import { MANAGEMENT_PAGE_HELP, PAGE_HELP } from '../_lib/guards/page-help.js'
 import { DEFAULT_BRANCHES } from '../_lib/mis/store.js'
@@ -7,22 +8,29 @@ import {
   MASTER_DIRECTORY_HELP_LINK_HTML,
   SHOW_MASTER_DIRECTORY_LINK_JS,
 } from '../_lib/master-directory.js'
+import { suiteMgmtBranchOptionsJs } from '../_lib/suite-mgmt-branch-select.js'
 
 const ALL_BRANCHES = DEFAULT_BRANCHES.map((b) => ({ id: b.id, name: b.name }))
 
-export default function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   const url = new URL(req.url ?? '/', 'https://www.agilegroup-digital.co.in')
   const isMgmt =
     url.searchParams.get('portal') === 'management' ||
     url.searchParams.get('suite_role') === 'management'
+  const otpRole = isMgmt ? 'management' : 'staff'
+  /** Must pass real role here — a placeholder made OTP_STAFF_PIN=false and hid the branch box. */
+  const otpScript = otpLoginScript('guards', 'Agile Guards', otpRole)
   const loginHtml = isMgmt
     ? otpLoginHtml(
         'Agile Guards — Management',
-        'Director / Admin — sign in with your @agilegroup.co.in email. Master PIN 170658 works here.',
+        'Director / Admin — sign in with your @agilegroup.co.in email.',
       )
-    : hodLoginHtml('Agile Guards — HOD Portal', 'App 07 — HOD sign in with branch password')
-  const otpRole = isMgmt ? 'management' : 'staff'
-  const html = PAGE.replace('__GUARDS_LOGIN__', loginHtml).replaceAll('__GUARDS_OTP_ROLE__', otpRole)
+    : hodLoginHtml(
+        'Agile Guards — HOD Portal',
+        'Select your branch (Mumbai, Chennai, Kochi, …), then email PIN (morning) or branch password',
+        await loadBranchLoginOptionsHtml('guards'),
+      )
+  const html = PAGE.replace('__GUARDS_LOGIN__', loginHtml).replace('__GUARDS_OTP_SCRIPT__', otpScript)
   res.setHeader('Content-Type', 'text/html; charset=utf-8')
   res.setHeader('Cache-Control', 'no-store')
   return res.status(200).send(html)
@@ -161,7 +169,7 @@ __GUARDS_LOGIN__
     <div class="menu" id="menu"></div>
     <div class="help-links">
       ${MASTER_DIRECTORY_HELP_LINK_HTML}
-      <a href="/guards/manual" target="_blank">📖 User Manual</a>
+      <a href="/guards/manual" target="_blank">📖 User Guide (Staff &amp; HOD)</a>
       <a href="/guards/troubleshooting" target="_blank">🔧 Troubleshooting</a>
     </div>
     <div class="logout" onclick="logout()">⎋ Logout</div>
@@ -177,9 +185,10 @@ __GUARDS_LOGIN__
 </div>
 
 <script>
-${otpLoginScript('guards', 'Agile Guards', '__GUARDS_OTP_ROLE__' as 'staff' | 'management')}
+__GUARDS_OTP_SCRIPT__
 
 ${SHOW_MASTER_DIRECTORY_LINK_JS}
+${suiteMgmtBranchOptionsJs()}
 
 function isDemoMode(){return false;}
 function isMgmtPortal(){
@@ -194,7 +203,7 @@ var GUARD_CATS=${JSON.stringify(GUARD_CATEGORIES)};
 var HOD_PAGE_HELP=${JSON.stringify(PAGE_HELP)};
 var MGMT_PAGE_HELP=${JSON.stringify(MANAGEMENT_PAGE_HELP)};
 var ALL_BRANCHES=${JSON.stringify(ALL_BRANCHES)};
-var S={tab:0,role:'hod',branchId:'',branchName:'',canAssign:true,complaints:[],ops:[],dept:[],comms:[],dash:{},delayed:{},analysis:{},events:[],shareUrl:'',search:'',selected:null,caseDetail:null,pageHelp:{},isManagement:false,branches:[],branchFilter:'',branchNames:{},liveData:null,regBranch:'',commsLoaded:false,feedback:[],feedbackSummary:{},hodContacts:[]};
+var S={tab:0,role:'hod',branchId:'',branchName:'',canAssign:true,complaints:[],ops:[],dept:[],comms:[],dash:{},delayed:{},analysis:{},events:[],shareUrl:'',search:'',selected:null,caseDetail:null,pageHelp:{},isManagement:false,branches:[],branchFilter:'',branchNames:{},liveData:null,regBranch:'',commsLoaded:false,feedback:[],feedbackSummary:{},hodContacts:[],waRows:null,waFilter:'ALL',waError:'',waBusy:false,waQr:'',waPairCode:''};
 var MENU=HOD_MENU_REF.slice();
 
 function useMgmtLayout(){return S.isManagement||isMgmtPortal();}
@@ -220,31 +229,36 @@ function fmtIstDateTime(iso){
   }catch(e){return String(iso).slice(0,16).replace('T',' ');}
 }
 function formatBranchRaw(s){
-  var t=String(s||'').trim();
-  var m=t.match(/^hyderabad[\s_-]*([ab])$/i);
+  var t=String(s||'').trim().replace(/-(AP|TG|MH|GJ|UP|PY|TN|KA|KL|MP)$/i,'');
+  var m=t.match(/hyd(?:erabad)?[\s_-]*(?:zone[\s_-]*)?([ab])\b/i);
   if(m) return 'Hyderabad-'+m[1].toUpperCase();
   if(/^hyd\s*zone\s*a$/i.test(t)) return 'Hyderabad-A';
   if(/^hyd\s*zone\s*b$/i.test(t)) return 'Hyderabad-B';
+  if(/^karnataka$/i.test(t)||/^bengaluru$/i.test(t)||/^bangalore$/i.test(t)) return 'Bangalore';
   return t;
 }
 function resolveBranchClient(input){
   var q=String(input||'').trim();
   if(!q) return '';
-  var hit=S.branches.find(function(b){return b.id===q||b.name===q;});
+  if(S.branchNames&&S.branchNames[q]) return q;
+  var list=S.branches||[];
+  var hit=list.find(function(b){return b.id===q||b.name===q;});
+  if(hit) return hit.id;
+  var pretty=formatBranchRaw(q);
+  hit=list.find(function(b){return b.name===pretty||formatBranchRaw(b.name)===pretty;});
   if(hit) return hit.id;
   var key=q.toLowerCase().replace(/[_\s]+/g,'-');
-  var alias={'hyderabad-a':'Hyderabad-A','hyderabad-b':'Hyderabad-B','hyd-zone-a':'Hyderabad-A','hyd-zone-b':'Hyderabad-B'};
+  var alias={'hyderabad-a':'Hyderabad-A','hyderabad-b':'Hyderabad-B','hyd-zone-a':'Hyderabad-A','hyd-zone-b':'Hyderabad-B','hyd-a':'Hyderabad-A','hyd-b':'Hyderabad-B','karnataka':'Bangalore','bengaluru':'Bangalore','bangalore':'Bangalore','b-karnataka':'Bangalore'};
   if(alias[key]){
-    hit=S.branches.find(function(b){return b.name===alias[key];});
+    hit=list.find(function(b){return b.name===alias[key];});
     if(hit) return hit.id;
   }
-  var zm=q.match(/hyderabad[\s_-]*([ab])\b/i);
-  if(zm){
-    var target=zm[1].toUpperCase()==='A'?'Hyderabad-A':'Hyderabad-B';
-    hit=S.branches.find(function(b){return b.name===target;});
-    if(hit) return hit.id;
+  if(S.branchNames){
+    for(var id in S.branchNames){
+      if(S.branchNames[id]===q||S.branchNames[id]===pretty||formatBranchRaw(S.branchNames[id])===pretty) return id;
+    }
   }
-  return q;
+  return pretty||q;
 }
 function branchIdsMatch(a,b){
   if(!a&&!b) return true;
@@ -258,8 +272,20 @@ function allStaffList(kind){
 }
 function staffForBranch(kind,branchId){
   var list=allStaffList(kind);
+  if(!list.length) list=((kind==='ops'?S.ops:S.dept)||[]).filter(function(x){return x.active!==false;});
+  // Department staff is company-wide — same list for every branch (includes HR)
+  if(kind==='dept') return list;
+  // Operations staff: ONLY the complaint / login branch — never fall back to Visakhapatnam etc.
+  // Plus company-wide HOD/OM with no branch. Never another city.
+  function opsOnThisBranch(s){
+    if(!s.branchId) return true;
+    if(branchIdsMatch(s.branchId,branchId)) return true;
+    var want=String(branchLabel(branchId)||'').toLowerCase();
+    var n=String(s.branchName||branchLabel(s.branchId)||'').toLowerCase();
+    return !!(want&&n&&(n===want||(want.indexOf('bangalore')>=0&&(n.indexOf('bangalore')>=0||n.indexOf('bengaluru')>=0||n.indexOf('karnataka')>=0))));
+  }
   if(!branchId) return list;
-  return list.filter(function(s){return branchIdsMatch(s.branchId,branchId);});
+  return list.filter(opsOnThisBranch);
 }
 function branchLabel(id,row){
   if(row&&row.branchName) return row.branchName;
@@ -275,8 +301,13 @@ function applyBranchFilter(list){
 function applyDataView(){
   var src=S.liveData||{};
   S.complaints=applyBranchFilter(src.complaints||[]);
-  S.ops=applyBranchFilter(src.opsStaff||[]);
-  S.dept=applyBranchFilter(src.deptStaff||[]);
+  S.ops=(src.opsStaff||[]).filter(function(x){
+    if(x.active===false) return false;
+    if(!S.branchFilter||!x.branchId) return true;
+    return branchIdsMatch(x.branchId,S.branchFilter);
+  });
+  // Department staff is the same for all branches — do not filter by branch
+  S.dept=(src.deptStaff||[]).filter(function(x){return x.active!==false;});
   S.comms=(src.communications||[]).slice();
   if(S.branchFilter) S.comms=S.comms.filter(function(c){var row=(src.complaints||[]).find(function(x){return x.id===c.complaintId;});return !c.complaintId||!row||row.branchId===S.branchFilter;});
   S.dash=src.dashboard||{};
@@ -300,7 +331,17 @@ function el(id){return document.getElementById(id)}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function api(body){
   return fetch('/api/guards/data',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json','Cache-Control':'no-cache'},body:JSON.stringify(Object.assign({sessionToken:OTP_SESSION,_t:Date.now()},body||{}))})
-    .then(function(r){return r.json().then(function(j){if(r.status===401){logout();throw new Error('Session expired');}return j;});});
+    .then(function(r){
+      return r.text().then(function(t){
+        var j=null;
+        try{j=t?JSON.parse(t):{};}catch(e){
+          if(r.status===401){otpHandleUnauthorized();throw new Error('Session expired');}
+          throw new Error((t||'Server error').slice(0,120).replace(/\s+/g,' ').trim()||'Server error — please refresh');
+        }
+        if(r.status===401){otpHandleUnauthorized();throw new Error('Session expired');}
+        return j;
+      });
+    });
 }
 function onOtpLogin(d){
   el('login').style.display='none';el('shell').style.display='block';
@@ -312,7 +353,7 @@ function onOtpLogin(d){
   el('content').innerHTML='<p style="color:#94a3b8;padding:20px">Loading…</p>';
   load(false);
 }
-function logout(){sessionStorage.removeItem('otp_guards');location.reload();}
+function logout(){otpLogout();}
 function buildMenu(){
   if(!MENU||!MENU.length) return;
   var h='';MENU.forEach(function(m,i){if(!m) return;h+='<button class="mi'+(S.tab===i?' on':'')+'" onclick="tab('+i+')"><b>'+esc(m[0])+'</b><small>'+esc(m[1])+'</small></button>';});
@@ -330,7 +371,10 @@ function load(fromRefresh){
     if(d.branches&&d.branches.length) S.branches=dedupeBranchesClient(d.branches);
     else if(S.isManagement) S.branches=dedupeBranchesClient(ALL_BRANCHES.slice());
     S.branchNames={};
-    (d.branches||[]).forEach(function(b){S.branchNames[b.id]=b.name;});
+    (S.branches||[]).forEach(function(b){S.branchNames[b.id]=b.name;});
+    (d.complaints||[]).concat(d.opsStaff||[]).concat(d.deptStaff||[]).forEach(function(row){
+      if(row&&row.branchId&&row.branchName) S.branchNames[row.branchId]=row.branchName;
+    });
     S.liveData={
       complaints:d.complaints||[],opsStaff:d.opsStaff||[],deptStaff:d.deptStaff||[],
       communications:d.communications||[],dashboard:d.dashboard||{},delayedAnalysis:d.delayedAnalysis||{},
@@ -352,6 +396,13 @@ function load(fromRefresh){
     el('userLine').textContent=(d.name||d.email)+' · '+(S.isManagement?'All branches':d.branchName)+(fromRefresh?' · refreshed '+new Date().toLocaleTimeString('en-IN'):'');
     if(S.isManagement) el('content').classList.add('mgmt-wide'); else el('content').classList.remove('mgmt-wide');
     showMasterDirectoryLink(S.isManagement);
+    if(!S.selected){
+      try{
+        var q=new URLSearchParams(location.search);
+        var deep=String(q.get('case')||q.get('focus')||'').trim();
+        if(deep) S.selected=deep;
+      }catch(e){}
+    }
     if(S.selected) return openCase(S.selected);
     render();
     api({action:'escalateDelayed'}).catch(function(){});
@@ -378,7 +429,7 @@ function canRemind(){return S.isManagement||S.role==='management';}
 function canDeleteComplaint(){return canRemind();}
 function deleteComplaintBtn(c,inline){
   if(!canDeleteComplaint()) return '';
-  var label=inline?'Delete':'Delete test entry';
+  var label=inline?'Delete':'Remove complaint';
   return '<button class="btn btn-sm btn-danger" type="button" onclick="deleteComplaint(\\''+esc(c.id)+'\\')">'+label+'</button>';
 }
 function deleteComplaint(id){
@@ -386,7 +437,7 @@ function deleteComplaint(id){
   var c=(S.complaints||[]).find(function(x){return x.id===id;})||(S.caseDetail&&S.caseDetail.complaint);
   var code=c?c.code:id;
   var guardName=c?displayGuardName(c):'';
-  var msg='Delete complaint '+code+(guardName?' ('+guardName+')':'')+'?\\n\\nThis removes the test/fake entry permanently.';
+  var msg='Remove complaint '+code+(guardName?' ('+guardName+')':'')+'?\\n\\nThis cannot be undone.';
   if(!confirm(msg)) return;
   api({action:'deleteComplaint',complaintId:id}).then(function(d){
     if(d.ok){
@@ -425,21 +476,37 @@ function pieChartHtml(items){
 function sendReminder(id,target){
   sendReminderPick(id,target);
 }
+function hodMatchesBranch(h,branchId){
+  if(branchIdsMatch(h.branchId,branchId)) return true;
+  var want=String(formatBranchRaw(branchLabel(branchId))||'').toLowerCase();
+  var have=String(formatBranchRaw(h.branchName||branchLabel(h.branchId))||'').toLowerCase();
+  return !!(want&&have&&want===have);
+}
+function staffRoleLabel(o){
+  return String(o&&o.roleLabel||'').trim()||'Operations';
+}
 function hodOptionsForBranch(branchId){
-  var list=(S.hodContacts||[]).filter(function(h){return branchIdsMatch(h.branchId,branchId);});
+  var list=(S.hodContacts||[]).filter(function(h){return !h.branchId||hodMatchesBranch(h,branchId);});
   var seen={},h='';
+  function addHod(em,name,role,br){
+    em=String(em||'').trim();
+    var key=em.toLowerCase();
+    if(!em||em.indexOf('@')<0||seen[key]) return;
+    seen[key]=1;
+    h+='<option value="'+esc(em)+'">'+esc(role||'HOD')+' — '+esc(name||em)+' ('+esc(em)+')'+(br?' — '+esc(br):'')+'</option>';
+  }
   list.forEach(function(hod){
-    var em=String(hod.email||'').toLowerCase();
-    if(!em||seen[em]) return;
-    seen[em]=1;
-    h+='<option value="'+esc(hod.email)+'">'+esc(hod.name)+' — '+esc(hod.branchName||branchLabel(branchId))+'</option>';
+    addHod(hod.email,hod.name,hod.roleLabel,hod.branchName||branchLabel(hod.branchId||branchId));
+  });
+  staffForBranch('ops',branchId).forEach(function(o){
+    addHod(o.email,o.name,staffRoleLabel(o),o.branchName||branchLabel(o.branchId||branchId));
   });
   return h;
 }
 function reminderStaffOptions(branchId){
   var h='';
   staffForBranch('ops',branchId).forEach(function(o){
-    h+='<option value="ops:'+esc(o.id)+'">Ops — '+esc(o.name)+(o.email?' ('+esc(o.email)+')':'')+'</option>';
+    h+='<option value="ops:'+esc(o.id)+'">'+esc(staffRoleLabel(o))+' — '+esc(o.name)+(o.email?' ('+esc(o.email)+')':'')+'</option>';
   });
   staffForBranch('dept',branchId).forEach(function(d){
     h+='<option value="dept:'+esc(d.id)+'">'+esc(d.department)+' — '+esc(d.name)+(d.email?' ('+esc(d.email)+')':'')+'</option>';
@@ -454,7 +521,7 @@ function reminderCellHtml(c){
   h+='<button class="btn btn-sm btn-ol" type="button" onclick="sendReminderPick(\\''+esc(c.id)+'\\',\\'hod\\')">Remind HOD</button>';
   h+='<label>Ops / Department (select)</label><select id="rstaff_'+esc(c.id)+'"><option value="">— Select staff —</option>'+staffOpts+'</select>';
   h+='<button class="btn btn-sm btn-ol" type="button" onclick="sendReminderPick(\\''+esc(c.id)+'\\',\\'department\\')">Remind staff</button>';
-  if(!hodOpts&&!staffOpts) h+='<p style="font-size:11px;color:#fbbf24;margin-top:6px">Add HODs in MIS User Management, or add Ops/Dept staff in the menus on the left.</p>';
+  if(!hodOpts&&!staffOpts) h+='<p style="font-size:11px;color:#fbbf24;margin-top:6px">No HOD or Operation Manager for this branch in User Management. Add them there, or add Ops/Dept staff in the left menu.</p>';
   return h+'</div>';
 }
 function sendReminderPick(id,target){
@@ -479,13 +546,13 @@ function shareDashboard(){
   var to=(inp&&inp.value||'').trim();
   if(!to||to.indexOf('@')<0){alert('Please enter email address to send dashboard.');if(inp) inp.focus();return;}
   api({action:'shareDashboard',to:to,branchId:S.branchFilter||''}).then(function(d){
-    if(d.ok) alert('Dashboard shared by email to '+to); else alert(d.error||'Could not share');
+    if(d.ok) alert('Colourful dashboard shared by email to '+to+' (with Agile header & footer)'); else alert(d.error||'Could not share');
   });
 }
 function deptOptionsForBranch(branchId){
   var h='';
   staffForBranch('ops',branchId).forEach(function(o){
-    if(o.email) h+='<option value="ops:'+esc(o.id)+'">Ops — '+esc(o.name)+' ('+esc(o.email)+')</option>';
+    if(o.email) h+='<option value="ops:'+esc(o.id)+'">'+esc(staffRoleLabel(o))+' — '+esc(o.name)+' ('+esc(o.email)+')</option>';
   });
   staffForBranch('dept',branchId).forEach(function(d){
     if(d.email) h+='<option value="dept:'+esc(d.id)+'">'+esc(d.department)+' — '+esc(d.name)+' ('+esc(d.email)+')</option>';
@@ -595,7 +662,7 @@ function complaintRows(list,click,opts){
   var branchCol=S.isManagement?'<th>Branch</th>':'';
   var remindCol=(opts.showRemind&&canRemind())?'<th>Reminder</th>':'';
   var statusCol=(opts.showStatus&&canRemind())?'<th>Inform status</th>':'';
-  var h='<div class="tblwrap"><table><thead><tr>'+branchCol+'<th>Code</th><th>Guard</th><th>Category</th><th>Time by department</th><th>Status</th>'+remindCol+statusCol+'</tr></thead><tbody>';
+  var h='<div class="tblwrap"><table><thead><tr>'+branchCol+'<th>Code</th><th>Guard</th><th>Category</th><th>Time by department</th><th>Status</th><th></th>'+remindCol+statusCol+'</tr></thead><tbody>';
   list.slice().sort(function(a,b){return String(b.registeredAt).localeCompare(String(a.registeredAt));}).forEach(function(c){
     h+='<tr'+(click?' class="click" onclick="openCase(\\''+esc(c.id)+'\\')"':'')+'>';
     if(S.isManagement) h+='<td><b>'+esc(branchLabel(c.branchId,c))+'</b></td>';
@@ -603,6 +670,7 @@ function complaintRows(list,click,opts){
     h+='<td><b style="font-size:15px;color:#f8fafc">'+esc(displayGuardName(c))+'</b><br><small>ID '+esc(c.idNo)+' · '+esc(c.mobile)+'</small></td>';
     h+='<td>'+esc(c.category)+'<br><small>'+esc(c.subCategory)+'</small></td>';
     h+='<td style="min-width:200px">'+deptTimeBarsHtml(c)+'</td><td>'+displayStatus(c)+(S.isManagement?'<br>'+assignedToNote(c):'')+'</td>';
+    h+='<td onclick="event.stopPropagation()"><button class="btn btn-sm" type="button" onclick="openCase(\\''+esc(c.id)+'\\')">Open &amp; assign</button></td>';
     if(opts.showRemind&&canRemind()) h+='<td onclick="event.stopPropagation()">'+reminderCellHtml(c)+'</td>';
     if(opts.showStatus&&canRemind()) h+='<td class="status-cell" onclick="event.stopPropagation()">'+informStatusHtml(c)+'</td>';
     h+='</tr>';
@@ -613,10 +681,16 @@ function render(){
   if(S.caseDetail) return renderCase();
   el('pageTitle').textContent=(MENU[S.tab]&&MENU[S.tab][0])||'Branch Dashboard';
   var fn=[rDash,rRegister,rReceived,rDelayed,rAnalysis,rDelayedA,rComms,rFeedback,rOps,rDept];
-  el('content').innerHTML=pageIntro()+fn[S.tab]();
+  var view=fn[S.tab];
+  el('content').innerHTML=pageIntro()+(view?view():'');
 }
 function rDash(){
-  var d=S.dash,h='<div class="share-dash"><div><label style="font-size:12px;color:#b8a0a0;display:block;margin-bottom:4px">Email to send dashboard summary</label><input id="dashShareEmail" type="email" placeholder="client@bank.com"></div><button class="btn btn-sm" onclick="shareDashboard()">Share dashboard by email</button><button class="btn btn-sm btn-ol" onclick="navigator.clipboard&&navigator.clipboard.writeText(location.href).then(function(){alert(\\'Link copied\\')})">Copy portal link</button></div>';
+  var d=S.dash,h='';
+  if(S.isManagement){
+    h+='<div class="panel" style="margin-bottom:12px"><label>Branch</label><select id="mgmtBr" onchange="S.branchFilter=this.value===\\'ALL\\'?\\'\\':this.value;load()">'+suiteMgmtBranchOptionsHtml(S.branches,S.branchFilter||'ALL')+'</select></div>';
+  }
+  h+='<div class="share-dash"><div><label style="font-size:12px;color:#b8a0a0;display:block;margin-bottom:4px">Email to send colourful dashboard (Agile header &amp; footer)</label><input id="dashShareEmail" type="email" placeholder="client@bank.com"></div><button class="btn btn-sm" onclick="shareDashboard()">Share dashboard by email</button><button class="btn btn-sm btn-ol" onclick="navigator.clipboard&&navigator.clipboard.writeText(location.href).then(function(){alert(\\'Link copied\\')})">Copy portal link</button></div>';
+  h+='<p style="color:#94a3b8;font-size:12px;margin:-6px 0 12px">Shared mail uses the usual Agile letterhead header and suite footer, with the same colourful KPI cards and tables as this dashboard.</p>';
   h+='<div class="kgrid">';
   [['total','Total'],['received','Open'],['delayed','Delayed &gt;24h'],['solved','Solved'],['avgResponseHours','Avg hours (h)'],['slaCompliancePct','Within 24h %']].forEach(function(p){
     var v=d[p[0]];if(p[0]==='avgResponseHours') v=(v||0)+'h';else if(p[0]==='slaCompliancePct') v=(v||0)+'%';
@@ -624,6 +698,16 @@ function rDash(){
   });
   h+='</div>';
   var delayed=S.complaints.filter(function(c){return c.isDelayed&&c.status!=='solved';});
+  // Locked order after KPI cards: branch table, then department hours, then category cards
+  if(S.isManagement&&(d.byBranch||[]).length){h+='<div class="panel"><h3>Branch-wise breakdown</h3><div class="tblwrap"><table><tr><th>Branch</th><th>Total</th><th>Open</th><th>Delayed</th><th>Solved</th><th>Avg hours</th><th>Within 24h</th></tr>';
+    d.byBranch.forEach(function(x){h+='<tr><td><b>'+esc(x.branchName)+'</b></td><td>'+x.total+'</td><td>'+x.received+'</td><td>'+x.delayed+'</td><td>'+x.solved+'</td><td>'+x.avgHours+'h</td><td>'+x.slaPct+'%</td></tr>';});
+    h+='</table></div></div>';}
+  if((d.byDepartment||[]).length){h+='<div class="panel"><h3>Time per department</h3><div class="tblwrap"><table><tr><th>Department</th><th>Cases</th><th>Avg hours</th><th>Delayed</th></tr>';
+    d.byDepartment.forEach(function(x){h+='<tr><td>'+esc(x.department)+'</td><td>'+x.count+'</td><td>'+x.avgHours+'h</td><td>'+x.delayed+'</td></tr>';});
+    h+='</table></div></div>';}
+  if((d.topCategories||[]).length){h+='<div class="panel"><h3>Complaint categories</h3><div class="kgrid">';
+    d.topCategories.forEach(function(c){h+='<div class="kpi"><b>'+c.count+'</b><span>'+esc(c.category)+' · avg '+c.avgHours+'h</span></div>';});
+    h+='</div></div>';}
   if(delayed.length){
     h+='<div class="panel"><h3>Beyond 24 hours — all delayed complaints</h3><p style="color:#b8a0a0;margin-bottom:10px">Each case shows where time was spent (HOD · Ops · Dept) and overall 24-hour clock.</p>';
     delayed.forEach(function(c){
@@ -636,15 +720,6 @@ function rDash(){
     });
     h+='</div>';
   }
-  if((d.byDepartment||[]).length){h+='<div class="panel"><h3>Time per department</h3><div class="tblwrap"><table><tr><th>Department</th><th>Cases</th><th>Avg hours</th><th>Delayed</th></tr>';
-    d.byDepartment.forEach(function(x){h+='<tr><td>'+esc(x.department)+'</td><td>'+x.count+'</td><td>'+x.avgHours+'h</td><td>'+x.delayed+'</td></tr>';});
-    h+='</table></div></div>';}
-  if(S.isManagement&&(d.byBranch||[]).length){h+='<div class="panel"><h3>Branch-wise breakdown</h3><div class="tblwrap"><table><tr><th>Branch</th><th>Total</th><th>Open</th><th>Delayed</th><th>Solved</th><th>Avg hours</th><th>Within 24h</th></tr>';
-    d.byBranch.forEach(function(x){h+='<tr><td><b>'+esc(x.branchName)+'</b></td><td>'+x.total+'</td><td>'+x.received+'</td><td>'+x.delayed+'</td><td>'+x.solved+'</td><td>'+x.avgHours+'h</td><td>'+x.slaPct+'%</td></tr>';});
-    h+='</table></div></div>';}
-  if((d.topCategories||[]).length){h+='<div class="panel"><h3>Complaint categories</h3><div class="kgrid">';
-    d.topCategories.forEach(function(c){h+='<div class="kpi"><b>'+c.count+'</b><span>'+esc(c.category)+' · avg '+c.avgHours+'h</span></div>';});
-    h+='</div></div>';}
   if((d.hurdles||[]).length){h+='<div class="panel"><h3>Where it is delayed</h3>';d.hurdles.forEach(function(x){h+='<div class="alert '+(x.count>2?'red':'amber')+'"><b>'+esc(x.label)+' ('+x.count+')</b><br>'+esc(x.hint)+'</div>';});h+='</div>';}
   h+='<div class="panel"><h3>Suggestions to reduce response time (24 hours)</h3><ul class="suggest">';
   (d.suggestions||[]).forEach(function(s){h+='<li>'+esc(s)+'</li>';});h+='</ul></div>';
@@ -666,6 +741,9 @@ function rRegister(){
   var regBranch=regBranchForQr();
   var url=regUrlForBranch(regBranch);
   var qr='https://api.qrserver.com/v1/create-qr-code/?size=260x260&data='+encodeURIComponent(url)+'&t='+Date.now();
+  var commonUrl='https://www.agilegroup-digital.co.in/guards/register';
+  var commonPoster='https://www.agilegroup-digital.co.in/guards/complaint-poster';
+  var commonQr='https://api.qrserver.com/v1/create-qr-code/?size=260x260&data='+encodeURIComponent(commonUrl)+'&t='+Date.now();
   var waText=encodeURIComponent('Agile Security Force — Guards Complaint\\nBranch: '+regBranch+'\\nRegister here (no login):\\n'+url+'\\nOur response time: 24 hours');
   var cats='';Object.keys(GUARD_CATS||{}).forEach(function(k){cats+='<option value="'+esc(k)+'">'+esc(k)+'</option>';});
   var branchPick='';
@@ -685,9 +763,15 @@ function rRegister(){
   h+='<label>Describe complaint</label><textarea id="regNote" rows="3" placeholder="Guard explains the issue…"></textarea>';
   h+='<button class="btn btn-sm" onclick="submitControlComplaint()">Submit complaint</button>';
   h+='<button class="btn btn-sm btn-ol" onclick="resetControlForm()">Clear form</button></div>';
-  h+='<div class="panel"><h3>Share with guards (phone / site)</h3><p style="color:#b8a0a0;margin-bottom:8px">Same form on guard phone — no login.</p>';
-  h+='<input readonly value="'+esc(url)+'" onclick="this.select()"><button class="btn btn-sm" onclick="navigator.clipboard&&navigator.clipboard.writeText(\\''+esc(url)+'\\').then(function(){alert(\\'Link copied\\')})">Copy link</button></div>';
-  h+='<div class="share-grid"><div class="panel"><h3>QR code</h3><img src="'+qr+'" width="260" alt="QR" style="background:#fff;padding:8px;border-radius:8px"><p style="color:#b8a0a0;font-size:13px;margin-top:8px">Print at site / branch.</p></div>';
+  h+='<div class="panel"><h3>Common QR — all branches (save on phone)</h3>';
+  h+='<p style="color:#b8a0a0;margin-bottom:10px">One poster for every guard. They scan, pick <b>their branch</b>, and register. Not locked to one zone.</p>';
+  h+='<div style="text-align:center;background:#fff;border-radius:12px;padding:12px;margin-bottom:10px"><img src="'+commonQr+'" width="220" alt="Common QR" style="background:#fff"></div>';
+  h+='<input readonly value="'+esc(commonUrl)+'" onclick="this.select()">';
+  h+='<button class="btn btn-sm" onclick="window.open(\\''+esc(commonPoster)+'\\',\\'_blank\\')">Open / print common poster</button>';
+  h+='<button class="btn btn-sm btn-ol" onclick="navigator.clipboard&&navigator.clipboard.writeText(\\''+esc(commonUrl)+'\\').then(function(){alert(\\'Common link copied\\')})">Copy common link</button></div>';
+  h+='<div class="panel"><h3>This branch only (print at site)</h3><p style="color:#b8a0a0;margin-bottom:8px">Locked to <b>'+esc(regBranch)+'</b> — same as the old A-zone poster style.</p>';
+  h+='<input readonly value="'+esc(url)+'" onclick="this.select()"><button class="btn btn-sm" onclick="navigator.clipboard&&navigator.clipboard.writeText(\\''+esc(url)+'\\').then(function(){alert(\\'Link copied\\')})">Copy branch link</button></div>';
+  h+='<div class="share-grid"><div class="panel"><h3>This-branch QR</h3><img src="'+qr+'" width="260" alt="QR" style="background:#fff;padding:8px;border-radius:8px"><p style="color:#b8a0a0;font-size:13px;margin-top:8px">Print at this site only.</p></div>';
   h+='<div class="panel"><h3>Send to guard</h3><label>Mobile (WhatsApp)</label><input id="shareWa" placeholder="10-digit mobile"><button class="btn btn-sm" onclick="shareLink(\\'whatsapp\\')">Send WhatsApp</button>';
   h+='<label style="margin-top:12px">Email</label><input id="shareEmail" placeholder="email@agilegroup.co.in"><button class="btn btn-sm" onclick="shareLink(\\'email\\')">Send email</button>';
   h+='<button class="btn btn-sm btn-ol" onclick="window.open(\\'https://wa.me/?text='+waText+'\\',\\'_blank\\')">Open WhatsApp (pick contact)</button></div></div>';
@@ -750,15 +834,27 @@ function submitControlComplaint(){
 }
 function rReceived(){
   var list=S.complaints.filter(function(c){return c.status!=='solved';});
-  var intro='<p style="color:#b8a0a0;margin-bottom:10px"><b>Guard name</b> is in the blue bar on each card. To remove a test/fake entry, click <b>Delete test entry</b> (Management only).</p>';
+  var intro='<p style="color:#b8a0a0;margin-bottom:10px"><b>Guard name</b> is in the blue bar on each card. Only live complaints are shown — test / practice entries are removed automatically.</p>';
   var body=useMgmtLayout()
     ? complaintMgmtCards(list,{showActions:canRemind()})
     : complaintRows(list,true,{showRemind:canRemind(),showStatus:canRemind()});
   return searchBar()+'<div class="panel"><h3>Received complaints</h3>'+intro+body+'</div>';
 }
+function previewDelayedMail(){
+  if(!canRemind()){alert('Director / Management only.');return;}
+  api({action:'previewDelayedMail'}).then(function(d){
+    if(!d.ok||!d.html){alert(d.error||'Could not open draft');return;}
+    var w=window.open('','_blank');
+    if(!w){alert('Please allow the new window to see the draft.');return;}
+    w.document.open();
+    w.document.write(d.html);
+    w.document.close();
+  });
+}
 function rDelayed(){
   var list=S.complaints.filter(function(c){return c.isDelayed&&c.status!=='solved';});
-  var intro='<p style="color:#b8a0a0;margin-bottom:10px">'+(useMgmtLayout()?'Every branch — ':'')+'Past 24 hours. Staff and HOD must be from the <b>same branch</b> as the complaint.</p>';
+  var intro='<p style="color:#b8a0a0;margin-bottom:10px">'+(useMgmtLayout()?'Every branch — ':'')+'Past 24 hours. Staff and HOD must be from the <b>same branch</b> as the complaint. Each branch HOD is mailed this list at <b>9:30 AM</b> only (Director is copied). Colour bars show where it is held up.</p>';
+  if(canRemind()) intro+='<p style="margin:0 0 12px"><button class="btn" type="button" onclick="previewDelayedMail()">View 9:30 AM mail draft</button></p>';
   var body=useMgmtLayout()
     ? complaintMgmtCards(list,{showActions:canRemind()})
     : complaintRows(list,true,{showRemind:canRemind(),showStatus:canRemind()});
@@ -852,19 +948,38 @@ function rFeedbackAnalysis(){
 }
 function rOps(){
   var branchCol=S.isManagement?'<th>Branch</th>':'';
-  var h='<div class="panel"><h3>Operations staff</h3><p style="color:#b8a0a0">'+(S.isManagement?'All branches — add staff per branch below.':'')+' Used in assignment dropdown. Only HOD/RM/Management assigns.</p><button class="btn btn-sm" onclick="editOps(null)">+ Add staff</button></div><div class="tblwrap"><table><tr>'+branchCol+'<th>Name</th><th>Mobile</th><th>Email</th><th>Active</th><th></th></tr>';
+  var h='<div class="panel"><h3>Operations staff</h3><p style="color:#b8a0a0">'+(S.isManagement?'Add Operations staff per branch. Assign dropdown shows only that branch’s Ops (never another city).':'Add Bangalore Operations staff here — used only for Bangalore complaints.')+'</p><button class="btn btn-sm" onclick="editOps(null)">+ Add staff</button></div><div class="tblwrap"><table><tr>'+branchCol+'<th>Name</th><th>Mobile</th><th>Email</th><th>Active</th><th></th></tr>';
   S.ops.forEach(function(o){h+='<tr>';if(S.isManagement) h+='<td>'+esc(o.branchName||branchLabel(o.branchId,o))+'</td>';h+='<td>'+esc(o.name)+'</td><td>'+esc(o.mobile)+'</td><td>'+esc(o.email)+'</td><td>'+(o.active?'<span class="badge ok">Yes</span>':'No')+'</td><td><button class="btn btn-sm btn-ol" onclick="editOps(\\''+esc(o.id)+'\\')">Edit</button></td></tr>';});
   return h+'</table></div><div id="staffForm"></div>';
 }
 function rDept(){
   var branchCol=S.isManagement?'<th>Branch</th>':'';
-  var h='<div class="panel"><h3>Department staff</h3><p style="color:#b8a0a0">'+(S.isManagement?'All branches — add staff per branch below.':'')+' Dropdown when assigning complaints.</p><button class="btn btn-sm" onclick="editDept(null)">+ Add department staff</button></div><div class="tblwrap"><table><tr>'+branchCol+'<th>Department</th><th>Name</th><th>Email</th><th>Mobile</th><th></th></tr>';
+  var h='<div class="panel"><h3>Department staff</h3><p style="color:#b8a0a0">Same department list for all branches. Used when assigning complaints.</p><button class="btn btn-sm" onclick="editDept(null)">+ Add department staff</button></div><div class="tblwrap"><table><tr>'+branchCol+'<th>Department</th><th>Name</th><th>Email</th><th>Mobile</th><th></th></tr>';
   S.dept.forEach(function(o){h+='<tr>';if(S.isManagement) h+='<td>'+esc(o.branchName||branchLabel(o.branchId,o))+'</td>';h+='<td>'+esc(o.department)+'</td><td>'+esc(o.name)+'</td><td>'+esc(o.email)+'</td><td>'+esc(o.mobile)+'</td><td><button class="btn btn-sm btn-ol" onclick="editDept(\\''+esc(o.id)+'\\')">Edit</button></td></tr>';});
   return h+'</table></div><div id="staffForm"></div>';
 }
 function openCase(id){
+  if(!id){alert('Could not open this complaint.');return;}
   S.selected=id;
-  api({action:'caseDetail',complaintId:id}).then(function(d){if(!d.ok){alert(d.error);S.selected=null;render();return;}S.caseDetail=d;renderCase();});
+  if(el('content')) el('content').innerHTML='<p style="color:#94a3b8;padding:20px">Opening complaint…</p>';
+  api({action:'caseDetail',complaintId:id}).then(function(d){
+    if(!d.ok||!d.complaint){alert(d.error||'Could not open complaint');S.selected=null;S.caseDetail=null;render();return;}
+    S.caseDetail=d;
+    // Always refresh lists from this case (Ops = branch-only; Dept = company-wide)
+    if(!S.liveData) S.liveData={};
+    if(Array.isArray(d.opsStaff)){
+      S.liveData.opsStaff=d.opsStaff;
+      S.ops=d.opsStaff.slice();
+    }
+    if(Array.isArray(d.deptStaff)){
+      S.liveData.deptStaff=d.deptStaff;
+      S.dept=d.deptStaff.slice();
+    }
+    renderCase();
+  }).catch(function(e){
+    alert((e&&e.message)||'Could not open complaint');
+    S.selected=null;S.caseDetail=null;render();
+  });
 }
 function renderCase(){
   var d=S.caseDetail,c=d.complaint;
@@ -882,30 +997,146 @@ function renderCase(){
   if(S.canAssign&&c.status!=='solved'){
     var opsPick=staffForBranch('ops',c.branchId);
     var deptPick=staffForBranch('dept',c.branchId);
-    h+='<div class="panel"><h3>Assign (HOD / RM / Management)</h3><label>Operations staff</label><select id="asOps"><option value="">— Select —</option>';
-    opsPick.forEach(function(o){h+='<option value="'+esc(o.id)+'"'+(o.id===c.opsStaffId?' selected':'')+'>'+esc(o.name)+(o.branchName?' ('+esc(o.branchName)+')':'')+'</option>';});
-    h+='</select><label>Department staff</label><select id="asDept"><option value="">— Select —</option>';
-    deptPick.forEach(function(o){h+='<option value="'+esc(o.id)+'"'+(o.id===c.deptStaffId?' selected':'')+'>'+esc(o.department)+' — '+esc(o.name)+(o.branchName?' ('+esc(o.branchName)+')':'')+'</option>';});
-    if(!opsPick.length&&!deptPick.length) h+='<p style="color:#fbbf24;font-size:13px;margin:8px 0">No staff for <b>'+esc(branchLabel(c.branchId,c))+'</b> yet — add them under <b>Operations Staff</b> / <b>Department Staff</b> (pick this branch).</p>';
-    h+='</select><label>Or department email</label><input id="asDeptEmail" value="'+esc(c.deptStaffEmail||'')+'" placeholder="finance@agilegroup.co.in"><button class="btn btn-sm" onclick="assignCase()">Save assignment</button></div>';
+    // Ops from caseDetail are already branch-scoped; Dept is company-wide
+    if((!opsPick||!opsPick.length)&&d.opsStaff&&d.opsStaff.length){
+      opsPick=d.opsStaff.filter(function(x){return x.active!==false&&branchIdsMatch(x.branchId,c.branchId);});
+    }
+    if((!deptPick||!deptPick.length)&&d.deptStaff&&d.deptStaff.length) deptPick=d.deptStaff.filter(function(x){return x.active!==false;});
+    h+='<div class="panel"><h3>Assign (HOD / Operation Manager / Department)</h3>';
+    if(opsPick.length){
+      h+='<label>HOD / Operation Manager ('+esc(branchLabel(c.branchId,c))+' only)</label><select class="m-inp" id="asOps" style="width:100%;margin-bottom:10px"><option value="">— Select HOD or Operation Manager —</option>';
+      opsPick.forEach(function(o){h+='<option value="'+esc(o.id)+'"'+(o.id===c.opsStaffId?' selected':'')+'>'+esc(staffRoleLabel(o))+' — '+esc(o.name)+(o.email?' ('+esc(o.email)+')':'')+'</option>';});
+      h+='</select>';
+    }else{
+      h+='<input type="hidden" id="asOps" value="">';
+      h+='<div style="margin:10px 0;padding:12px;border:1px solid #b45309;border-radius:10px;background:#1a1200">';
+      h+='<b style="color:#fde68a">'+esc(branchLabel(c.branchId,c))+' has no HOD or Operation Manager in User Management — type one below</b>';
+      h+='<p class="hint" style="margin-top:6px;color:#cbd5e1">One tap adds the name and assigns this complaint.</p>';
+      h+='<label>Operations staff name *</label><input id="quickOpsName" placeholder="Type name here" style="width:100%;margin-bottom:8px">';
+      h+='<label>Mobile</label><input id="quickOpsMobile" placeholder="10-digit mobile" style="width:100%;margin-bottom:8px">';
+      h+='<label>Email</label><input id="quickOpsEmail" placeholder="name@agilegroup.co.in" style="width:100%;margin-bottom:8px">';
+      h+='<button type="button" class="btn btn-sm gold" onclick="quickAddOpsThenAssign()">Save name and assign</button></div>';
+    }
+    if(deptPick.length){
+      h+='<label>Department staff (same for all branches)</label><select class="m-inp" id="asDept" style="width:100%;margin-bottom:10px"><option value="">— Select department staff —</option>';
+      deptPick.forEach(function(o){h+='<option value="'+esc(o.id)+'"'+(o.id===c.deptStaffId?' selected':'')+'>'+esc(o.department||'Dept')+' — '+esc(o.name)+(o.email?' ('+esc(o.email)+')':'')+'</option>';});
+      h+='</select>';
+    }else{
+      h+='<input type="hidden" id="asDept" value="">';
+      h+='<div style="margin:10px 0;padding:12px;border:1px solid #1d4ed8;border-radius:10px;background:#0b1220">';
+      h+='<b style="color:#93c5fd">No Department names yet — type one below (optional)</b>';
+      h+='<label>Department</label><input id="quickDeptDept" value="Operations" style="width:100%;margin-bottom:8px">';
+      h+='<label>Name</label><input id="quickDeptName" placeholder="Department staff name" style="width:100%;margin-bottom:8px">';
+      h+='<label>Email</label><input id="quickDeptEmail" placeholder="name@agilegroup.co.in" style="width:100%;margin-bottom:8px">';
+      h+='<label>Mobile</label><input id="quickDeptMobile" placeholder="10-digit mobile" style="width:100%;margin-bottom:8px">';
+      h+='<button type="button" class="btn btn-sm" onclick="quickAddDeptThenAssign()">Save Dept name and assign</button></div>';
+    }
+    h+='<label>Or department email</label><input id="asDeptEmail" value="'+esc(c.deptStaffEmail||'')+'" placeholder="finance@agilegroup.co.in" style="width:100%">';
+    if(opsPick.length||deptPick.length){
+      h+='<button type="button" class="btn btn-sm gold" style="margin-top:12px" onclick="assignCase()">Save assignment</button>';
+    }
+    h+='</div>';
   }
   if(c.status!=='solved'){
-    h+='<div class="panel"><h3>Completion report — Operations</h3><textarea id="opsRes" rows="2" placeholder="What was done?">'+esc(c.opsResolution||'')+'</textarea><label>Assurance to avoid repeat</label><textarea id="assurance" rows="2" placeholder="We will make all necessary corrections…">'+esc(c.assuranceNote||'')+'</textarea><button class="btn btn-sm" onclick="submitOps()">Submit ops report</button></div>';
-    h+='<div class="panel"><h3>Completion report — Department</h3><textarea id="deptRes" rows="2" placeholder="Department action taken">'+esc(c.deptResolution||'')+'</textarea><button class="btn btn-sm" onclick="submitDept()">Submit dept report</button></div>';
-    h+='<div class="panel"><h3>Send completion letter to guard</h3><p style="color:#b8a0a0;font-size:13px">Includes resolution message <b>and feedback form link</b> (1–5 stars). Subject: Update on your issue : Resolved '+esc(c.code)+'</p><button class="btn btn-sm" onclick="sendComplete(\\'whatsapp\\')">WhatsApp</button><button class="btn btn-sm" onclick="sendComplete(\\'email\\')">Email</button></div>';
+    h+='<div class="panel"><h3>Completion report — Operations</h3><textarea id="opsRes" rows="2" placeholder="What was done?">'+esc(c.opsResolution||'')+'</textarea><label>Assurance to avoid repeat</label><textarea id="assurance" rows="2" placeholder="We will make all necessary corrections…">'+esc(c.assuranceNote||'')+'</textarea><button type="button" class="btn btn-sm" onclick="submitOps()">Submit ops report</button></div>';
+    h+='<div class="panel"><h3>Completion report — Department</h3><textarea id="deptRes" rows="2" placeholder="Department action taken">'+esc(c.deptResolution||'')+'</textarea><button type="button" class="btn btn-sm" onclick="submitDept()">Submit dept report</button></div>';
+    h+='<div class="panel"><h3>Send completion letter to guard</h3><p style="color:#b8a0a0;font-size:13px">Includes resolution message <b>and feedback form link</b> (1–5 stars). Subject: Update on your issue : Resolved '+esc(c.code)+'</p><button type="button" class="btn btn-sm btn-ol" onclick="previewComplete()">Preview</button><button type="button" class="btn btn-sm" onclick="sendComplete(\\'whatsapp\\')">WhatsApp</button><button type="button" class="btn btn-sm" onclick="sendComplete(\\'email\\')">Email</button></div>';
   }
   if(c.opsResolution) h+='<div class="panel"><h3>Ops report</h3><p>'+esc(c.opsResolution)+'</p></div>';
   if(c.deptResolution) h+='<div class="panel"><h3>Dept report</h3><p>'+esc(c.deptResolution)+'</p></div>';
   h+='<div class="panel"><h3>Timeline</h3><div class="timeline">';
   (d.events||[]).forEach(function(ev){h+='<div class="tl"><b>'+esc(ev.level)+' — '+esc(ev.action)+'</b><p>'+esc(ev.detail)+'</p><small>'+esc(ev.createdAt)+'</small></div>';});
   h+='</div></div>';
-  if(canDeleteComplaint()) h+='<div class="panel" style="margin-top:12px;border-color:#7f1d1d"><h3 style="color:#f87171">Remove test / fake entry</h3><p style="color:#b8a0a0;font-size:13px">Permanently deletes this complaint from Received list. Use only for test data.</p>'+deleteComplaintBtn(c,false)+'</div>';
+  if(canDeleteComplaint()) h+='<div class="panel" style="margin-top:12px;border-color:#7f1d1d"><h3 style="color:#f87171">Remove this complaint</h3><p style="color:#b8a0a0;font-size:13px">Permanently deletes this complaint. Use only for a genuine mistake — test entries are already removed automatically.</p>'+deleteComplaintBtn(c,false)+'</div>';
   el('content').innerHTML=h;
 }
-function assignCase(){api({action:'assignComplaint',complaintId:S.caseDetail.complaint.id,opsStaffId:el('asOps').value,deptStaffId:el('asDept').value,deptStaffEmail:el('asDeptEmail').value}).then(function(d){if(d.ok)openCase(S.selected);else alert(d.error);});}
-function submitOps(){api({action:'opsResolve',complaintId:S.caseDetail.complaint.id,opsResolution:el('opsRes').value,assuranceNote:el('assurance').value}).then(function(d){if(d.ok)openCase(S.selected);else alert(d.error);});}
-function submitDept(){api({action:'deptResolve',complaintId:S.caseDetail.complaint.id,deptResolution:el('deptRes').value,assuranceNote:el('assurance')?el('assurance').value:''}).then(function(d){if(d.ok)openCase(S.selected);else alert(d.error);});}
-function sendComplete(ch){var assurance=el('assurance')?el('assurance').value:'';api({action:'sendCompletion',complaintId:S.caseDetail.complaint.id,channel:ch,assuranceNote:assurance}).then(function(d){if(d.ok){alert('Completion letter sent via '+ch);load(true);}else alert(d.error||'Could not send');});}
+function assignCase(){
+  if(!S.caseDetail||!S.caseDetail.complaint){alert('Open the complaint first.');return;}
+  var opsId=el('asOps')?el('asOps').value:'';
+  var deptId=el('asDept')?el('asDept').value:'';
+  var deptEmail=el('asDeptEmail')?String(el('asDeptEmail').value||'').trim():'';
+  if(!opsId&&!deptId&&deptEmail.indexOf('@')<0){
+    alert('Select HOD / Operation Manager or Department staff, then Save assignment.');
+    return;
+  }
+  api({action:'assignComplaint',complaintId:S.caseDetail.complaint.id,opsStaffId:opsId,deptStaffId:deptId,deptStaffEmail:deptEmail}).then(function(d){
+    if(d.ok){alert('Assignment saved.');openCase(S.selected);}
+    else alert(d.error||'Could not save assignment');
+  }).catch(function(e){alert((e&&e.message)||'Could not save assignment');});
+}
+function quickAddOpsThenAssign(){
+  var name=(el('quickOpsName')&&el('quickOpsName').value||'').trim();
+  if(!name){alert('Enter Operations staff name.');return;}
+  var branchId=S.branchId||(S.caseDetail&&S.caseDetail.complaint&&S.caseDetail.complaint.branchId)||'';
+  var complaintId=S.caseDetail.complaint.id;
+  var deptEmail=(el('asDeptEmail')&&el('asDeptEmail').value)||'';
+  var deptId=(el('asDept')&&el('asDept').value)||'';
+  api({action:'saveOps',id:'',branchId:branchId,name:name,mobile:(el('quickOpsMobile')&&el('quickOpsMobile').value)||'',email:(el('quickOpsEmail')&&el('quickOpsEmail').value)||'',whatsApp:(el('quickOpsMobile')&&el('quickOpsMobile').value)||'',active:true}).then(function(d){
+    if(!d.ok||!d.staff||!d.staff.id){alert(d.error||'Could not save Ops staff');return;}
+    return api({action:'assignComplaint',complaintId:complaintId,opsStaffId:d.staff.id,deptStaffId:deptId,deptStaffEmail:deptEmail}).then(function(a){
+      if(!a.ok){alert(a.error||'Name saved, but assignment failed. Open the case again and pick the name.');openCase(S.selected);return;}
+      alert('Assigned to '+name+'.');
+      openCase(S.selected);
+    });
+  });
+}
+function quickAddDeptThenAssign(){
+  var name=(el('quickDeptName')&&el('quickDeptName').value||'').trim();
+  var dept=(el('quickDeptDept')&&el('quickDeptDept').value||'').trim()||'Operations';
+  if(!name){alert('Enter Department staff name.');return;}
+  var branchId=S.branchId||(S.caseDetail&&S.caseDetail.complaint&&S.caseDetail.complaint.branchId)||'';
+  var complaintId=S.caseDetail.complaint.id;
+  var opsId=(el('asOps')&&el('asOps').value)||'';
+  var deptEmail=(el('quickDeptEmail')&&el('quickDeptEmail').value)||(el('asDeptEmail')&&el('asDeptEmail').value)||'';
+  api({action:'saveDept',id:'',branchId:branchId,department:dept,name:name,email:(el('quickDeptEmail')&&el('quickDeptEmail').value)||'',mobile:(el('quickDeptMobile')&&el('quickDeptMobile').value)||'',active:true}).then(function(d){
+    if(!d.ok||!d.staff||!d.staff.id){alert(d.error||'Could not save Department staff');return;}
+    return api({action:'assignComplaint',complaintId:complaintId,opsStaffId:opsId,deptStaffId:d.staff.id,deptStaffEmail:deptEmail}).then(function(a){
+      if(!a.ok){alert(a.error||'Name saved, but assignment failed. Open the case again.');openCase(S.selected);return;}
+      alert('Department assigned to '+name+'.');
+      openCase(S.selected);
+    });
+  });
+}
+function submitOps(){
+  if(!S.caseDetail||!S.caseDetail.complaint){alert('Open the complaint first.');return;}
+  var note=el('opsRes')?String(el('opsRes').value||'').trim():'';
+  if(!note){alert('Write what Operations did, then tap Submit ops report.');if(el('opsRes'))el('opsRes').focus();return;}
+  var assurance=el('assurance')?el('assurance').value:'';
+  api({action:'opsResolve',complaintId:S.caseDetail.complaint.id,opsResolution:note,assuranceNote:assurance}).then(function(d){
+    if(d.ok){alert('Ops report saved.');openCase(S.selected);}
+    else alert(d.error||'Could not save ops report');
+  }).catch(function(e){alert((e&&e.message)||'Could not save ops report');});
+}
+function submitDept(){
+  if(!S.caseDetail||!S.caseDetail.complaint){alert('Open the complaint first.');return;}
+  var note=el('deptRes')?String(el('deptRes').value||'').trim():'';
+  if(!note){alert('Write the Department action, then tap Submit dept report.');if(el('deptRes'))el('deptRes').focus();return;}
+  var assurance=el('assurance')?el('assurance').value:'';
+  api({action:'deptResolve',complaintId:S.caseDetail.complaint.id,deptResolution:note,assuranceNote:assurance}).then(function(d){
+    if(d.ok){alert('Dept report saved.');openCase(S.selected);}
+    else alert(d.error||'Could not save dept report');
+  }).catch(function(e){alert((e&&e.message)||'Could not save dept report');});
+}
+function previewComplete(){
+  if(!S.caseDetail||!S.caseDetail.complaint){alert('Open the complaint first.');return;}
+  var assurance=el('assurance')?el('assurance').value:'';
+  api({action:'previewCompletion',complaintId:S.caseDetail.complaint.id,assuranceNote:assurance}).then(function(d){
+    if(!d.ok||!d.html){alert(d.error||'Could not open preview');return;}
+    var w=window.open('','_blank');
+    if(!w){alert('Please allow the new window to see the letter.');return;}
+    w.document.open();
+    w.document.write(d.html);
+    w.document.close();
+  }).catch(function(e){alert((e&&e.message)||'Could not open preview');});
+}
+function sendComplete(ch){
+  if(!S.caseDetail||!S.caseDetail.complaint){alert('Open the complaint first.');return;}
+  var assurance=el('assurance')?el('assurance').value:'';
+  api({action:'sendCompletion',complaintId:S.caseDetail.complaint.id,channel:ch,assuranceNote:assurance}).then(function(d){
+    if(d.ok){alert('Completion letter sent via '+ch);load(true);}
+    else alert(d.error||'Could not send');
+  }).catch(function(e){alert((e&&e.message)||'Could not send');});
+}
 function quickComplete(id){
   S.selected=id;
   openCase(id);

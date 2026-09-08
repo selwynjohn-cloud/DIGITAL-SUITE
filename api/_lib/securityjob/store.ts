@@ -8,9 +8,16 @@ export type SjSettings = {
   guardsPlaced: string
   locations: string
   states: string
+  helpline: string
   whatsapp: string
   email1: string
   email2: string
+  /** Show Administrative & Operations hiring banner on public site */
+  adminOpsShow: 'Yes' | 'No'
+  adminOpsEyebrow: string
+  adminOpsTitle: string
+  adminOpsText: string
+  adminOpsButton: string
 }
 
 export type SjJob = {
@@ -30,6 +37,8 @@ export type SjApplicant = {
   regCode: string
   name: string
   phone: string
+  email: string
+  dob: string
   location: string
   role: string
   experience: string
@@ -44,34 +53,132 @@ const JOBS_KEY = 'sj:jobs'
 const APPLICANTS_KEY = 'sj:applicants'
 const COUNTER_KEY = 'sj:counter'
 const IMG_PREFIX = 'sj:img:'
+const ANTHEMS_KEY = 'sj:anthems'
+const ACADEMY_VIDEOS_KEY = 'sj:academy-videos'
+
+export type SjAnthem = {
+  id: string
+  language: string
+  title: string
+  url: string
+  active: boolean
+}
+
+export type SjAcademyVideo = {
+  id: string
+  title: string
+  url: string
+  active: boolean
+}
 
 export const DEFAULT_SETTINGS: SjSettings = {
   guardsPlaced: '24,000+',
   locations: '1,410+',
   states: '15+',
+  helpline: '+91 8500915599',
   whatsapp: '9248707070',
   email1: 'Recruitment@securityjob.co.in',
   email2: 'recruitment@agilegroup.co.in',
+  adminOpsShow: 'Yes',
+  adminOpsEyebrow: 'Office & Operations — Pan India',
+  adminOpsTitle: 'We Are Hiring: Operations & Administrative Staff',
+  adminOpsText:
+    'Hiring for HR, Admin, Accounts, Operations & Coordination roles — register directly, no fees ever.',
+  adminOpsButton: "Register Now — It's Free",
 }
 
-export const BENEFIT_OPTIONS = [
-  'ESI & PF as applicable law',
-  'Free Accommodation',
-  'Monthly Bonus',
-  'Compulsory Weekly Off',
-  'National Holidays',
-  'Meritorious Service Appreciation',
-  'Guard of Month',
-  'Monthly Referral Incentives',
-  'Accommodation Assistance',
-  'POSH compliance with ICC support',
-  'Quarterly Performance Incentives (every three months)',
-  'Defined Career Growth on performance',
-  'Government Scheme benefits',
-  'Peaceful work environment',
-  'Caring Client',
-  'Timely wages',
+export const BENEFIT_GROUPS: { heading: string; items: string[] }[] = [
+  {
+    heading: 'Statutory Compliance',
+    items: ['Wages as per MW Act', 'ESIC & EPF As Per Law'],
+  },
+  {
+    heading: 'Financial Incentives & Bonuses',
+    items: [
+      'Monthly Bonus',
+      'Annual Bonus',
+      'Gratuity As per the Law',
+      'Attendance Bonus',
+      'Night Duty Allowance',
+      'Operational Support Incentives',
+      'Performance Incentives',
+    ],
+  },
+  {
+    heading: 'Food & Meals',
+    items: ['Free Duty Food', 'Subsidized Food'],
+  },
+  {
+    heading: 'Accommodation & Logistics',
+    items: ['Accommodation Assistance', 'Free Accommodation', 'Free Transport (Route Basis)'],
+  },
+  {
+    heading: 'Workplace Culture & Environment',
+    items: ['Safe Working Place', 'Peaceful Working Environment', 'Caring Client'],
+  },
+  {
+    heading: 'Leave & Time Off',
+    items: ['Compulsory Weekly Off', 'National Holidays'],
+  },
+  {
+    heading: 'Recognition & Career Growth',
+    items: ['Guard of the Month Award', 'Meritorious Duty Appreciation', 'Defined Career Growth'],
+  },
+  {
+    heading: 'Safety & Compliance',
+    items: ['Timely Wages', 'POSH Compliance with ICC Support'],
+  },
 ]
+
+/** Flat list for toggles / validation (order follows groups). */
+export const BENEFIT_OPTIONS = BENEFIT_GROUPS.flatMap((g) => g.items)
+
+/** Map older saved benefit labels onto the new catalogue. */
+const BENEFIT_ALIASES: Record<string, string> = {
+  'Free Duty Food': 'Free Duty Food',
+  'Subsidized Food': 'Subsidized Food',
+  'Wages as per MW Act': 'Wages as per MW Act',
+  'ESI & PF as applicable law': 'ESIC & EPF As Per Law',
+  'ESIC & EPF As Per Law': 'ESIC & EPF As Per Law',
+  'Meritorious Service Appreciation': 'Meritorious Duty Appreciation',
+  'Guard of Month': 'Guard of the Month Award',
+  'Guard of the Month Award': 'Guard of the Month Award',
+  'POSH compliance with ICC support': 'POSH Compliance with ICC Support',
+  'POSH Compliance with ICC Support': 'POSH Compliance with ICC Support',
+  'Quarterly Performance Incentives (every three months)': 'Performance Incentives',
+  'Defined Career Growth on performance': 'Defined Career Growth',
+  'Defined Career Growth': 'Defined Career Growth',
+  'Peaceful work environment': 'Peaceful Working Environment',
+  'Peaceful Working Environment': 'Peaceful Working Environment',
+  'Timely wages': 'Timely Wages',
+  'Timely Wages': 'Timely Wages',
+  'Monthly Referral Incentives': 'Operational Support Incentives',
+  'Safe Working Place': 'Safe Working Place',
+  'Caring Client': 'Caring Client',
+  'Free Accommodation': 'Free Accommodation',
+  'Accommodation Assistance': 'Accommodation Assistance',
+  'Monthly Bonus': 'Monthly Bonus',
+  'Annual Bonus': 'Annual Bonus',
+  'Gratuity As per the Law': 'Gratuity As per the Law',
+  'Attendance Bonus': 'Attendance Bonus',
+  'Night Duty Allowance': 'Night Duty Allowance',
+  'Operational Support Incentives': 'Operational Support Incentives',
+  'Performance Incentives': 'Performance Incentives',
+  'Free Transport (Route Basis)': 'Free Transport (Route Basis)',
+  'Compulsory Weekly Off': 'Compulsory Weekly Off',
+  'National Holidays': 'National Holidays',
+  'Meritorious Duty Appreciation': 'Meritorious Duty Appreciation',
+}
+
+export function normalizeBenefitLabels(list: string[] | undefined): string[] {
+  const allowed = new Set(BENEFIT_OPTIONS)
+  const out: string[] = []
+  for (const raw of list || []) {
+    const mapped = BENEFIT_ALIASES[String(raw).trim()] || String(raw).trim()
+    if (allowed.has(mapped) && !out.includes(mapped)) out.push(mapped)
+  }
+  return out
+}
 
 export const DEFAULT_JOBS: SjJob[] = [
   {
@@ -84,18 +191,17 @@ export const DEFAULT_JOBS: SjJob[] = [
     postedDate: '26/06/2026',
     closingDate: '18/07/2026',
     benefits: [
-      'ESI & PF as applicable law',
-      'Guard of Month',
-      'Quarterly Performance Incentives (every three months)',
-      'Government Scheme benefits',
-      'Peaceful work environment',
+      'ESIC & EPF As Per Law',
+      'Guard of the Month Award',
+      'Performance Incentives',
+      'Peaceful Working Environment',
       'Caring Client',
-      'Timely wages',
-      'Defined Career Growth on performance',
-      'POSH compliance with ICC support',
+      'Timely Wages',
+      'Defined Career Growth',
+      'POSH Compliance with ICC Support',
       'Accommodation Assistance',
-      'Monthly Referral Incentives',
-      'Meritorious Service Appreciation',
+      'Operational Support Incentives',
+      'Meritorious Duty Appreciation',
     ],
   },
   {
@@ -108,14 +214,14 @@ export const DEFAULT_JOBS: SjJob[] = [
     postedDate: '28/06/2026',
     closingDate: '20/07/2026',
     benefits: [
-      'ESI & PF as applicable law',
-      'Defined Career Growth on performance',
-      'Quarterly Performance Incentives (every three months)',
-      'Monthly Referral Incentives',
+      'ESIC & EPF As Per Law',
+      'Defined Career Growth',
+      'Performance Incentives',
+      'Operational Support Incentives',
       'National Holidays',
       'Compulsory Weekly Off',
-      'Peaceful work environment',
-      'Timely wages',
+      'Peaceful Working Environment',
+      'Timely Wages',
     ],
   },
   {
@@ -128,13 +234,11 @@ export const DEFAULT_JOBS: SjJob[] = [
     postedDate: '01/07/2026',
     closingDate: '22/07/2026',
     benefits: [
-      'ESI & PF as applicable law',
-      'Safe & supportive work environment',
-      'Day shifts available',
-      'POSH compliance with ICC support',
-      'Meritorious Service Appreciation',
-      'Government Scheme benefits',
-      'Timely wages',
+      'ESIC & EPF As Per Law',
+      'Safe Working Place',
+      'POSH Compliance with ICC Support',
+      'Meritorious Duty Appreciation',
+      'Timely Wages',
       'Accommodation Assistance',
     ],
   },
@@ -148,13 +252,11 @@ export const DEFAULT_JOBS: SjJob[] = [
     postedDate: '28/06/2026',
     closingDate: '15/07/2026',
     benefits: [
-      'Team leadership role',
-      'Quarterly Performance Incentives (every three months)',
-      'Defined Career Growth on performance',
-      'ESI & PF as applicable law',
-      'Monthly Referral Incentives',
-      'Training provided',
-      'Timely wages',
+      'Performance Incentives',
+      'Defined Career Growth',
+      'ESIC & EPF As Per Law',
+      'Operational Support Incentives',
+      'Timely Wages',
     ],
   },
   {
@@ -167,13 +269,11 @@ export const DEFAULT_JOBS: SjJob[] = [
     postedDate: '30/06/2026',
     closingDate: '25/07/2026',
     benefits: [
-      'Premium wage scale',
-      'Specialised training',
-      'Client-facing role',
-      'ESI & PF as applicable law',
-      'Meritorious Service Appreciation',
-      'Defined Career Growth on performance',
-      'Timely wages',
+      'ESIC & EPF As Per Law',
+      'Meritorious Duty Appreciation',
+      'Defined Career Growth',
+      'Timely Wages',
+      'Performance Incentives',
     ],
   },
   {
@@ -186,12 +286,9 @@ export const DEFAULT_JOBS: SjJob[] = [
     postedDate: '02/07/2026',
     closingDate: '20/07/2026',
     benefits: [
-      'Technical role',
-      'Certification support',
-      'ESI & PF as applicable law',
-      'Quarterly Performance Incentives (every three months)',
-      'Government Scheme benefits',
-      'Timely wages',
+      'ESIC & EPF As Per Law',
+      'Performance Incentives',
+      'Timely Wages',
       'Accommodation Assistance',
     ],
   },
@@ -216,6 +313,8 @@ export const ROLE_OPTIONS = [
   'Accounts Executive',
   'Sales Co-ordinator',
   'Area Sales Manager (ASM)',
+  'Area Manager',
+  'Field Officer',
   'Operations Manager (OM)',
   'Regional Manager (RM)',
   'General Manager (GM)',
@@ -329,7 +428,14 @@ export async function getJobs(): Promise<SjJob[]> {
   if (d?.result && typeof d.result === 'string') {
     try {
       const arr = JSON.parse(d.result)
-      if (Array.isArray(arr) && arr.length > 0) return arr as SjJob[]
+      if (Array.isArray(arr) && arr.length > 0) {
+        return (arr as SjJob[])
+          .filter((j) => !/^Operations Team\s*[—-]\s*(Mumbai|Hyderabad)$/i.test(String(j.title || '')))
+          .map((j) => ({
+            ...j,
+            benefits: normalizeBenefitLabels(j.benefits),
+          }))
+      }
     } catch {
       /* ignore */
     }
@@ -338,7 +444,11 @@ export async function getJobs(): Promise<SjJob[]> {
 }
 
 export async function saveJobs(jobs: SjJob[]): Promise<boolean> {
-  const r = await redis(['SET', JOBS_KEY, JSON.stringify(jobs)])
+  const cleaned = (jobs || []).map((j) => ({
+    ...j,
+    benefits: normalizeBenefitLabels(j.benefits),
+  }))
+  const r = await redis(['SET', JOBS_KEY, JSON.stringify(cleaned)])
   return r?.result === 'OK'
 }
 
@@ -381,14 +491,28 @@ export function parseRegCodeDate(regCode: string): Date | null {
 }
 
 export function normalizeApplicant(a: SjApplicant): SjApplicant {
-  const createdAt = String(a.createdAt ?? '').trim()
-  if (createdAt) {
-    const parsed = Date.parse(createdAt)
-    if (!Number.isNaN(parsed)) return { ...a, createdAt: sjRegisteredStamp(new Date(parsed)) }
-    return { ...a, createdAt }
+  const base: SjApplicant = {
+    id: String(a.id || ''),
+    regCode: String(a.regCode || ''),
+    name: String(a.name || ''),
+    phone: String(a.phone || ''),
+    email: String(a.email || '').trim().toLowerCase(),
+    dob: String(a.dob || '').trim(),
+    location: String(a.location || ''),
+    role: String(a.role || ''),
+    experience: String(a.experience || ''),
+    education: String(a.education || ''),
+    language: String(a.language || ''),
+    photoId: String(a.photoId || ''),
+    createdAt: String(a.createdAt ?? '').trim(),
   }
-  const fromCode = parseRegCodeDate(a.regCode)
-  return { ...a, createdAt: fromCode ? sjRegisteredStamp(fromCode) : '—' }
+  if (base.createdAt) {
+    const parsed = Date.parse(base.createdAt)
+    if (!Number.isNaN(parsed)) return { ...base, createdAt: sjRegisteredStamp(new Date(parsed)) }
+    return base
+  }
+  const fromCode = parseRegCodeDate(base.regCode)
+  return { ...base, createdAt: fromCode ? sjRegisteredStamp(fromCode) : '—' }
 }
 
 /** Build a registration code: ST/CODE/00000/DDMMYYYY-HHMM (from the city). */
@@ -445,4 +569,118 @@ export async function getImage(id: string): Promise<string | null> {
   if (!safe) return null
   const d = await redis(['GET', `${IMG_PREFIX}${safe}`])
   return d?.result && typeof d.result === 'string' ? d.result : null
+}
+
+export const DEFAULT_ANTHEMS: SjAnthem[] = [
+  {
+    id: 'anthem-en',
+    language: 'English',
+    title: 'The Shield of Honor',
+    url: '/securityjob/song-english.mp3',
+    active: true,
+  },
+  {
+    id: 'anthem-te',
+    language: 'Telugu',
+    title: 'Gauravam – Rakshana',
+    url: '/securityjob/song-telugu.mp3',
+    active: true,
+  },
+  {
+    id: 'anthem-hi',
+    language: 'Hindi',
+    title: 'Shaurya aur Suraksha',
+    url: '/securityjob/song-hindi.mp3',
+    active: true,
+  },
+  {
+    id: 'anthem-ta',
+    language: 'Tamil',
+    title: 'Gauravam – Pathukaappu',
+    url: '/securityjob/song-tamil.mp3',
+    active: true,
+  },
+  {
+    id: 'anthem-ml',
+    language: 'Malayalam',
+    title: 'Agile Recruitment Anthem',
+    url: '/securityjob/song-malayalam.mp3',
+    active: true,
+  },
+]
+
+export const DEFAULT_ACADEMY_VIDEOS: SjAcademyVideo[] = []
+
+function sanitizeAnthem(raw: Partial<SjAnthem>): SjAnthem | null {
+  const language = String(raw.language ?? '').trim().slice(0, 80)
+  const title = String(raw.title ?? '').trim().slice(0, 160)
+  const url = String(raw.url ?? '').trim().slice(0, 600)
+  if (!language || !url) return null
+  return {
+    id: String(raw.id || `anthem-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`).slice(0, 40),
+    language,
+    title: title || language,
+    url,
+    active: raw.active !== false,
+  }
+}
+
+function sanitizeAcademyVideo(raw: Partial<SjAcademyVideo>): SjAcademyVideo | null {
+  const title = String(raw.title ?? '').trim().slice(0, 160)
+  const url = String(raw.url ?? '').trim().slice(0, 600)
+  if (!title || !url) return null
+  return {
+    id: String(raw.id || `vid-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`).slice(0, 40),
+    title,
+    url,
+    active: raw.active !== false,
+  }
+}
+
+export async function getAnthems(): Promise<SjAnthem[]> {
+  const d = await redis(['GET', ANTHEMS_KEY])
+  if (d?.result && typeof d.result === 'string') {
+    try {
+      const arr = JSON.parse(d.result)
+      if (Array.isArray(arr) && arr.length > 0) {
+        return arr.map((x) => sanitizeAnthem(x)).filter((x): x is SjAnthem => Boolean(x))
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return DEFAULT_ANTHEMS
+}
+
+export async function saveAnthems(list: SjAnthem[]): Promise<boolean> {
+  const cleaned = (list || [])
+    .map((x) => sanitizeAnthem(x))
+    .filter((x): x is SjAnthem => Boolean(x))
+    .slice(0, 40)
+  const r = await redis(['SET', ANTHEMS_KEY, JSON.stringify(cleaned)])
+  return r?.result === 'OK'
+}
+
+export async function getAcademyVideos(): Promise<SjAcademyVideo[]> {
+  const d = await redis(['GET', ACADEMY_VIDEOS_KEY])
+  if (d?.result && typeof d.result === 'string') {
+    try {
+      const arr = JSON.parse(d.result)
+      if (Array.isArray(arr)) {
+        return arr.map((x) => sanitizeAcademyVideo(x)).filter((x): x is SjAcademyVideo => Boolean(x))
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return DEFAULT_ACADEMY_VIDEOS
+}
+
+export async function saveAcademyVideos(list: SjAcademyVideo[]): Promise<boolean> {
+  const cleaned = (list || [])
+    .map((x) => sanitizeAcademyVideo(x))
+    .filter((x): x is SjAcademyVideo => Boolean(x))
+    .slice(0, 40)
+  const r = await redis(['SET', ACADEMY_VIDEOS_KEY, JSON.stringify(cleaned)])
+  return r?.result === 'OK'
 }

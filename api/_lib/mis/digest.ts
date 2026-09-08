@@ -6,12 +6,19 @@ import { Resend } from 'resend'
 import {
   docPresent,
   getBranches,
+  getMisReportBranches,
   getClients,
   getComplaints,
   getGuardDocs,
   getReportsForDate,
   getUsers,
   getMisAckSent,
+  getLatestOstBaseline,
+  getCollections,
+  getComplaintsMany,
+  getDutyIncidents,
+  getGuardDocsMany,
+  getVisits,
   guardRecordEligible,
   markMisAckSent,
   setReminderTime,
@@ -19,7 +26,17 @@ import {
   type MisUser,
 } from './store.js'
 import { complaintMatchesBranch } from '../guards/store.js'
-import { deployPct, reportDeployTotals } from './deploy-math.js'
+import {
+  buildOtSummary,
+  buildVacantSummary,
+  deployPct,
+  filterActiveReportRows,
+  reportDeployTotals,
+  rowDeployTotals,
+  rowOtTotal,
+} from './deploy-math.js'
+import { guardComplianceCounts, branchSanctionedPosts } from './guard-compliance-math.js'
+import { buildDashboardExtras } from './dashboard-stats.js'
 import { withoutNoMailRecipients, isNoMailRecipientEmail } from '../auth.js'
 import {
   misAckDateDisplay,
@@ -30,12 +47,31 @@ import {
   misReminderMailWrap,
 } from './brand.js'
 import { pinMailFrom, pinMailReplyTo, sendSuiteEmail } from '../suite-mail.js'
-import { ackStatsTableHtml, buildBranchAckStats, buildConsolidatedAckStats, type BranchAckStats } from './ack-stats.js'
+import {
+  ackStatsTableHtml,
+  buildAllBranchAckStats,
+  buildBranchAckStats,
+  buildConsolidatedAckStats,
+  type BranchAckStats,
+} from './ack-stats.js'
+import { collectionDso } from './collection-import.js'
+import { weekCollectedSum, ostMonthCollectionPct, ostFooterRecoveryPct } from './summary-autofill.js'
+import { emptyVacancyRanks, vacancyRanksFromShortage, type VacancyRankCounts } from './manpower-shortage.js'
 import { misTodayIst, isOnTimeMisSubmission, isExcusedLateMisSubmission } from './dates.js'
-import { buildBranchReportMap } from './branch-match.js'
-import { misBranchDirectorCc, misBranchCcLokesh, LOKESH_CC_EMAIL } from './branch-mail-cc.js'
+import { buildBranchReportMap, isSubmitted } from './branch-match.js'
+import {
+  misBranchDirectorCc,
+  misBranchCcLokesh,
+  LOKESH_CC_EMAIL,
+  SRIDHAR_M_CC_EMAIL,
+  MIS_DIRECTOR_CC_EMAIL,
+  misDirectorCcEmail,
+  misManagementCcEmails,
+  misSelwynGmailCopy,
+} from './branch-mail-cc.js'
 import { isSupportMisUser } from '../user-team.js'
 import { misBranchGroupKey } from './branch-dedupe.js'
+import { ssaFixedHodEmailsForGroup } from './ssa-directory.js'
 import {
   clientPerfMwLabel,
   clientPerfPeriodLabel,
@@ -170,7 +206,97 @@ function misAckDirectorEmail(): string {
 }
 
 function misAckGmailCopy(): string {
-  return (process.env.ADMIN_NOTIFY_EMAIL?.trim() || 'selwyn.john@gmail.com').toLowerCase()
+  return misSelwynGmailCopy()
+}
+
+function directorPersonalCopyTargets(): string[] {
+  const gmail = misAckGmailCopy()
+  const director = misAckDirectorEmail()
+  return withoutNoMailRecipients(
+    Array.from(new Set([gmail, director].filter((e) => e.includes('@')))),
+  )
+}
+
+/** Personal copies — use the verified agilegroup-digital.co.in sender; Gmail fallback via Resend test address. */
+function directorPersonalFrom(): string {
+  return misAckFromAddress()
+}
+
+const RESEND_GMAIL_FALLBACK_FROM = 'Agile MIS <onboarding@resend.dev>'
+
+async function sendDirectorPersonalCopies(
+  resend: Resend,
+  opts: { subject: string; html: string; text: string; replyTo: string; gmailOnly?: boolean },
+): Promise<Array<{ to: string; from: string; id?: string; error?: string }>> {
+  const from = directorPersonalFrom()
+  const out: Array<{ to: string; from: string; id?: string; error?: string }> = []
+  const targets = opts.gmailOnly ? [misAckGmailCopy()].filter((e) => e.includes('@')) : directorPersonalCopyTargets()
+  for (const to of targets) {
+    let usedFrom = from
+    let result: Awaited<ReturnType<Resend['emails']['send']>>
+    if (/@gmail\.com$/i.test(to)) {
+      usedFrom = RESEND_GMAIL_FALLBACK_FROM
+      result = await resend.emails.send({
+        from: usedFrom,
+        to,
+        replyTo: opts.replyTo,
+        subject: opts.subject,
+        text: opts.text,
+        html: opts.html,
+      })
+      if (result.error) {
+        usedFrom = from
+        result = await resend.emails.send({
+          from: usedFrom,
+          to,
+          replyTo: opts.replyTo,
+          subject: opts.subject,
+          html: opts.html,
+          text: opts.text,
+        })
+      }
+    } else {
+      result = await resend.emails.send({
+        from: usedFrom,
+        to,
+        replyTo: opts.replyTo,
+        subject: opts.subject,
+        html: opts.html,
+        text: opts.text,
+      })
+    }
+    out.push({ to, from: usedFrom, id: result.data?.id, error: result.error?.message })
+  }
+  return out
+}
+
+/** Manual test — plain email to Gmail + director@agilegroup.co.in using work-domain sender. */
+export async function sendDirectorGmailTest() {
+  const apiKey = process.env.RESEND_API_KEY?.trim()
+  if (!apiKey) return { ok: false, error: 'Email not configured' }
+  const resend = new Resend(apiKey)
+  const from = directorPersonalFrom()
+  const now = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
+  const subject = `Agile MIS email test — ${misTodayIst()}`
+  const text = `Sir, this is a test email from Agile MIS at ${now} IST.\n\nIf you receive this, the daily 5 PM consolidated report will reach this inbox.\n\nDashboard: https://www.agilegroup-digital.co.in/mis-dashboard`
+  const html = `<div style="font-family:Arial,sans-serif;max-width:520px;padding:20px">
+    <p>Sir, this is a <b>test email</b> from Agile MIS at ${esc(now)} IST.</p>
+    <p>If you receive this, the daily <b>5 PM consolidated report</b> will reach this inbox.</p>
+    <p><a href="https://www.agilegroup-digital.co.in/mis-dashboard">Open MIS Dashboard</a></p>
+    <p style="font-size:12px;color:#64748b">Sent from ${esc(from)}</p>
+  </div>`
+  const copies = await sendDirectorPersonalCopies(resend, {
+    subject,
+    html,
+    text,
+    replyTo: misAckDirectorEmail(),
+  })
+  return {
+    ok: copies.some((c) => c.id),
+    from,
+    copies,
+    error: copies.every((c) => c.error) ? copies.map((c) => c.error).join('; ') : undefined,
+  }
 }
 
 async function resendOne(
@@ -219,20 +345,23 @@ export async function getHodEmailsForBranch(
   const branchList = branches ?? (await getBranches())
   const branch = branchList.find((b) => b.id === branchId)
   const branchKey = branch ? misBranchGroupKey(branch.name) : ''
+  const fromUsers = list
+    .filter((u) => {
+      if (!isHodUser(u)) return false
+      const ub = String(u.branchId ?? '').trim()
+      if (!ub) return false
+      if (complaintMatchesBranch(ub, branchId, branchList)) return true
+      if (branch && ub.toLowerCase() === branch.name.toLowerCase()) return true
+      if (branch && misBranchGroupKey(ub) === branchKey && branchKey) return true
+      return false
+    })
+    .map((u) => u.email.trim())
+    .filter(Boolean)
   return Array.from(
     new Set(
-      list
-        .filter((u) => {
-          if (!isHodUser(u)) return false
-          const ub = String(u.branchId ?? '').trim()
-          if (!ub) return false
-          if (complaintMatchesBranch(ub, branchId, branchList)) return true
-          if (branch && ub.toLowerCase() === branch.name.toLowerCase()) return true
-          if (branch && misBranchGroupKey(ub) === branchKey && branchKey) return true
-          return false
-        })
-        .map((u) => u.email.trim())
-        .filter(Boolean),
+      [...fromUsers, ...ssaFixedHodEmailsForGroup(branchKey)]
+        .map((e) => e.trim().toLowerCase())
+        .filter((e) => e.includes('@')),
     ),
   )
 }
@@ -271,7 +400,7 @@ export async function getBranchNotifyEmails(
 }
 
 export async function computeDeploymentTotals(date: string) {
-  const [branches, reports, clients] = await Promise.all([getBranches(true), getReportsForDate(date), getClients()])
+  const [branches, reports, clients] = await Promise.all([getMisReportBranches(true), getReportsForDate(date), getClients()])
   const reportMap = buildBranchReportMap(branches, reports)
   const countedReportIds = new Set<string>()
 
@@ -283,7 +412,7 @@ export async function computeDeploymentTotals(date: string) {
 
   for (const b of branches) {
     const r = reportMap.get(b.id)
-    if (!r) {
+    if (!isSubmitted(r)) {
       pending.push(b)
       branchRows.push({ id: b.id, name: b.name, submitted: false, depPct: 0, vac: 0 })
       continue
@@ -338,10 +467,10 @@ export type MisHodReminderOpts = {
 }
 
 async function misReminderCcList(hodTo: string[], branchName?: string): Promise<string[]> {
-  const director = misAckDirectorEmail()
   const hodEmails = await getAllHodEmails()
   const skip = new Set(hodTo.map((e) => e.trim().toLowerCase()))
-  const mgmt: string[] = [director, ...hodEmails]
+  // Director + HODs only — do not CC IT on operational reminders.
+  const mgmt: string[] = [misDirectorCcEmail(), ...hodEmails]
   if (branchName && misBranchCcLokesh(branchName)) mgmt.push(LOKESH_CC_EMAIL)
   return withoutNoMailRecipients(
     Array.from(
@@ -364,7 +493,7 @@ export async function sendMisHodReminders(date: string, branchIds?: string[], op
   let target: MisBranch[] = []
   if (branchIds?.length) {
     const byId = new Map(branches.map((b) => [b.id, b]))
-    const allActive = await getBranches(true)
+    const allActive = await getMisReportBranches(true)
     for (const id of branchIds) {
       const b = byId.get(id) || allActive.find((x) => x.id === id)
       if (b) target.push(b)
@@ -557,7 +686,7 @@ export function buildMisDirectorReminderHtml(
         <div style="font-size:16px;font-weight:800;color:#16a34a;margin-top:6px">All ${opts.total} branches have submitted</div>
         <div style="font-size:13px;color:#475569;margin-top:6px">Today's daily MIS for <b>${esc(misAckDateDisplay(date))}</b></div>
       </div>
-      <p style="margin:16px 0 0;font-size:14px;color:#475569">Full consolidated dashboard will be sent at <b>5:00 PM IST</b>.</p>`
+      <p style="margin:16px 0 0;font-size:14px;color:#475569">The Command Centre daily MIS report will be sent at <b>4:30 PM IST</b>.</p>`
     return misReminderMailWrap(title, subtitle, inner, '#16a34a')
   }
 
@@ -585,7 +714,7 @@ export function buildMisDirectorReminderHtml(
     <p style="margin:0 0 10px;font-size:14px;font-weight:700;color:#b91c1c">Pending branches — please ensure submission before 4.00 pm IST:</p>
     <ul style="margin:0 0 16px;padding:0;list-style:none">${pendingList}</ul>
     <p style="margin:0 0 8px;font-size:13px;color:#475569;line-height:1.55">Branch reminders have been sent to HOD and branch staff for these branches.</p>
-    <p style="margin:0;font-size:13px;color:#475569">Full consolidated dashboard at <b>5:00 PM IST</b>. · <a href="https://www.agilegroup-digital.co.in/mis-submission" style="color:#1d4ed8">Daily MIS Submission</a></p>`
+    <p style="margin:0;font-size:13px;color:#475569">Command Centre daily MIS report at <b>4:30 PM IST</b>. · <a href="https://www.agilegroup-digital.co.in/mis-submission" style="color:#1d4ed8">Daily MIS Submission</a></p>`
   return misReminderMailWrap(title, subtitle, inner, accent)
 }
 
@@ -646,6 +775,7 @@ export async function sendMisSubmissionReminders(
       replyTo: director,
       subject,
       html: buildMisBranchReminderHtml(b.name, date, slot),
+      skipDirectorCc: true,
     })
     if (result.error) return { ok: false, error: result.error.message ?? 'Send failed', branch: b.name, sent, skipped }
     await setReminderTime(date, b.id, now)
@@ -653,7 +783,25 @@ export async function sendMisSubmissionReminders(
     emailed.push({ branch: b.name, to, cc })
   }
 
-  return { ok: true, sent, skipped, emailed, date, slot, directorCc: ccDirector ? director : '' }
+  let gmailCopy: Array<{ to: string; from: string; id?: string; error?: string }> = []
+  if (sent.length) {
+    const { subject } = misReminderHeadline('branch', date, slot)
+    const branchList = sent.map((n) => `<li>${esc(n)}</li>`).join('')
+    const copyHtml = `<div style="font-family:Arial,sans-serif;max-width:560px;padding:16px">
+      <p><b>Your copy</b> — MIS submission reminders sent at ${slot === 'morning' ? '11:00 AM' : '2:00 PM'} IST on ${esc(date)}.</p>
+      <p>Branches reminded (${sent.length}):</p><ul>${branchList}</ul>
+      <p style="font-size:12px;color:#64748b">CC on each mail: director@agilegroup.co.in, IT@; Lokesh@ where applicable.</p>
+    </div>`
+    gmailCopy = await sendDirectorPersonalCopies(resend, {
+      subject: `[Your copy] ${subject} — ${sent.length} branch(es)`,
+      html: copyHtml,
+      text: `MIS reminders sent for ${date} (${slot}). Branches: ${sent.join(', ')}`,
+      replyTo: director,
+      gmailOnly: true,
+    })
+  }
+
+  return { ok: true, sent, skipped, emailed, date, slot, directorCc: ccDirector ? director : '', gmailCopy }
 }
 
 /** 11:00 AM or 2:00 PM IST — consolidated pending-branch reminder to Director only. */
@@ -666,104 +814,167 @@ export async function sendMisDirectorPendingReminder(date: string, slot: MisSubm
 
   const resend = new Resend(apiKey)
   const from = process.env.EMAIL_FROM ?? 'Agile MIS <noreply@agilegroup.co.in>'
+  const cc = misManagementCcEmails(director, { includeDirector: false })
 
   if (!pending.length) {
     const { subject } = misReminderHeadline('director', date, slot)
+    const html = buildMisDirectorReminderHtml(date, slot, {
+      submitted: branches.length,
+      total: branches.length,
+      pending: [],
+    })
     const result = await sendSuiteEmail(resend, {
       from,
       to: director,
+      cc: cc.length ? cc : undefined,
       replyTo: director,
       subject,
-      html: buildMisDirectorReminderHtml(date, slot, {
-        submitted: branches.length,
-        total: branches.length,
-        pending: [],
-      }),
+      html,
+      skipDirectorCc: true,
     })
     if (result.error) return { ok: false, error: result.error.message ?? 'Send failed' }
-    return { ok: true, to: director, submitted, total: branches.length, pending: [], slot }
+    const gmailCopy = await sendDirectorPersonalCopies(resend, {
+      subject: `[Your copy] ${subject}`,
+      html,
+      text: `All branches submitted MIS for ${date} (${slot}).`,
+      replyTo: director,
+      gmailOnly: true,
+    })
+    return { ok: true, to: director, cc, submitted, total: branches.length, pending: [], slot, gmailCopy }
   }
 
   const { subject } = misReminderHeadline('director', date, slot)
+  const html = buildMisDirectorReminderHtml(date, slot, {
+    submitted,
+    total: branches.length,
+    pending: pending.map((b) => b.name),
+  })
   const result = await sendSuiteEmail(resend, {
     from,
     to: director,
+    cc: cc.length ? cc : undefined,
     replyTo: director,
     subject,
-    html: buildMisDirectorReminderHtml(date, slot, {
-      submitted,
-      total: branches.length,
-      pending: pending.map((b) => b.name),
-    }),
+    html,
+    skipDirectorCc: true,
   })
   if (result.error) return { ok: false, error: result.error.message ?? 'Send failed' }
-  return { ok: true, to: director, pending: pending.map((b) => b.name), submitted, total: branches.length, slot }
+  const gmailCopy = await sendDirectorPersonalCopies(resend, {
+    subject: `[Your copy] ${subject}`,
+    html,
+    text: `Pending MIS for ${date}: ${pending.map((b) => b.name).join(', ')}`,
+    replyTo: director,
+    gmailOnly: true,
+  })
+  return {
+    ok: true,
+    to: director,
+    cc,
+    pending: pending.map((b) => b.name),
+    submitted,
+    total: branches.length,
+    slot,
+    gmailCopy,
+  }
 }
 
 export async function sendMisPendingReminder(date: string) {
   return sendMisDirectorPendingReminder(date, 'midday')
 }
 
-export async function sendMisDirectorDigest(date: string) {
+export async function sendMisDirectorDigest(date: string, opts?: { sampleOnly?: boolean }) {
   const apiKey = process.env.RESEND_API_KEY?.trim()
   if (!apiKey) return { ok: false, error: 'Email not configured' }
 
-  const { branches, submitted, pending, totals, branchRows } = await computeDeploymentTotals(date)
+  const [{ branches, submitted, pending, totals, branchRows }, reports, clients] = await Promise.all([
+    computeDeploymentTotals(date),
+    getReportsForDate(date),
+    getClients(),
+  ])
+  const repBy: Record<string, (typeof reports)[number]> = {}
+  for (const r of reports) repBy[r.branchId] = r
 
   let cmpOpen = 0
-  let cTot = 0
   let cPvc = 0
+  let cSan = 0
   for (const b of branches) {
     const cs = await getComplaints(b.id)
     cmpOpen += cs.filter((c) => c.status !== 'Closed').length
     const docs = await getGuardDocs(b.id)
-    for (const d of docs.filter(guardRecordEligible)) {
-      cTot++
-      if (docPresent(d.pvc)) cPvc++
-    }
+    const branchSan = branchSanctionedPosts(b.id, repBy[b.id], clients)
+    const counts = guardComplianceCounts(docs, branchSan)
+    cPvc += counts.pvc
+    cSan += counts.sanctioned
   }
-  const pvcPct = cTot ? Math.round((cPvc / cTot) * 100) : 0
+  const pvcPct = cSan ? Math.min(100, Math.round((Math.min(cPvc, cSan) * 100) / cSan)) : 0
 
   const branchTable = branchRows
     .map(
-      (r) =>
-        `<tr><td>${esc(r.name)}</td><td style="text-align:center">${r.submitted ? '✓' : '<span style="color:#b91c1c">Pending</span>'}</td><td style="text-align:center">${r.depPct}%</td><td style="text-align:center;color:#b45309">${r.vac}</td></tr>`,
+      (r, i) =>
+        `<tr style="background:${i % 2 ? '#f8fafc' : '#fff'}"><td style="padding:9px 8px;border-bottom:1px solid #e2e8f0">${esc(r.name)}</td><td style="padding:9px 8px;border-bottom:1px solid #e2e8f0;text-align:center">${r.submitted ? '<span style="color:#16a34a;font-weight:800">Submitted</span>' : '<span style="color:#b91c1c;font-weight:800">Pending</span>'}</td><td style="padding:9px 8px;border-bottom:1px solid #e2e8f0;text-align:center">${r.depPct}%</td><td style="padding:9px 8px;border-bottom:1px solid #e2e8f0;text-align:center;color:#b45309;font-weight:700">${r.vac}</td></tr>`,
     )
     .join('')
 
+  const { suiteColourEmailShell, suiteDigestRecipients, suiteStatRow, suiteTable } = await import(
+    '../suite-digest-shell.js'
+  )
+  const recipients = await suiteDigestRecipients({ sampleOnly: opts?.sampleOnly })
+  const sampleTag = recipients.sampleOnly ? ' [SAMPLE — you only]' : ''
+  const pendingNames = pending.map((b) => b.name).join(', ')
+
+  const bodyHtml = `
+    <p style="margin:0 0 8px">Dear Director / HODs,</p>
+    <p style="margin:0 0 12px;color:#475569">Agile MIS daily operations summary for <b>${esc(date)}</b> (4:00 PM IST). Suitable for management review and client discussions.</p>
+    ${suiteStatRow([
+      { label: 'Submitted', value: submitted, color: '#16a34a', bg: '#f0fdf4' },
+      { label: 'Pending', value: pending.length, color: '#dc2626', bg: '#fef2f2' },
+      { label: 'Deployment', value: `${totals.depPct}%`, color: '#14224f', bg: '#eff6ff' },
+      { label: 'Vacant', value: totals.vac, color: '#b45309', bg: '#fffbeb' },
+      { label: 'PVC', value: `${pvcPct}%`, color: '#7c3aed', bg: '#f5f3ff' },
+      { label: 'Open complaints', value: cmpOpen, color: '#dc2626', bg: '#fef2f2' },
+    ])}
+    ${
+      pending.length
+        ? `<div style="margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#fef2f2;border:1px solid #fecaca;color:#991b1b;font-size:13px"><b>MIS not yet received:</b> ${esc(pendingNames)}</div>`
+        : `<div style="margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;font-weight:700">All branches have submitted MIS for today.</div>`
+    }
+    <h3 style="margin:8px 0;color:#14224f;font-size:15px">Branch status</h3>
+    ${suiteTable(['Branch', 'Report', 'Deploy %', 'Vacant'], branchTable, 4)}
+    <p style="font-size:12px;color:#64748b;margin:0">Company: <a href="https://www.agilegroup.co.in" style="color:#1d4ed8">www.agilegroup.co.in</a></p>
+    <p style="font-size:12px;color:#1e293b;margin:8px 0 0;line-height:1.7">Central Control Centre: <b>+91 9248707070</b><br>Toll Free: <b>18005995599</b><br>Help Desk: <b>+91 850091599</b></p>`
+
   const resend = new Resend(apiKey)
   const from = process.env.EMAIL_FROM ?? 'Agile MIS <noreply@agilegroup.co.in>'
-  const director = process.env.MIS_DIRECTOR_EMAIL?.trim() || process.env.FLEET_DIRECTOR_EMAIL?.trim() || 'director@agilegroup.co.in'
+  const subject =
+    `Agile MIS — Daily Summary ${date} — ${submitted}/${branches.length} branches · ${totals.depPct}% deployment` +
+    sampleTag
+  const html = suiteColourEmailShell({
+    appName: 'Agile MIS',
+    title: 'Daily Operations Summary',
+    subtitle: `${esc(date)} · ${submitted}/${branches.length} submitted · ${totals.depPct}% deployment`,
+    accentFrom: '#14224f',
+    accentTo: '#c9a84c',
+    bodyHtml,
+    footerNote: 'Agile MIS — Daily deployment & branch accountability',
+  })
 
   const result = await sendSuiteEmail(resend, {
     from,
-    to: director,
-    subject: `Agile MIS — Daily Summary ${date} — ${submitted}/${branches.length} branches · ${totals.depPct}% deployment`,
-    html: `<div style="font-family:Arial,sans-serif;max-width:720px;color:#111">
-      <div style="background:#14224f;color:#fff;padding:18px;border-radius:10px 10px 0 0">
-        <b style="font-size:18px;color:#c9a84c">Agile MIS — Daily Director Summary</b>
-        <div style="font-size:13px;color:#cbd5e1;margin-top:4px">${esc(date)}</div>
-      </div>
-      <div style="display:flex;background:#f1f5f9;text-align:center;font-size:13px;flex-wrap:wrap">
-        <div style="flex:1;min-width:100px;padding:12px"><b style="font-size:22px;color:#16a34a">${submitted}</b><br>Submitted</div>
-        <div style="flex:1;min-width:100px;padding:12px"><b style="font-size:22px;color:#dc2626">${pending.length}</b><br>Pending</div>
-        <div style="flex:1;min-width:100px;padding:12px"><b style="font-size:22px;color:#14224f">${totals.depPct}%</b><br>Deployment</div>
-        <div style="flex:1;min-width:100px;padding:12px"><b style="font-size:22px;color:#b45309">${totals.vac}</b><br>Vacant Posts</div>
-        <div style="flex:1;min-width:100px;padding:12px"><b style="font-size:22px;color:#7c3aed">${pvcPct}%</b><br>PVC Compliance</div>
-        <div style="flex:1;min-width:100px;padding:12px"><b style="font-size:22px;color:#dc2626">${cmpOpen}</b><br>Open Complaints</div>
-      </div>
-      <div style="padding:16px">
-        <h3 style="color:#14224f;border-left:4px solid #c9a84c;padding-left:8px">Branch Status</h3>
-        <table style="border-collapse:collapse;width:100%;font-size:12px;margin-top:8px" border="1" cellpadding="6">
-          <thead style="background:#14224f;color:#fff"><tr><th>Branch</th><th>Report</th><th>Deploy %</th><th>Vacant</th></tr></thead>
-          <tbody>${branchTable}</tbody>
-        </table>
-        <p style="font-size:12px;color:#64748b;margin-top:14px">Full dashboard: <a href="https://www.agilegroup-digital.co.in/mis">www.agilegroup-digital.co.in/mis</a> · MD Report: /mis-md</p>
-      </div>
-    </div>`,
+    to: recipients.to,
+    cc: recipients.cc.length ? recipients.cc : undefined,
+    skipDirectorCc: true,
+    subject,
+    html,
   })
   if (result.error) return { ok: false, error: result.error.message ?? 'Send failed' }
-  return { ok: true, to: director }
+  const gmailCopy = await sendDirectorPersonalCopies(resend, {
+    subject: `[Your copy] ${subject}`,
+    html,
+    text: `Agile MIS daily summary ${date}: ${submitted}/${branches.length} submitted, ${totals.depPct}% deployment.`,
+    replyTo: misAckDirectorEmail(),
+    gmailOnly: true,
+  })
+  return { ok: true, to: recipients.to, cc: recipients.cc, gmailCopy }
 }
 
 export async function sendConsolidatedMisMail(date: string, to: string[]) {
@@ -772,11 +983,21 @@ export async function sendConsolidatedMisMail(date: string, to: string[]) {
   if (!to.length) return { ok: false, error: 'No recipients' }
 
   const { branches, submitted, pending, totals, branchRows } = await computeDeploymentTotals(date)
+  const reports = await getReportsForDate(date)
+  const remarksByBranch = new Map(
+    reports.map((r) => [r.branchId, String(r.summary?.remarks ?? '').trim()] as const),
+  )
   const rows = branchRows
-    .map(
-      (r) =>
-        `<tr><td>${esc(r.name)}</td><td style="text-align:center">${r.submitted ? '<span style="color:#16a34a">✓</span>' : '<span style="color:#b91c1c">✗</span>'}</td><td style="text-align:center">${r.submitted ? r.depPct + '%' : '—'}</td><td style="text-align:center;color:#b45309">${r.submitted ? r.vac : '—'}</td></tr>`,
-    )
+    .map((r) => {
+      const rem = remarksByBranch.get(r.id) || ''
+      return `<tr>
+        <td>${esc(r.name)}</td>
+        <td style="text-align:center">${r.submitted ? '<span style="color:#16a34a">✓</span>' : '<span style="color:#b91c1c">✗</span>'}</td>
+        <td style="text-align:center">${r.submitted ? r.depPct + '%' : '—'}</td>
+        <td style="text-align:center;color:#b45309">${r.submitted ? r.vac : '—'}</td>
+        <td style="text-align:left;font-size:11px;white-space:pre-wrap;max-width:280px">${r.submitted ? esc(rem || '—') : '—'}</td>
+      </tr>`
+    })
     .join('')
 
   const resend = new Resend(apiKey)
@@ -796,7 +1017,7 @@ export async function sendConsolidatedMisMail(date: string, to: string[]) {
       </div>
       ${pending.length ? `<p style="color:#b91c1c;font-weight:700">⚠ MIS not received from ${pending.length} branch(es): ${pending.map((b) => esc(b.name)).join(', ')}</p>` : ''}
       <table style="border-collapse:collapse;width:100%;font-size:12px;margin-top:10px" border="1" cellpadding="6">
-        <thead style="background:#14224f;color:#fff"><tr><th>Branch</th><th>MIS Recd</th><th>Deploy %</th><th>Vacant</th></tr></thead>
+        <thead style="background:#14224f;color:#fff"><tr><th>Branch</th><th>MIS Recd</th><th>Deploy %</th><th>Vacant</th><th>Remarks</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
       <p style="font-size:12px;color:#64748b;margin-top:12px">Full dashboard: <a href="https://www.agilegroup-digital.co.in/mis-board">agilegroup-digital.co.in/mis-board</a></p>`,
@@ -806,41 +1027,179 @@ export async function sendConsolidatedMisMail(date: string, to: string[]) {
   return { ok: true, to }
 }
 
+type MdMailDeployRow = {
+  branch?: string
+  submitted?: boolean
+  san?: number
+  dep?: number
+  abs?: number
+  ot?: number
+  vac?: number
+  resignation?: number
+  recruitment?: number
+  rejoin?: number
+  depPct?: number
+}
+
+type MdMailVacantRow = {
+  client?: string
+  branches?: string
+  locations?: string
+  unit?: string
+  branch?: string
+  san?: number
+  abs?: number
+  ot?: number
+  dep?: number
+  vac?: number
+  fill?: number
+}
+
 export async function sendMdSirReportMail(date: string, to: string[], summary: Record<string, unknown>) {
   const apiKey = process.env.RESEND_API_KEY?.trim()
   if (!apiKey) return { ok: false, error: 'Email not configured' }
   if (!to.length) return { ok: false, error: 'No recipients' }
 
-  const t = (summary.totals ?? {}) as { san?: number; dep?: number; abs?: number; ot?: number; vac?: number }
-  const depPct = t.san ? Math.round(((t.dep ?? 0) * 100) / t.san) : 0
+  const t = (summary.totals ?? {}) as {
+    san?: number
+    dep?: number
+    abs?: number
+    ot?: number
+    vac?: number
+    resignation?: number
+    recruitment?: number
+    rejoin?: number
+  }
+  const depPct = t.san ? Math.min(100, Math.round(((t.dep ?? 0) * 100) / t.san)) : 0
   const submitted = Number(summary.submitted ?? 0)
   const branchCount = Number(summary.branchCount ?? 0)
+  const deployment = (Array.isArray(summary.deployment) ? summary.deployment : []) as MdMailDeployRow[]
+  const vacantGrouped = (Array.isArray(summary.vacantGrouped) ? summary.vacantGrouped : []) as MdMailVacantRow[]
+  const otGrouped = (Array.isArray(summary.otGrouped) ? summary.otGrouped : []) as MdMailVacantRow[]
+
+  const th = 'padding:6px 8px;border:1px solid #cbd5e1;background:#14224f;color:#fff;font-size:11px;text-align:center'
+  const td = 'padding:6px 8px;border:1px solid #e2e8f0;font-size:11px'
+  const tdL = `${td};text-align:left`
+  const tdC = `${td};text-align:center`
+
+  const deployRows = deployment
+    .map((b) => {
+      const ok = Boolean(b.submitted)
+      const dp = ok ? (b.depPct ?? (b.san ? Math.min(100, Math.round(((b.dep ?? 0) * 100) / b.san)) : 0)) : 0
+      return `<tr>
+        <td style="${tdL}">${esc(b.branch)}</td>
+        <td style="${tdC}">${ok ? '✓' : '✗'}</td>
+        <td style="${tdC}">${ok ? b.san ?? 0 : '—'}</td>
+        <td style="${tdC}">${ok ? b.abs ?? 0 : '—'}</td>
+        <td style="${tdC}">${ok ? b.ot ?? 0 : '—'}</td>
+        <td style="${tdC}">${ok ? b.dep ?? 0 : '—'}</td>
+        <td style="${tdC};color:${ok && (b.vac ?? 0) > 0 ? '#dc2626' : '#334155'};font-weight:${ok && (b.vac ?? 0) > 0 ? '700' : '400'}">${ok ? b.vac ?? 0 : '—'}</td>
+        <td style="${tdC}">${ok ? `${dp}%` : '—'}</td>
+        <td style="${tdC}">${ok ? b.resignation ?? 0 : '—'}</td>
+        <td style="${tdC}">${ok ? b.recruitment ?? 0 : '—'}</td>
+        <td style="${tdC}">${ok ? b.rejoin ?? 0 : '—'}</td>
+      </tr>`
+    })
+    .join('')
+
+  const vacantRowsHtml = vacantGrouped
+    .map(
+      (v, i) => `<tr>
+        <td style="${tdC}">${i + 1}</td>
+        <td style="${tdL}">${esc(v.client)}</td>
+        <td style="${tdL}">${esc(v.branches || v.branch || '—')}</td>
+        <td style="${tdL}">${esc(v.locations || v.unit || '—')}</td>
+        <td style="${tdC}">${v.san ?? 0}</td>
+        <td style="${tdC}">${v.abs ?? 0}</td>
+        <td style="${tdC}">${v.ot ?? 0}</td>
+        <td style="${tdC}">${v.dep ?? 0}</td>
+        <td style="${tdC};color:#dc2626;font-weight:700">${v.vac ?? 0}</td>
+        <td style="${tdC}">${v.fill ?? 0}%</td>
+      </tr>`,
+    )
+    .join('')
+
+  const otRowsHtml = otGrouped
+    .map(
+      (v, i) => `<tr>
+        <td style="${tdC}">${i + 1}</td>
+        <td style="${tdL}">${esc(v.client)}</td>
+        <td style="${tdL}">${esc(v.branches || v.branch || '—')}</td>
+        <td style="${tdL}">${esc(v.locations || v.unit || '—')}</td>
+        <td style="${tdC};color:#7c3aed;font-weight:700">${v.ot ?? 0}</td>
+        <td style="${tdC}">${v.abs ?? 0}</td>
+      </tr>`,
+    )
+    .join('')
 
   const resend = new Resend(apiKey)
   const from = process.env.EMAIL_FROM ?? 'Agile MIS <noreply@agilegroup.co.in>'
   const result = await sendSuiteEmail(resend, {
     from,
     to,
+    // Director is always CC'd by sendSuiteEmail for preview (unless already in To).
     subject: `Agile MIS — MD Sir Daily Report ${date} — ${depPct}% deployment`,
     html: mailWrap(
       `MD Sir Report — ${date}`,
       `<p><b>Agile Security Force Pvt. Ltd.</b><br>Daily Operations Report — ${esc(date)}</p>
+      <p style="font-size:12px;color:#64748b;margin:0 0 12px">${submitted}/${branchCount} branches submitted · ${Math.max(0, branchCount - submitted)} pending · Director receives a copy for preview</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin:12px 0">
         <div style="padding:10px 14px;background:#eff6ff;border-radius:8px"><b style="font-size:18px;color:#1d4ed8">${t.san ?? 0}</b><br>Sanctioned</div>
+        <div style="padding:10px 14px;background:#fefce8;border-radius:8px"><b style="font-size:18px;color:#ca8a04">${t.abs ?? 0}</b><br>Absent</div>
+        <div style="padding:10px 14px;background:#f5f3ff;border-radius:8px"><b style="font-size:18px;color:#7c3aed">${t.ot ?? 0}</b><br>OT</div>
         <div style="padding:10px 14px;background:#f0fdf4;border-radius:8px"><b style="font-size:18px;color:#16a34a">${t.dep ?? 0}</b><br>Deployed</div>
         <div style="padding:10px 14px;background:#fef2f2;border-radius:8px"><b style="font-size:18px;color:#dc2626">${t.vac ?? 0}</b><br>Vacant</div>
         <div style="padding:10px 14px;background:#fefce8;border-radius:8px"><b style="font-size:18px;color:#ca8a04">${depPct}%</b><br>Deploy %</div>
+        <div style="padding:10px 14px;background:#f5f3ff;border-radius:8px"><b style="font-size:18px;color:#7c3aed">${t.recruitment ?? 0}</b><br>Recruitment</div>
+        <div style="padding:10px 14px;background:#fff7ed;border-radius:8px"><b style="font-size:18px;color:#ea580c">${t.rejoin ?? 0}</b><br>Rejoin</div>
       </div>
-      <p>${submitted}/${branchCount} branches submitted · ${branchCount - submitted} pending</p>
-      <p style="font-size:12px;color:#64748b">Full interactive report: <a href="https://www.agilegroup-digital.co.in/mis-md">agilegroup-digital.co.in/mis-md</a></p>`,
+
+      <h3 style="margin:20px 0 8px;color:#14224f;font-size:15px">1. Deployment</h3>
+      <table style="border-collapse:collapse;width:100%;margin-bottom:8px">
+        <thead><tr>
+          <th style="${th};text-align:left">Branch</th><th style="${th}">MIS</th><th style="${th}">San.</th><th style="${th}">Abs.</th><th style="${th}">OT</th>
+          <th style="${th}">Dep.</th><th style="${th}">Vacant</th><th style="${th}">Deploy %</th><th style="${th}">Resign.</th><th style="${th}">Recruit.</th><th style="${th}">Rejoin</th>
+        </tr></thead>
+        <tbody>${deployRows || `<tr><td colspan="10" style="${tdC}">No branch data.</td></tr>`}</tbody>
+        <tfoot><tr style="background:#f8fafc;font-weight:700">
+          <td style="${tdL}">TOTAL</td><td style="${tdC}"></td>
+          <td style="${tdC}">${t.san ?? 0}</td><td style="${tdC}">${t.abs ?? 0}</td><td style="${tdC}">${t.ot ?? 0}</td>
+          <td style="${tdC}">${t.dep ?? 0}</td><td style="${tdC}">${t.vac ?? 0}</td><td style="${tdC}">${depPct}%</td>
+          <td style="${tdC}">${t.resignation ?? 0}</td><td style="${tdC}">${t.recruitment ?? 0}</td><td style="${tdC}">${t.rejoin ?? 0}</td>
+        </tr></tfoot>
+      </table>
+
+      <h3 style="margin:20px 0 8px;color:#14224f;font-size:15px">2. Vacant Posts (worst first)</h3>
+      <p style="font-size:11px;color:#64748b;margin:0 0 8px">Same client clubbed across branches · sorted by vacant posts (highest first) · full list</p>
+      <table style="border-collapse:collapse;width:100%;margin-bottom:16px">
+        <thead><tr>
+          <th style="${th}">#</th><th style="${th};text-align:left">Client</th><th style="${th};text-align:left">Branches</th><th style="${th};text-align:left">Locations</th>
+          <th style="${th}">San.</th><th style="${th}">Abs.</th><th style="${th}">OT</th><th style="${th}">Dep.</th><th style="${th}">Vacant</th><th style="${th}">Fill %</th>
+        </tr></thead>
+        <tbody>${vacantRowsHtml || `<tr><td colspan="10" style="${tdC}">No vacant posts reported.</td></tr>`}</tbody>
+      </table>
+
+      <h3 style="margin:20px 0 8px;color:#14224f;font-size:15px">3. Overtime (OT)</h3>
+      <p style="font-size:11px;color:#64748b;margin:0 0 8px">Company OT: <b>${t.ot ?? 0}</b> · same client clubbed · highest OT first</p>
+      <table style="border-collapse:collapse;width:100%">
+        <thead><tr>
+          <th style="${th}">#</th><th style="${th};text-align:left">Client</th><th style="${th};text-align:left">Branches</th><th style="${th};text-align:left">Locations</th>
+          <th style="${th}">OT</th><th style="${th}">Abs.</th>
+        </tr></thead>
+        <tbody>${otRowsHtml || `<tr><td colspan="6" style="${tdC}">No overtime reported.</td></tr>`}</tbody>
+      </table>
+
+      <p style="font-size:12px;color:#64748b;margin-top:16px">Interactive report: <a href="https://www.agilegroup-digital.co.in/mis-md">agilegroup-digital.co.in/mis-md</a></p>`,
     ),
   })
   if (result.error) return { ok: false, error: result.error.message ?? 'Send failed' }
-  return { ok: true, to }
+  return { ok: true, to, cc: misDirectorCcEmail() }
 }
 
 function misConsolidatedToEmail(): string {
-  return (process.env.MIS_CONSOLIDATED_TO?.trim() || 'lokesh@agilegroup.co.in').toLowerCase()
+  const raw = (process.env.MIS_CONSOLIDATED_TO?.trim() || '').toLowerCase()
+  if (!raw || raw === 'lokesh@agilegroup.co.in') return 'director@agilegroup.co.in'
+  return raw
 }
 
 export async function getAllHodEmails(): Promise<string[]> {
@@ -859,9 +1218,11 @@ type MisAckDeployTotals = {
   abs: number
   ot: number
   vac: number
+  vacPct?: number
   dep: number
   depPct: number
   collDisplay: string
+  dsoDays?: number | null
 }
 
 export function buildMisAckEmailHtml(opts: {
@@ -874,12 +1235,22 @@ export function buildMisAckEmailHtml(opts: {
   statsHtml: string
   alertHtml: string
   extraHtml?: string
+  /** Wider layout for consolidated branch table. */
+  wide?: boolean
 }): string {
   const company = 'Agile Security Force Private Limited'
   const ackDate = misAckDateDisplay(opts.dateFor)
   const t = opts.totals
+  const maxW = opts.wide ? '1100px' : '640px'
+  const vacPct = t.vacPct != null ? t.vacPct : t.san ? Math.round((t.vac * 100) / t.san) : 0
+  const dsoLabel = t.dsoDays != null ? String(t.dsoDays) : '—'
+  const alertsBlock = `<div style="margin:0 0 20px;padding:16px 18px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px">
+      <div style="font-size:14px;font-weight:700;color:#92400e;margin-bottom:10px">Suggestion — Alert Messages</div>
+      <ul style="margin:0;padding-left:18px;font-size:13px">${opts.alertHtml}</ul>
+    </div>`
+  const extra = opts.extraHtml || ''
   return `<!DOCTYPE html><html><body style="margin:0;padding:0;background:#f4f4f5">
-<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:640px;margin:0 auto;background:#ffffff;color:#1e293b">
+<div style="font-family:'Segoe UI',Arial,sans-serif;max-width:${maxW};margin:0 auto;background:#ffffff;color:#1e293b">
   <div style="padding:24px 28px 18px;border-bottom:3px solid #c9a84c">
     <div style="font-size:14px;color:#475569;margin-bottom:6px">To,</div>
     <div style="font-size:16px;font-weight:700;color:#14224f;line-height:1.45">${esc(company)}</div>
@@ -887,37 +1258,45 @@ export function buildMisAckEmailHtml(opts: {
       <b>${esc(opts.headerLine)}</b> · Response to Daily MIS submitted on: <b>${esc(ackDate)}</b>
     </div>
   </div>
-  <div style="padding:24px 28px">
+  <div style="padding:24px 20px">
     <p style="margin:0 0 14px;font-size:15px;line-height:1.6">${opts.dearLine}</p>
     <p style="margin:0 0 18px;font-size:15px;line-height:1.6">${opts.bodyLine}</p>
     <p style="margin:0 0 16px;font-size:13px;color:#64748b">${opts.submittedByLine}</p>
     <div style="font-weight:700;color:#14224f;font-size:14px;margin-bottom:4px">Daily Deployment Summary</div>
     ${misAckRowDivider()}
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 4px;border-collapse:separate;border-spacing:8px 10px">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 4px;border-collapse:separate;border-spacing:6px 8px">
       <tr>
-        <td width="16.66%" style="padding:14px 8px;background:#eff6ff;border-radius:8px;text-align:center;vertical-align:middle">
-          <div style="font-size:24px;font-weight:700;color:#1d4ed8;line-height:1.2">${t.san}</div>
-          <div style="font-size:11px;color:#64748b;margin-top:6px">Sanctioned</div>
+        <td width="12.5%" style="padding:12px 6px;background:#eff6ff;border-radius:8px;text-align:center;vertical-align:middle">
+          <div style="font-size:20px;font-weight:700;color:#1d4ed8;line-height:1.2">${t.san}</div>
+          <div style="font-size:10px;color:#64748b;margin-top:4px">Sanctioned</div>
         </td>
-        <td width="16.66%" style="padding:14px 8px;background:#fef2f2;border-radius:8px;text-align:center;vertical-align:middle">
-          <div style="font-size:24px;font-weight:700;color:#dc2626;line-height:1.2">${t.abs}</div>
-          <div style="font-size:11px;color:#64748b;margin-top:6px">Absent</div>
+        <td width="12.5%" style="padding:12px 6px;background:#fef2f2;border-radius:8px;text-align:center;vertical-align:middle">
+          <div style="font-size:20px;font-weight:700;color:#dc2626;line-height:1.2">${t.abs}</div>
+          <div style="font-size:10px;color:#64748b;margin-top:4px">Absent</div>
         </td>
-        <td width="16.66%" style="padding:14px 8px;background:#fff7ed;border-radius:8px;text-align:center;vertical-align:middle">
-          <div style="font-size:24px;font-weight:700;color:#ea580c;line-height:1.2">${t.ot}</div>
-          <div style="font-size:11px;color:#64748b;margin-top:6px">OT</div>
+        <td width="12.5%" style="padding:12px 6px;background:#fff7ed;border-radius:8px;text-align:center;vertical-align:middle">
+          <div style="font-size:20px;font-weight:700;color:#ea580c;line-height:1.2">${t.ot}</div>
+          <div style="font-size:10px;color:#64748b;margin-top:4px">OT</div>
         </td>
-        <td width="16.66%" style="padding:14px 8px;background:#fefce8;border-radius:8px;text-align:center;vertical-align:middle">
-          <div style="font-size:24px;font-weight:700;color:#ca8a04;line-height:1.2">${t.vac}</div>
-          <div style="font-size:11px;color:#64748b;margin-top:6px">Vacant</div>
+        <td width="12.5%" style="padding:12px 6px;background:#f0fdf4;border-radius:8px;text-align:center;vertical-align:middle">
+          <div style="font-size:20px;font-weight:700;color:#16a34a;line-height:1.2">${t.dep}</div>
+          <div style="font-size:10px;color:#64748b;margin-top:4px">Deployed</div>
         </td>
-        <td width="16.66%" style="padding:14px 8px;background:#f0fdf4;border-radius:8px;text-align:center;vertical-align:middle">
-          <div style="font-size:24px;font-weight:700;color:#16a34a;line-height:1.2">${t.dep}</div>
-          <div style="font-size:11px;color:#64748b;margin-top:6px">Deployed</div>
+        <td width="12.5%" style="padding:12px 6px;background:#fefce8;border-radius:8px;text-align:center;vertical-align:middle">
+          <div style="font-size:20px;font-weight:700;color:#ca8a04;line-height:1.2">${t.vac}</div>
+          <div style="font-size:10px;color:#64748b;margin-top:4px">Vacant</div>
         </td>
-        <td width="16.66%" style="padding:14px 8px;background:#f5f3ff;border-radius:8px;text-align:center;vertical-align:middle">
-          <div style="font-size:24px;font-weight:700;color:#7c3aed;line-height:1.2">${esc(t.collDisplay)}</div>
-          <div style="font-size:11px;color:#64748b;margin-top:6px">Collection</div>
+        <td width="12.5%" style="padding:12px 6px;background:#fffbeb;border-radius:8px;text-align:center;vertical-align:middle">
+          <div style="font-size:20px;font-weight:700;color:#b45309;line-height:1.2">${vacPct}%</div>
+          <div style="font-size:10px;color:#64748b;margin-top:4px">Vacant %</div>
+        </td>
+        <td width="12.5%" style="padding:12px 6px;background:#f5f3ff;border-radius:8px;text-align:center;vertical-align:middle">
+          <div style="font-size:18px;font-weight:700;color:#7c3aed;line-height:1.2">${esc(t.collDisplay)}</div>
+          <div style="font-size:10px;color:#64748b;margin-top:4px">Overall Coll %</div>
+        </td>
+        <td width="12.5%" style="padding:12px 6px;background:#ecfeff;border-radius:8px;text-align:center;vertical-align:middle">
+          <div style="font-size:20px;font-weight:700;color:#0e7490;line-height:1.2">${esc(dsoLabel)}</div>
+          <div style="font-size:10px;color:#64748b;margin-top:4px">DSO days</div>
         </td>
       </tr>
     </table>
@@ -925,11 +1304,8 @@ export function buildMisAckEmailHtml(opts: {
     ${misAckRowDivider()}
     ${opts.statsHtml}
     ${misAckRowDivider()}
-    <div style="margin:0 0 20px;padding:16px 18px;background:#fffbeb;border:1px solid #fcd34d;border-radius:8px">
-      <div style="font-size:14px;font-weight:700;color:#92400e;margin-bottom:10px">Suggestion (AI) — Alert Message</div>
-      <ul style="margin:0;padding-left:18px;font-size:13px">${opts.alertHtml}</ul>
-    </div>
-    ${opts.extraHtml || ''}
+    ${alertsBlock}
+    ${extra}
     <p style="margin:0 0 6px;font-size:14px;line-height:1.6">Regards,</p>
     <p style="margin:0;font-size:14px;line-height:1.6">
       <b>Director — Security Division</b><br>
@@ -944,24 +1320,106 @@ export function buildMisAckEmailHtml(opts: {
 </body></html>`
 }
 
-type ConsolidatedBranchRow = {
+export type ConsolidatedBranchRow = {
   name: string
   submitted: boolean
   san: number
   abs: number
   ot: number
-  vac: number
   dep: number
-  depPct: number
+  vac: number
+  vacPct: number
   collectionPct: string
+  dso: number | null
+  pvcPct: number
+  mcPct: number
+  siteVisits: number
+  srMgmtVisits: number
+  resigned: number
+  recruited: number
+  guardReceived: number
+  guardSolved: number
+  guardBalance: number
+  clientReceived: number
+  clientSolved: number
+  clientBalance: number
+  /** Incident reports: Open = draft; Closed = submitted (report sent). */
+  incidentOpen: number
+  incidentClosed: number
+  /** Branch daily MIS remarks (summary.remarks). */
+  remarks: string
+  lateStart: number
+  outOfPost: number
+  nightChecks: number
+  monthlyBilling: number
+  outstanding: number
+  weeklyCollected: number
+  over90: boolean
+  vacancyRanks: VacancyRankCounts
 }
 
-async function buildConsolidatedMisAckPayload(date: string, filter?: { onTimeOnly?: boolean; lateOnly?: boolean }) {
-  const [branches, allReports, clients] = await Promise.all([
-    getBranches(true),
-    getReportsForDate(date),
-    getClients(),
-  ])
+function weekStartMondayFor(dateFor: string): string {
+  const d = new Date(`${dateFor}T12:00:00`)
+  const day = d.getDay()
+  const diff = day === 0 ? -6 : 1 - day
+  d.setDate(d.getDate() + diff)
+  return d.toISOString().slice(0, 10)
+}
+
+function emptyConsolidatedBranchRow(name: string): ConsolidatedBranchRow {
+  return {
+    name,
+    submitted: false,
+    san: 0,
+    abs: 0,
+    ot: 0,
+    dep: 0,
+    vac: 0,
+    vacPct: 0,
+    collectionPct: '—',
+    dso: null,
+    pvcPct: 0,
+    mcPct: 0,
+    siteVisits: 0,
+    srMgmtVisits: 0,
+    resigned: 0,
+    recruited: 0,
+    guardReceived: 0,
+    guardSolved: 0,
+    guardBalance: 0,
+    clientReceived: 0,
+    clientSolved: 0,
+    clientBalance: 0,
+    incidentOpen: 0,
+    incidentClosed: 0,
+    remarks: '',
+    lateStart: 0,
+    outOfPost: 0,
+    nightChecks: 0,
+    monthlyBilling: 0,
+    outstanding: 0,
+    weeklyCollected: 0,
+    over90: false,
+    vacancyRanks: emptyVacancyRanks(0),
+  }
+}
+
+export async function buildConsolidatedMisAckPayload(date: string, filter?: { onTimeOnly?: boolean; lateOnly?: boolean }) {
+  const weekStart = weekStartMondayFor(date)
+  const branches = await getMisReportBranches(true)
+  const branchIds = branches.map((b) => b.id)
+  const [allReports, clients, ackPack, collections, baseline, visits, guardDocsMap, complaintsMap, dutyIncidents] =
+    await Promise.all([
+      getReportsForDate(date, branches),
+      getClients(undefined, { skipRepair: true, branches }),
+      buildAllBranchAckStats(date),
+      getCollections(weekStart),
+      getLatestOstBaseline(weekStart),
+      getVisits(date),
+      getGuardDocsMany(branchIds),
+      getComplaintsMany(branchIds),
+      getDutyIncidents(date),
+    ])
   const reports = allReports.filter((r) => {
     const onTime = isOnTimeMisSubmission(r.dateFor, r.submittedAt)
     if (filter?.onTimeOnly) return onTime
@@ -970,6 +1428,10 @@ async function buildConsolidatedMisAckPayload(date: string, filter?: { onTimeOnl
   })
   const reportMap = buildBranchReportMap(branches, reports)
   const countedReportIds = new Set<string>()
+  const colByBranch = new Map(collections.map((c) => [c.branchId, c]))
+  const { countIncidentsByBranches } = await import('./incident-report-store.js')
+  const incidentStats = await countIncidentsByBranches(branches.map((b) => ({ id: b.id, name: b.name })))
+  const incidentById = new Map(incidentStats.byBranch.map((r) => [r.branchId, r]))
 
   let san = 0
   let abs = 0
@@ -987,29 +1449,122 @@ async function buildConsolidatedMisAckPayload(date: string, filter?: { onTimeOnl
   let medN = 0
   let pvcN = 0
   let psaraN = 0
+  let TRes = 0
+  let TRec = 0
+  let cPvc = 0
+  let cMed = 0
+  let cTrn = 0
+  let cStrength = 0
   const pending: string[] = []
   const branchRows: ConsolidatedBranchRow[] = []
+  const vacantDetail: Array<{
+    branchId: string
+    branch: string
+    client: string
+    unit: string
+    san: number
+    abs: number
+    ot: number
+    dep: number
+    vac: number
+    fill: number
+  }> = []
+  const otDetail: typeof vacantDetail = []
 
   for (const b of branches) {
+    const stats = ackPack.byBranchId[b.id]
+    const col = colByBranch.get(b.id)
+    const billing = Number(col?.monthlyBilling) || 0
+    const outstanding = Number(col?.outstanding) || 0
+    const dso = billing > 0 ? collectionDso(outstanding, billing) : null
+    const gc = stats?.guardComplaints || { received: 0, solved: 0 }
+    const cc = stats?.clientComplaints || { received: 0, solved: 0 }
+    const ir = incidentById.get(b.id) || { open: 0, closed: 0 }
     const r = reportMap.get(b.id)
-    if (!r) {
+    const docs = guardDocsMap.get(b.id) ?? []
+    const branchPosts = branchSanctionedPosts(b.id, r, clients)
+    const counts = guardComplianceCounts(docs, branchPosts)
+    const branchStrength = counts.registered || branchPosts
+    cStrength += branchStrength
+    cPvc += counts.pvc
+    cMed += counts.medical
+    cTrn += counts.training
+
+    const weeklyCollected = col ? weekCollectedSum(col) : 0
+    const over90 = dso != null && dso > 90
+    const branchClientNames = new Set(
+      clients
+        .filter((c) => c.branchId === b.id && c.active !== false)
+        .map((c) => c.name.trim().toLowerCase())
+        .filter(Boolean),
+    )
+    const dutyFor = (kind: 'late_start' | 'out_of_post') =>
+      dutyIncidents.filter((inc) => {
+        if (inc.type !== kind) return false
+        const cl = inc.client.trim().toLowerCase()
+        if (!cl) return false
+        if (!branchClientNames.size) return false
+        return branchClientNames.has(cl) || [...branchClientNames].some((n) => cl.includes(n) || n.includes(cl))
+      }).length
+
+    if (!isSubmitted(r)) {
       pending.push(b.name)
       branchRows.push({
-        name: b.name,
-        submitted: false,
-        san: 0,
-        abs: 0,
-        ot: 0,
-        vac: 0,
-        dep: 0,
-        depPct: 0,
-        collectionPct: '—',
+        ...emptyConsolidatedBranchRow(b.name),
+        pvcPct: stats?.pvcPct || 0,
+        mcPct: stats?.mcPct || 0,
+        siteVisits: stats?.dayVisits || 0,
+        nightChecks: stats?.nightChecks || 0,
+        srMgmtVisits: stats?.srMgmtVisits || 0,
+        resigned: stats?.resigned || 0,
+        recruited: stats?.recruited || 0,
+        dso,
+        monthlyBilling: billing,
+        outstanding,
+        weeklyCollected,
+        over90,
+        lateStart: dutyFor('late_start'),
+        outOfPost: dutyFor('out_of_post'),
+        guardReceived: gc.received,
+        guardSolved: gc.solved,
+        guardBalance: Math.max(0, gc.received - gc.solved),
+        clientReceived: cc.received,
+        clientSolved: cc.solved,
+        clientBalance: Math.max(0, cc.received - cc.solved),
+        incidentOpen: ir.open,
+        incidentClosed: ir.closed,
+        vacancyRanks: emptyVacancyRanks(0),
       })
       continue
     }
     const t = reportDeployTotals(r.rows as Record<string, unknown>[], r.branchId, clients)
     const v = Math.max(0, t.abs - t.ot)
     const d = Math.min(t.san, Math.max(0, t.san - v))
+    const vacPct = t.san ? Math.round((v * 100) / t.san) : 0
+    const ostBranchPct = ostMonthCollectionPct(col)
+    const collPctStr = ostBranchPct ? `${ostBranchPct}%` : '—'
+    let siteRows = filterActiveReportRows(b.id, r.rows as Record<string, unknown>[], clients)
+    if (!siteRows.length && (r.rows as Record<string, unknown>[]).length) {
+      siteRows = r.rows as Record<string, unknown>[]
+    }
+    for (const row of siteRows) {
+      const rt = rowDeployTotals(row)
+      const siteOt = rowOtTotal(row)
+      const siteRow = {
+        branchId: b.id,
+        branch: b.name,
+        client: String(row.clientName ?? ''),
+        unit: String(row.location ?? ''),
+        san: rt.san,
+        abs: rt.abs,
+        ot: siteOt,
+        dep: rt.dep,
+        vac: rt.vac,
+        fill: deployPct(rt.dep, rt.san),
+      }
+      if (rt.vac > 0) vacantDetail.push(siteRow)
+      if (siteOt > 0) otDetail.push(siteRow)
+    }
     if (!countedReportIds.has(r.id)) {
       countedReportIds.add(r.id)
       san += t.san
@@ -1017,7 +1572,9 @@ async function buildConsolidatedMisAckPayload(date: string, filter?: { onTimeOnl
       ot += t.ot
       vac += v
       dep += d
-      const coll = pctNum(r.summary?.collectionPct)
+      TRes += intNum(r.summary?.resignation)
+      TRec += intNum(r.summary?.recruitment)
+      const coll = ostFooterRecoveryPct(parseFloat(ostBranchPct || ''))
       if (coll > 0 && t.san > 0) {
         collWeighted += coll * t.san
         collWeight += t.san
@@ -1047,42 +1604,114 @@ async function buildConsolidatedMisAckPayload(date: string, filter?: { onTimeOnl
       san: t.san,
       abs: t.abs,
       ot: t.ot,
-      vac: v,
       dep: d,
-      depPct: deployPct(d, t.san),
-      collectionPct: String(r.summary?.collectionPct || '—'),
+      vac: v,
+      vacPct,
+      collectionPct: collPctStr.includes('%') ? collPctStr : collPctStr === '—' ? '—' : `${collPctStr}%`,
+      dso,
+      pvcPct: stats?.pvcPct ?? pctNum(r.summary?.pvcPct),
+      mcPct: stats?.mcPct ?? pctNum(r.summary?.medicalFitnessPct),
+      siteVisits: stats?.dayVisits || intNum(r.summary?.dayVisits),
+      nightChecks: stats?.nightChecks || intNum(r.summary?.nightChecks),
+      srMgmtVisits: stats?.srMgmtVisits || 0,
+      resigned: stats?.resigned || intNum(r.summary?.resignation),
+      recruited: stats?.recruited || intNum(r.summary?.recruitment),
+      lateStart: intNum(r.summary?.lateStartCases) || dutyFor('late_start'),
+      outOfPost: intNum(r.summary?.outOfPostCases) || dutyFor('out_of_post'),
+      monthlyBilling: billing,
+      outstanding,
+      weeklyCollected,
+      over90,
+      guardReceived: gc.received,
+      guardSolved: gc.solved,
+      guardBalance: Math.max(0, gc.received - gc.solved),
+      clientReceived: cc.received,
+      clientSolved: cc.solved,
+      clientBalance: Math.max(0, cc.received - cc.solved),
+      incidentOpen: ir.open,
+      incidentClosed: ir.closed,
+      remarks: String(r.summary?.remarks ?? '').trim(),
+      vacancyRanks: vacancyRanksFromShortage(r.manpowerShortage, v),
     })
   }
 
   const depPct = san ? Math.round((dep / san) * 100) : 0
+  const vacPctAll = san ? Math.round((vac * 100) / san) : 0
   const collDisplay = collWeight ? `${(collWeighted / collWeight).toFixed(2)}%` : '—'
+  const billL =
+    (Number(baseline?.billingK) || 0) > 0
+      ? (Number(baseline?.billingK) || 0) / 100
+      : collections.reduce((s, c) => s + (Number(c.monthlyBilling) || 0), 0)
+  const outL =
+    (Number(baseline?.outstandingK) || 0) > 0
+      ? (Number(baseline?.outstandingK) || 0) / 100
+      : collections.reduce((s, c) => s + (Number(c.outstanding) || 0), 0)
+  const companyDso = billL > 0 ? collectionDso(outL, billL) : null
+  const ostCompanyPct = ostFooterRecoveryPct(baseline?.recoveryPct)
+  const overallCollPct = ostCompanyPct
+    ? `${ostCompanyPct}%`
+    : collDisplay
+
+  const remarksJoined = branchRows
+    .filter((r) => r.submitted && r.remarks)
+    .map((r) => `${r.name}: ${r.remarks}`)
+    .join(' | ')
+
   const mergedSummary: Record<string, string> = {
-    collectionPct: collDisplay.replace(/%/g, '').trim(),
+    collectionPct: String(overallCollPct).replace(/%/g, '').trim(),
     complaints: String(sumComplaints),
     lateStartCases: String(sumLate),
     outOfPostCases: String(sumOut),
-    medicalFitnessPct: medN ? String(Math.round(medSum / medN)) : '',
-    pvcPct: pvcN ? String(Math.round(pvcSum / pvcN)) : '',
+    medicalFitnessPct: medN ? String(Math.round(medSum / medN)) : String(ackPack.aggregate.mcPct || ''),
+    pvcPct: pvcN ? String(Math.round(pvcSum / pvcN)) : String(ackPack.aggregate.pvcPct || ''),
     psaraPct: psaraN ? String(Math.round(psaraSum / psaraN)) : '',
-    remarks: '',
+    remarks: remarksJoined.slice(0, 2000),
   }
 
-  const ackStats = await buildConsolidatedAckStats(date)
-  const aiAlerts = buildMisAckAiAlerts({ san, abs, ot, vac, dep, depPct }, mergedSummary)
+  const ackStats = ackPack.aggregate
+  const aiAlerts = buildMisAckAiAlerts({ san, abs, ot, vac, dep, depPct }, mergedSummary, ackStats)
   if (pending.length) {
     aiAlerts.unshift(
       `${pending.length} branch(es) have NOT submitted MIS today: ${pending.join(', ')}. Follow up before close of day.`,
     )
   }
+  if (companyDso != null && companyDso > 90) {
+    aiAlerts.unshift(
+      `ALERT — Company DSO is ${companyDso} days (above 90). Accelerate collections against June billing.`,
+    )
+  }
+
+  // Email size: top 25 vacant + top 25 OT (worst / highest first) — full lists stay on Dashboard.
+  const vacantSummary = buildVacantSummary(vacantDetail, { maxGrouped: 25 })
+  const otSummary = buildOtSummary(otDetail)
+  const dashboard = await buildDashboardExtras(
+    date,
+    weekStart,
+    {
+      branches,
+      reports: allReports,
+      visits,
+      guardDocsMap,
+      complaintsMap,
+      clients,
+      cols: collections,
+      dutyIncidents,
+    },
+    { includeSla: false },
+  )
 
   return {
     san,
     abs,
     ot,
     vac,
+    vacPct: vacPctAll,
     dep,
     depPct,
-    collDisplay,
+    resignation: TRes,
+    recruitment: TRec,
+    collDisplay: overallCollPct,
+    companyDso,
     ackStats,
     aiAlerts,
     pending,
@@ -1090,113 +1719,508 @@ async function buildConsolidatedMisAckPayload(date: string, filter?: { onTimeOnl
     submitted: countedReportIds.size,
     branchCount: branches.length,
     date,
+    vacantGrouped: vacantSummary.vacantGrouped,
+    otGrouped: otSummary.otGrouped,
+    otDetail,
+    compliance: { strength: cStrength, pvc: cPvc, medical: cMed, training: cTrn },
+    incidents: {
+      open: incidentStats.open,
+      closed: incidentStats.closed,
+      total: incidentStats.total,
+    },
+    dashboard,
   }
 }
 
-function consolidatedBranchTableHtml(rows: ConsolidatedBranchRow[]): string {
+function consolidatedCell(v: string | number, pending = false): string {
+  if (pending) return '—'
+  return esc(String(v))
+}
+
+function mailInr(n: number): string {
+  if (!Number.isFinite(n)) return '—'
+  return Math.round(n).toLocaleString('en-IN')
+}
+
+function dashKpiTile(val: string | number, label: string, bg: string, color: string): string {
+  return `<td style="padding:10px 8px;background:${bg};border-radius:8px;text-align:center;vertical-align:top;min-width:90px">
+    <div style="font-size:18px;font-weight:700;color:${color};line-height:1.2">${esc(val)}</div>
+    <div style="font-size:10px;color:#64748b;margin-top:4px;line-height:1.3">${esc(label)}</div>
+  </td>`
+}
+
+function dashKpiSection(title: string, tilesHtml: string): string {
+  return `<div style="margin:18px 0 8px;font-weight:700;color:#14224f;font-size:14px">${esc(title)}</div>
+  <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 12px;border-collapse:separate;border-spacing:6px 0"><tr>${tilesHtml}</tr></table>`
+}
+
+function dashClientTableHtml(
+  title: string,
+  subtitle: string,
+  headers: string[],
+  rows: string[][],
+  empty: string,
+): string {
+  const th = headers
+    .map(
+      (h, i) =>
+        `<th style="padding:7px 6px;font-size:10px;color:#fff;background:#14224f;border:1px solid #0f1a3d;text-align:${i === 0 || i === 1 || i === 2 ? 'left' : 'center'}">${esc(h)}</th>`,
+    )
+    .join('')
+  const body = rows.length
+    ? rows
+        .map(
+          (r) =>
+            `<tr>${r
+              .map(
+                (c, i) =>
+                  `<td style="padding:6px;border:1px solid #e2e8f0;font-size:11px;text-align:${i <= 2 ? 'left' : 'center'}">${c}</td>`,
+              )
+              .join('')}</tr>`,
+        )
+        .join('')
+    : `<tr><td colspan="${headers.length}" style="padding:10px;border:1px solid #e2e8f0;text-align:center;color:#64748b;font-size:12px">${esc(empty)}</td></tr>`
+  return `<div style="margin:20px 0 8px;font-weight:700;color:#14224f;font-size:14px">${esc(title)}</div>
+  <p style="margin:0 0 8px;font-size:11px;color:#64748b">${esc(subtitle)}</p>
+  <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 16px"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table>`
+}
+
+/**
+ * Fixed Daily MIS report sections — same order every calendar day
+ * (Monday–Sunday, including weekends). Do not skip or reorder by getDay().
+ */
+export const MIS_DAILY_REPORT_SECTIONS = [
+  '1. Dashboard',
+  '2. Consolidated MIS report',
+  '3. Vacancy report — branch-wise (rank)',
+  '4. OT report — branch-wise',
+  '5. Late start — out of post report',
+  '6. Day visit — Night visit report',
+  '7. Finance report',
+  '8. Client Complaints',
+  '9. Guards Complaints',
+  '10. Conclusion — AI report (branch-wise)',
+] as const
+
+/** Dashboard sections matching /mis-dashboard — reused as section 1 of the 4:30 PM Command Centre mail. */
+export function consolidatedDashboardSectionsHtml(
+  payload: {
+  san: number
+  dep: number
+  ot: number
+  vac: number
+  depPct: number
+  resignation: number
+  recruitment: number
+  rejoin?: number
+  compliance: { strength: number; pvc: number; medical: number; training: number }
+  incidents: { open: number; closed: number; total: number }
+  vacantGrouped: Array<{ client: string; branches: string; vac: number; fill: number }>
+  otGrouped: Array<{ client: string; branches: string; locations: string; ot: number; abs: number }>
+  dashboard: Awaited<ReturnType<typeof buildDashboardExtras>>
+},
+  opts?: { includeBranchHeading?: boolean; includeClientOtVacantTables?: boolean },
+): string {
+  const t = payload
+  const ov = t.dashboard.opsVisits
+  const ds = t.dashboard.dutyStart
+  const col = t.dashboard.collection
+  const strength = t.compliance.strength || t.san || 0
+  const pctOf = (n: number, d: number) => (d > 0 ? Math.min(100, Math.round((Math.min(n, d) * 100) / d)) : 0)
+
+  const deploy = dashKpiSection(
+    'Deployment',
+    [
+      dashKpiTile(t.san, 'Sanctioned Posts', '#eff6ff', '#1d4ed8'),
+      dashKpiTile(t.dep, `Deployed (${t.depPct}%)`, '#f0fdf4', '#16a34a'),
+      dashKpiTile(t.ot, 'OT', '#f5f3ff', '#7c3aed'),
+      dashKpiTile(t.vac, 'Vacant', '#fef2f2', '#dc2626'),
+      dashKpiTile(t.resignation, 'Resignation', '#fff7ed', '#ea580c'),
+      dashKpiTile(t.recruitment, 'Recruitment', '#f5f3ff', '#7c3aed'),
+      dashKpiTile(t.rejoin ?? 0, 'Rejoin', '#fff7ed', '#ea580c'),
+    ].join(''),
+  )
+
+  const ops = dashKpiSection(
+    'Operations & Compliance',
+    [
+      dashKpiTile(ov.total, `Ops Visits (${ov.pct}% of ${ov.sites} sites)`, '#f5f3ff', '#7c3aed'),
+      dashKpiTile(ov.nightChecks, 'Night Checks', '#eff6ff', '#1d4ed8'),
+      dashKpiTile(ov.trainedSites, 'Trained Sites', '#fefce8', '#ca8a04'),
+      dashKpiTile(`${pctOf(t.compliance.pvc, strength)}%`, `PVC (${t.compliance.pvc}/${strength})`, '#f0fdf4', '#16a34a'),
+      dashKpiTile(`${pctOf(t.compliance.medical, strength)}%`, `Medical (${t.compliance.medical}/${strength})`, '#fffbeb', '#b45309'),
+      dashKpiTile(`${pctOf(t.compliance.training, strength)}%`, `Training (${t.compliance.training}/${strength})`, '#eff6ff', '#1d4ed8'),
+    ].join(''),
+  )
+
+  const collDuty = dashKpiSection(
+    'Collections & Duty Start',
+    [
+      dashKpiTile(`${col.overallPct}%`, 'Month Collection % (OST Friday)', '#fefce8', '#ca8a04'),
+      dashKpiTile(`${ds.timelyPct}%`, 'Timely Start Duty', '#f0fdf4', '#16a34a'),
+      dashKpiTile(`${ds.latePct}%`, `Late Start (${ds.lateCases})`, '#fffbeb', '#b45309'),
+      dashKpiTile(`${ds.outOfPostPct}%`, `Out of Post (${ds.outOfPostCases})`, '#fef2f2', '#dc2626'),
+    ].join(''),
+  )
+
+  const recv = dashKpiSection(
+    'Receivables & DSO',
+    [
+      dashKpiTile(`${col.overallPct}%`, 'Month Collection % (10th–10th · OST)', '#f0fdf4', '#16a34a'),
+      dashKpiTile(mailInr(col.dsoOver90Receivable), `DSO >90 Days (${col.dsoOver90Branches} br.)`, '#fffbeb', '#b45309'),
+      dashKpiTile(mailInr(col.outstanding), 'Total Outstanding', '#eff6ff', '#1d4ed8'),
+      dashKpiTile(col.avgDso != null ? col.avgDso : '—', 'Average DSO (days)', '#f5f3ff', '#7c3aed'),
+    ].join(''),
+  )
+
+  const incidents = dashKpiSection(
+    'Incidents',
+    [
+      dashKpiTile(t.incidents.open, 'Open', '#fef2f2', '#dc2626'),
+      dashKpiTile(t.incidents.closed, 'Closed (report sent)', '#f0fdf4', '#16a34a'),
+      dashKpiTile(t.incidents.total, 'Total', '#eff6ff', '#1d4ed8'),
+    ].join(''),
+  )
+
+  const showClientTables = opts?.includeClientOtVacantTables !== false
+  const otTotal = t.otGrouped.reduce((s, v) => s + (Number(v.ot) || 0), 0)
+  const otRows = t.otGrouped.map((v, i) => [
+    String(i + 1),
+    esc(v.client),
+    esc(v.branches),
+    esc(v.locations || '—'),
+    `<span style="color:#7c3aed;font-weight:700">${v.ot}</span>`,
+    String(v.abs || 0),
+  ])
+  const overtime = showClientTables
+    ? dashClientTableHtml(
+        'Overtime (OT) — client-wise',
+        `Company OT total: ${t.ot} · Highest first (top ${t.otGrouped.length || 0} · listed OT ${otTotal})`,
+        ['Sl.No.', 'Client', 'Branches', 'Locations', 'OT', 'Abs.'],
+        otRows,
+        'No overtime reported.',
+      )
+    : ''
+
+  const vacRows = t.vacantGrouped.map((v, i) => [
+    String(i + 1),
+    esc(v.client),
+    esc(v.branches),
+    `<span style="color:#dc2626;font-weight:700">${v.vac}</span>`,
+    `${v.fill}%`,
+  ])
+  const vacant = showClientTables
+    ? dashClientTableHtml(
+        'Vacant Posts (worst first) — client-wise',
+        'Same client clubbed across branches · highest vacant first · top 25 (full list on Dashboard)',
+        ['Sl.No.', 'Client', 'Branches', 'Vacant', 'Fill %'],
+        vacRows,
+        'No vacant posts reported.',
+      )
+    : ''
+
+  const branchHead =
+    opts?.includeBranchHeading === false
+      ? ''
+      : `<div style="margin:20px 0 8px;font-weight:700;color:#14224f;font-size:14px">Branch-wise MIS Data</div>`
+
+  return `${deploy}${ops}${collDuty}${recv}${incidents}${overtime}${vacant}${branchHead}`
+}
+
+export function consolidatedBranchTableHtml(
+  rows: ConsolidatedBranchRow[],
+  opts?: { monthCollectionPct?: string },
+): string {
+  const th = (label: string) =>
+    `<th style="padding:7px 5px;font-size:9px;color:#14224f;white-space:nowrap;border:1px solid #cbd5e1;background:#e2e8f0">${label}</th>`
+  const td = (v: string | number, opts?: { bold?: boolean; warn?: boolean }) =>
+    `<td style="padding:6px 5px;border:1px solid #e2e8f0;text-align:center;font-size:10px;white-space:nowrap;${opts?.bold ? 'font-weight:700;color:#14224f;' : ''}${opts?.warn ? 'color:#dc2626;font-weight:700;' : ''}">${v}</td>`
+
   const body = rows
-    .map((r) => {
+    .map((r, i) => {
+      const p = !r.submitted
       const status = r.submitted
-        ? '<span style="color:#16a34a">✓</span>'
-        : '<span style="color:#dc2626">Pending</span>'
-      const coll = r.submitted ? esc(r.collectionPct) : '—'
-      return `<tr>
-        <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;font-size:12px">${esc(r.name)}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:12px">${status}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:12px">${r.submitted ? r.san : '—'}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:12px">${r.submitted ? r.abs : '—'}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:12px">${r.submitted ? r.ot : '—'}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:12px">${r.submitted ? r.vac : '—'}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:12px">${r.submitted ? r.dep : '—'}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:12px">${r.submitted ? `${r.depPct}%` : '—'}</td>
-        <td style="padding:8px 10px;border-bottom:1px solid #e2e8f0;text-align:center;font-size:12px">${coll}</td>
+        ? '<span style="color:#16a34a;font-weight:700">✓</span>'
+        : '<span style="color:#dc2626;font-weight:700">Pending</span>'
+      return `<tr style="background:${i % 2 ? '#f8fafc' : '#ffffff'}">
+        ${td(i + 1)}
+        <td style="padding:6px 5px;border:1px solid #e2e8f0;text-align:left;font-size:10px;font-weight:700;color:#14224f;white-space:nowrap">${esc(r.name)} ${status}</td>
+        ${td(consolidatedCell(r.san, p))}
+        ${td(consolidatedCell(r.abs, p))}
+        ${td(consolidatedCell(r.ot, p))}
+        ${td(consolidatedCell(r.dep, p))}
+        ${td(consolidatedCell(r.vac, p), { warn: !p && r.vac > 0 })}
+        ${td(consolidatedCell(p ? '—' : `${r.vacPct}%`, p))}
+        ${td(consolidatedCell(r.collectionPct, p))}
+        ${td(consolidatedCell(r.dso != null ? r.dso : '—', p))}
+        ${td(consolidatedCell(`${r.pvcPct}%`, false))}
+        ${td(consolidatedCell(`${r.mcPct}%`, false))}
+        ${td(consolidatedCell(r.siteVisits, false))}
+        ${td(consolidatedCell(r.srMgmtVisits, false))}
+        ${td(consolidatedCell(r.resigned, false))}
+        ${td(consolidatedCell(r.recruited, false))}
+        ${td(consolidatedCell(r.guardReceived, false))}
+        ${td(consolidatedCell(r.guardSolved, false))}
+        ${td(consolidatedCell(r.guardBalance, false), { warn: r.guardBalance > 0 })}
+        ${td(consolidatedCell(r.clientReceived, false))}
+        ${td(consolidatedCell(r.clientSolved, false))}
+        ${td(consolidatedCell(r.clientBalance, false), { warn: r.clientBalance > 0 })}
+        ${td(consolidatedCell(r.incidentOpen, false), { warn: r.incidentOpen > 0 })}
+        ${td(consolidatedCell(r.incidentClosed, false))}
+        <td style="padding:6px 5px;border:1px solid #e2e8f0;text-align:left;font-size:10px;color:#0f172a;max-width:220px;white-space:normal;word-break:break-word;vertical-align:top">${p ? '—' : esc(r.remarks || '—')}</td>
       </tr>`
     })
     .join('')
 
+  const tot = rows.reduce(
+    (a, r) => {
+      if (!r.submitted) return a
+      a.san += r.san
+      a.abs += r.abs
+      a.ot += r.ot
+      a.dep += r.dep
+      a.vac += r.vac
+      a.siteVisits += r.siteVisits
+      a.srMgmtVisits += r.srMgmtVisits
+      a.resigned += r.resigned
+      a.recruited += r.recruited
+      a.guardReceived += r.guardReceived
+      a.guardSolved += r.guardSolved
+      a.guardBalance += r.guardBalance
+      a.clientReceived += r.clientReceived
+      a.clientSolved += r.clientSolved
+      a.clientBalance += r.clientBalance
+      a.incidentOpen += r.incidentOpen
+      a.incidentClosed += r.incidentClosed
+      return a
+    },
+    {
+      san: 0,
+      abs: 0,
+      ot: 0,
+      dep: 0,
+      vac: 0,
+      siteVisits: 0,
+      srMgmtVisits: 0,
+      resigned: 0,
+      recruited: 0,
+      guardReceived: 0,
+      guardSolved: 0,
+      guardBalance: 0,
+      clientReceived: 0,
+      clientSolved: 0,
+      clientBalance: 0,
+      incidentOpen: 0,
+      incidentClosed: 0,
+    },
+  )
+  // Also count incidents for pending branches (still in rows)
+  for (const r of rows) {
+    if (r.submitted) continue
+    tot.incidentOpen += r.incidentOpen
+    tot.incidentClosed += r.incidentClosed
+  }
+  const vacPct = tot.san ? Math.round((tot.vac * 100) / tot.san) : 0
+  const foot = `<tr style="background:#14224f;color:#fde68a;font-weight:800">
+      ${td('')}
+      <td style="padding:6px 5px;border:1px solid #334155;text-align:left;font-size:10px;color:#fde68a">TOTAL</td>
+      ${td(tot.san)}${td(tot.abs)}${td(tot.ot)}${td(tot.dep)}${td(tot.vac)}      ${td(`${vacPct}%`)}
+      ${td(opts?.monthCollectionPct || '—')}${td('—')}${td('—')}${td('—')}
+      ${td(tot.siteVisits)}${td(tot.srMgmtVisits)}${td(tot.resigned)}${td(tot.recruited)}
+      ${td(tot.guardReceived)}${td(tot.guardSolved)}${td(tot.guardBalance)}
+      ${td(tot.clientReceived)}${td(tot.clientSolved)}${td(tot.clientBalance)}
+      ${td(tot.incidentOpen)}${td(tot.incidentClosed)}
+      <td style="padding:6px 5px;border:1px solid #334155;text-align:left;font-size:10px;color:#fde68a">—</td>
+    </tr>`
+
+  const remarkNotes = rows
+    .filter((r) => r.submitted && String(r.remarks || '').trim())
+    .map(
+      (r) =>
+        `<div style="padding:8px 0;border-bottom:1px solid #e2e8f0"><b style="color:#14224f">${esc(r.name)}</b><br><span style="font-size:12px;color:#334155;white-space:pre-wrap">${esc(r.remarks)}</span></div>`,
+    )
+    .join('')
+
   return `<div style="margin:0 0 20px">
-    <div style="font-weight:700;color:#14224f;font-size:14px;margin-bottom:8px">Branch-wise MIS Data (each branch)</div>
-    <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;border-collapse:collapse">
+    <div style="font-weight:700;color:#14224f;font-size:14px;margin-bottom:8px">Branch-wise MIS Data</div>
+    <div style="overflow-x:auto;border:1px solid #cbd5e1;border-radius:8px;-webkit-overflow-scrolling:touch">
+    <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;min-width:1600px;width:100%">
       <thead>
-        <tr style="background:#f1f5f9">
-          <th style="padding:10px;font-size:11px;text-align:left;color:#14224f">Branch</th>
-          <th style="padding:10px;font-size:11px;color:#14224f">Report</th>
-          <th style="padding:10px;font-size:11px;color:#14224f">San</th>
-          <th style="padding:10px;font-size:11px;color:#14224f">Abs</th>
-          <th style="padding:10px;font-size:11px;color:#14224f">OT</th>
-          <th style="padding:10px;font-size:11px;color:#14224f">Vac</th>
-          <th style="padding:10px;font-size:11px;color:#14224f">Dep</th>
-          <th style="padding:10px;font-size:11px;color:#14224f">Deploy%</th>
-          <th style="padding:10px;font-size:11px;color:#14224f">Coll%</th>
+        <tr>
+          ${th('SI')}
+          ${th('Branch')}
+          ${th('Sanctioned')}
+          ${th('Absent')}
+          ${th('OT')}
+          ${th('Deployed')}
+          ${th('Vacant')}
+          ${th('Vacant %')}
+          ${th('Overall Coll %')}
+          ${th('DSO days')}
+          ${th('PVC %')}
+          ${th('MC %')}
+          ${th('Site Visit')}
+          ${th('Client Visit (Sr Mgmt)')}
+          ${th('Resigned')}
+          ${th('Recruited')}
+          ${th('Guard Comp Recd')}
+          ${th('Solved')}
+          ${th('Balance')}
+          ${th('Client Comp Recd')}
+          ${th('Solved')}
+          ${th('Balance')}
+          ${th('Incidents Open')}
+          ${th('Incidents Closed')}
+          ${th('Remarks')}
         </tr>
       </thead>
-      <tbody>${body}</tbody>
+      <tbody>${body}${foot}</tbody>
     </table>
+    </div>
+    <div style="margin-top:14px;padding:12px 14px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc">
+      <div style="font-weight:700;color:#14224f;font-size:13px;margin-bottom:8px">Branch remarks (full text)</div>
+      ${remarkNotes || '<span style="font-size:12px;color:#64748b">No branch wrote remarks for this date.</span>'}
+    </div>
   </div>`
 }
 
-/** 5:00 PM IST — consolidated daily dashboard to Director (all same-day submissions). */
-export async function sendMisConsolidatedDailyAck(date: string) {
+/**
+ * 5:00 PM IST — consolidated daily dashboard.
+ * Default: To all HODs · CC Lokesh + Director.
+ * opts.sampleOnly — Selwyn Gmail only (preview).
+ * opts.directorOnly — To Director only (manual resend).
+ */
+export async function sendMisConsolidatedDailyAck(
+  date: string,
+  opts?: { directorOnly?: boolean; sampleOnly?: boolean },
+) {
   const apiKey = process.env.RESEND_API_KEY?.trim()
   if (!apiKey) return { ok: false, error: 'Email not configured' }
 
+  const directorOnly = !!opts?.directorOnly
+  const sampleOnly = !!opts?.sampleOnly
   const payload = await buildConsolidatedMisAckPayload(date)
   const statsHtml = ackStatsTableHtml(payload.ackStats)
   const alertHtml = payload.aiAlerts
     .map((a) => `<li style="margin:0 0 8px;line-height:1.5;color:#1e293b">${esc(a)}</li>`)
     .join('')
+  const dashboardHtml = consolidatedDashboardSectionsHtml({
+    san: payload.san,
+    dep: payload.dep,
+    ot: payload.ot,
+    vac: payload.vac,
+    depPct: payload.depPct,
+    resignation: payload.resignation,
+    recruitment: payload.recruitment,
+    compliance: payload.compliance,
+    incidents: payload.incidents,
+    vacantGrouped: payload.vacantGrouped,
+    otGrouped: payload.otGrouped,
+    dashboard: payload.dashboard,
+  })
   const html = buildMisAckEmailHtml({
-    headerLine: 'ALL BRANCHES — Consolidated Dashboard',
+    headerLine: sampleOnly
+      ? 'SAMPLE — ALL BRANCHES Consolidated Dashboard'
+      : directorOnly
+        ? 'PREVIEW — Consolidated Daily MIS Dashboard'
+        : 'ALL BRANCHES — Consolidated Daily MIS Dashboard',
     dateFor: date,
-    dearLine: 'Dear Director,',
-    bodyLine:
-      'Please find the <b>consolidated Daily MIS Dashboard</b> for all branches — combined deployment and branch status below (sent daily at 5:00 PM IST).',
+    dearLine: sampleOnly || directorOnly ? 'Dear Sir,' : 'Dear All HODs,',
+    bodyLine: sampleOnly
+      ? 'Please find this <b>SAMPLE</b> consolidated Daily MIS Dashboard (for your review only — not sent to HODs).'
+      : directorOnly
+        ? 'Please find this <b>PREVIEW</b> of the consolidated Daily MIS Dashboard (Director only). The scheduled 5:00 PM IST mail goes to all HODs, with CC to Sridhar.M and Director.'
+        : 'Please find the <b>consolidated Daily MIS Dashboard</b> for all branches — Deployment, Operations &amp; Compliance, Collections &amp; Duty Start, Receivables &amp; DSO, Incidents, Vacant Posts (worst first) and Overtime (sent daily at 5:00 PM IST, including Saturday and Sunday).',
     submittedByLine: `Branches submitted: <b style="color:#14224f">${payload.submitted} of ${payload.branchCount}</b>`,
     totals: {
       san: payload.san,
       abs: payload.abs,
       ot: payload.ot,
       vac: payload.vac,
+      vacPct: payload.vacPct,
       dep: payload.dep,
       depPct: payload.depPct,
       collDisplay: payload.collDisplay,
+      dsoDays: payload.companyDso,
     },
     statsHtml,
     alertHtml,
-    extraHtml: consolidatedBranchTableHtml(payload.branchRows),
+    extraHtml: dashboardHtml + consolidatedBranchTableHtml(payload.branchRows, { monthCollectionPct: payload.collDisplay }),
+    wide: true,
   })
 
   const resend = new Resend(apiKey)
   const from = misAckFromAddress()
   const director = misAckDirectorEmail()
   const gmailCopy = misAckGmailCopy()
-  const cc = gmailCopy && gmailCopy !== director ? [gmailCopy] : undefined
+  const hodTo = withoutNoMailRecipients(await getAllHodEmails())
 
-  const subject = `MIS Consolidated Dashboard — ${date} — ${payload.submitted}/${payload.branchCount} branches — ${payload.depPct}% deployed`
+  let to: string[]
+  let cc: string[] = []
+  let bcc: string[] = []
+  if (sampleOnly) {
+    to = withoutNoMailRecipients([gmailCopy].filter((e) => e.includes('@')))
+    if (!to.length) to = [director]
+  } else if (directorOnly) {
+    to = withoutNoMailRecipients([director])
+  } else {
+    /** Scheduled daily: To HODs · CC Lokesh + Sridhar.M + Director */
+    to = hodTo.length ? hodTo : [director]
+    cc = withoutNoMailRecipients(
+      Array.from(
+        new Set(
+          [LOKESH_CC_EMAIL, SRIDHAR_M_CC_EMAIL, MIS_DIRECTOR_CC_EMAIL]
+            .map((e) => e.trim().toLowerCase())
+            .filter((e) => e.includes('@') && !to.includes(e)),
+        ),
+      ),
+    )
+  }
+
+  const sampleTag = sampleOnly ? ' [SAMPLE — Selwyn only]' : ''
+  const subject = `MIS Consolidated Dashboard — ${date} — ${payload.submitted}/${payload.branchCount} branches — ${payload.depPct}% deployed${sampleTag}`
   const result = await sendSuiteEmail(resend, {
     from,
-    to: director,
-    cc,
+    to,
+    cc: cc.length ? cc : undefined,
+    bcc: bcc.length ? bcc : undefined,
     replyTo: director,
     subject,
     html,
+    skipDirectorCc: true,
   })
-  if (result.error) return { ok: false, error: result.error.message ?? 'Send failed', to: director, cc }
-  if (!result.data?.id) return { ok: false, error: 'No delivery confirmation', to: director, cc }
+  if (result.error) return { ok: false, error: result.error.message ?? 'Send failed', to, cc, bcc }
+  if (!result.data?.id) return { ok: false, error: 'No delivery confirmation', to, cc, bcc }
+
+  /** Personal copies for normal daily send only. */
+  let directorCopies: Array<{ to: string; from: string; id?: string; error?: string }> = []
+  if (!directorOnly && !sampleOnly) {
+    const copySubject = `[Your copy] ${subject}`
+    const copyText = `Agile MIS Consolidated Dashboard — ${date}\nBranches submitted: ${payload.submitted} of ${payload.branchCount}\nDeployment: ${payload.depPct}%\n\nOpen dashboard: https://www.agilegroup-digital.co.in/mis-dashboard`
+    directorCopies = await sendDirectorPersonalCopies(resend, {
+      subject: copySubject,
+      html,
+      text: copyText,
+      replyTo: director,
+    })
+  }
 
   return {
     ok: true,
-    to: director,
+    to,
     cc,
+    bcc,
     from,
+    directorOnly,
+    sampleOnly,
+    directorCopies,
     submitted: payload.submitted,
     branchCount: payload.branchCount,
     pending: payload.pending,
     depPct: payload.depPct,
+    companyDso: payload.companyDso,
   }
 }
-
-/** Late submissions only — separate consolidated email (not mixed with on-time 4 PM report). */
 export async function sendMisLateConsolidatedAck(date: string) {
   const apiKey = process.env.RESEND_API_KEY?.trim()
   if (!apiKey) return { ok: false, error: 'Email not configured' }
@@ -1220,13 +2244,16 @@ export async function sendMisLateConsolidatedAck(date: string) {
       abs: payload.abs,
       ot: payload.ot,
       vac: payload.vac,
+      vacPct: payload.vacPct,
       dep: payload.dep,
       depPct: payload.depPct,
       collDisplay: payload.collDisplay,
+      dsoDays: payload.companyDso,
     },
     statsHtml,
     alertHtml,
-    extraHtml: consolidatedBranchTableHtml(payload.branchRows),
+    extraHtml: consolidatedBranchTableHtml(payload.branchRows, { monthCollectionPct: payload.collDisplay }),
+    wide: true,
   })
 
   const resend = new Resend(apiKey)
@@ -1284,19 +2311,23 @@ export async function sendBranchSubmitAck(
   const apiKey = process.env.RESEND_API_KEY?.trim()
   if (!apiKey) return { ok: false, skipped: true, error: 'Email not configured' }
 
-  const defaultAckStats = {
+  const defaultAckStats: BranchAckStats = {
     guardsTotal: 0,
+    sanctionedStrength: 0,
     pvcValid: 0,
     medicalValid: 0,
+    pvcPct: 0,
+    mcPct: 0,
     dayVisits: Number(report.summary.dayVisits) || 0,
     nightChecks: Number(report.summary.nightChecks) || 0,
     srMgmtVisits: 0,
     resigned: Number(report.summary.resignation) || 0,
+    recruited: Number(report.summary.recruitment) || 0,
     recruitmentOpen: Number(report.summary.recruitment) || 0,
     weeklyCollected: 0,
     weeklyBudget: 0,
-    guardComplaints: { received: 0, solved: 0, avgResponseHrs: null as number | null },
-    clientComplaints: { received: 0, solved: 0, avgResponseHrs: null as number | null },
+    guardComplaints: { received: 0, solved: 0, avgResponseHrs: null },
+    clientComplaints: { received: 0, solved: 0, avgResponseHrs: null },
   }
 
   /* Parallel load — keep acknowledgment email under ~2s so submit feels instant */
@@ -1746,6 +2777,14 @@ export type ClientPerfPayload = {
   outOfPost?: number
   mwCompliant?: string
   mwCompliantLabel?: string
+  pvcPct?: number | null
+  medicalPct?: number | null
+  pvcCount?: number
+  medicalCount?: number
+  complianceSan?: number
+  pvcLabel?: string
+  medicalLabel?: string
+  accuracyNote?: string
   monthlyBillLacs?: number | null
   balanceToPayLacs?: number | null
   collectedLacs?: number | null

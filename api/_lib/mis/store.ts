@@ -8,8 +8,8 @@
  *
  * Daily reporting:
  *   - Each branch submits one Deployment (Report 1a) per date. The form pre-fills
- *     sanctioned strength from the client master and the previous day's entries,
- *     so branches only update what changed.
+ *     sanctioned strength from the client master (and yesterday's Sanctioned),
+ *     so branches only update today's Absent and OT.
  */
 
 import { createRequire } from 'node:module'
@@ -22,8 +22,20 @@ import {
   filterClientsForBranch,
   sitesForBranch,
   normalizeClientBranchIds,
+  isHiTechCityBranch,
+  isKrcHiTechClient,
+  isVisakhapatnamBranch,
+  isKakinadaBookClient,
+  isKakinadaBranch,
+  isKakinadaLeftoverClient,
+  isSrmtClient,
+  isTadaBranch,
+  isTadaBookClient,
 } from './client-branch.js'
 import { normalizeToLacs } from '../inr-money.js'
+import type { MisManpowerShortage } from './manpower-shortage.js'
+
+export type { MisManpowerShortage } from './manpower-shortage.js'
 
 export type MisBranch = { id: string; name: string; pin: string; active: boolean }
 
@@ -33,6 +45,8 @@ export type MisClient = {
   name: string
   location: string
   staffName: string
+  /** Client work email — Client door PIN. Not money / internal notes. */
+  clientEmail?: string
   sanA: number // A / Day shift
   sanG: number // General shift
   sanB: number // B shift
@@ -42,16 +56,40 @@ export type MisClient = {
   uniformIssued: string
   rainGearIssued: string
   equipmentIssued: string
-  /** 1–5 stars: 1–2 Valued Client · 3–4 High Value Client · 5 Strategic Client */
+  /** 1–5 stars (SLA / cadence). Business tier = Standard/Cluster/Enterprise/Apex from footprint + Apex list. */
   starRating: number
   highValue: boolean
+  /** Computed on read — Standard | Cluster | Enterprise | Apex (not always persisted). */
+  businessTier?: 'standard' | 'cluster' | 'enterprise' | 'apex'
   active: boolean
+  /** agile = ASFPL · sparks = SSMS — for recruitment company filter */
+  entity?: 'agile' | 'sparks' | ''
   /** Minimum Wage compliant — branch HOD Yes/No for Client Performance. */
   mwCompliant?: 'yes' | 'no' | ''
   /** Client monthly bill (₹ lakhs) — branch manual for Client Performance. */
   monthlyBillLacs?: number
   /** Balance to be paid (₹ lakhs) — branch manual for Client Performance. */
   balanceToPayLacs?: number
+  /** GPS from HDFC SSA / field visit — for India road map later */
+  geoLat?: number
+  geoLng?: number
+  geoCapturedAt?: string
+  geoSource?: string
+  /** Director freeze — Daily MIS 14-08-2026 book. Geo / restore must not move this site. */
+  branchFrozen?: boolean
+}
+
+export type ClientBookFreeze = {
+  date: string
+  at: string
+  submitted: number
+  moved: number
+  added: number
+  deactivated: number
+  /** Kakinada uses Daily MIS 12-08-2026, not the 14-08 book. */
+  kakinadaDate?: string
+  kakinadaSites?: string[]
+  branches: Array<{ id: string; name: string; sites: number; active: number }>
 }
 
 /** Shift keys used across the daily report (A=Day, G=General, B, C=Night). */
@@ -71,7 +109,7 @@ export type MisStaff = {
   active: boolean
   /** operations = branch field team · support = HQ (Stores, HR, etc.) */
   team?: 'operations' | 'support'
-  /** Stores · HR · Recruitment · Payroll — for support staff only */
+  /** Stores · HR · RECRUITMENT · etc. — for support staff only */
   department?: string
 }
 
@@ -98,6 +136,8 @@ export type MisGuardDoc = {
   mobile: string
   /** Date of joining (YYYY-MM-DD or DD/MM/YYYY) */
   doj: string
+  /** ID card issue date — validity auto-set to +1 year when saved */
+  idCardIssueDate: string
   /** ID card validity date */
   idCardValidity: string
   aadhar: string
@@ -126,6 +166,10 @@ export type MisVisit = {
   remarks: string
   /** D = Day visit, N = Night check, T = Training */
   visitType?: 'D' | 'N' | 'T' | ''
+  /** Patrol point name from mobile visit / patrol report */
+  patrolPoint?: string
+  /** Distance travelled on patrol (e.g. "2.4 km") */
+  kmTravelled?: string
   fromMobile?: boolean
 }
 
@@ -135,12 +179,20 @@ export type MisDutyIncident = {
   date: string
   guardName: string
   employeeId: string
+  /** Guard mobile (10 digits) — for Call / WhatsApp warning */
+  mobile?: string
   client: string
   unit: string
   shift: string
   incidentTime: string
   type: 'late_start' | 'out_of_post'
   remarks: string
+  /** Actual duty start / punch time (late start cases) */
+  dutyStartTime?: string
+  /** Scheduled shift start time (late start cases) */
+  scheduledTime?: string
+  /** Distance away from post (out of location cases, e.g. "0.8 km") */
+  kmFromPost?: string
   fromMobile?: boolean
 }
 
@@ -159,6 +211,8 @@ export type MisCollection = {
   sat: number
   outstanding: number
   remarks: string
+  /** Friday OST current-month collected (lakhs). Weekly Mon–Sat must never change this. */
+  ostCollected?: number
 }
 
 /** Standard nature-of-complaint options (Operations Complaints Form + MIS). */
@@ -176,6 +230,8 @@ export const COMPLAINT_NATURES = [
   'Strike',
   'Water logging',
   'Shortage of Manpower',
+  'Missing',
+  'Incident',
   'No visit',
   'Not attending calls',
 ] as const
@@ -189,7 +245,7 @@ export function isComplaintNature(v: string): v is ComplaintNature {
 /** A complaint / incident record. */
 export type MisComplaint = {
   id: string
-  /** Unique reference e.g. AGM-OPS-2026-00042 */
+  /** Unique reference e.g. Agile - TCS-JUL-00042 22/07/2026 */
   code?: string
   branchId: string
   clientName: string
@@ -199,11 +255,11 @@ export type MisComplaint = {
   description: string
   actionTaken: string
   momWithin24h: boolean
-  status: string // Open / Closed
+  status: string // Open / Closed / Reopened
   reportedBy: string
-  /** manual | inbox | web | branch */
+  /** manual | inbox | web | branch | phone */
   source?: string
-  /** Phone | Mail | WhatsApp | Email | Web */
+  /** Phone | Help Desk | Control | Operations | Email | Mail | WhatsApp | Web */
   channel?: string
   /** Nature of complaint (dropdown) */
   nature?: string
@@ -211,6 +267,22 @@ export type MisComplaint = {
   contactPhone?: string
   /** What action / resolution is expected */
   expectedAction?: string
+  /** Staff / HOD assigned to handle the case (display name) */
+  assignedTo?: string
+  /** Assignee email for assignment mail */
+  assigneeEmail?: string
+  /** Branch / department of assignee */
+  assigneeDept?: string
+  /** Expected date of closure (YYYY-MM-DD) */
+  edc?: string
+  /** Corrective action plan (assignee text — visible to all when filled) */
+  correctiveActionPlan?: string
+  /** How to avoid reoccurrence */
+  avoidRecurrence?: string
+  /** ISO date when marked resolved / closed */
+  resolvedOn?: string
+  /** ISO date when completion report was sent */
+  completionReportSentOn?: string
   /** Gmail message id — prevents duplicate imports */
   emailId?: string
   fromEmail?: string
@@ -218,18 +290,41 @@ export type MisComplaint = {
   importedAt?: string
   /** ISO timestamp when complaint was first registered */
   registeredAt?: string
+  /** ISO datetime when client mail was received in Director inbox */
+  mailReceivedAt?: string
   /** false = archived / hidden — record kept */
   active?: boolean
+  /** This row is a reopen copy of another complaint */
+  reopenedFromId?: string
+  /** ISO time when this reopen copy was created (sorts to top) */
+  reopenedAt?: string
+  /** Old row marked after reopen — button shows Reopened, row faded */
+  reopenLabel?: 'reopened'
+  /** Id of the new open copy that superseded this row */
+  supersededById?: string
 }
 
-/** True if a document value means the document is present/valid. */
+/** True if a document value means the document is present/valid (not pending / to-collect). */
 export function docPresent(v: string): boolean {
   const s = String(v ?? '').trim().toUpperCase()
   if (!s) return false
-  if (['VALID', 'FIT', 'CERTIFIED', 'APPLIED', 'YES', 'Y', 'DONE'].includes(s)) return true
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return true
-  if (/^\d{2}[-/]\d{2}[-/]\d{4}$/.test(s)) return true
+  if (
+    /PENDING|TO BE COLLECTED|UNDER PROCESS|RENEWAL UNDER|NO CERTIFICATE|NOT APPLIED|EXPIRED|UNFIT|N\/A|^NA$|^NIL$|^-$/.test(
+      s,
+    )
+  ) {
+    return false
+  }
+  if (['VALID', 'FIT', 'CERTIFIED', 'APPLIED', 'YES', 'Y', 'DONE', 'ACTIVE', 'OK'].includes(s)) return true
+  // ISO / common Indian date forms (incl. DD.MM.YYYY)
+  if (/^\d{4}[-/.]\d{2}[-/.]\d{2}$/.test(s)) return true
+  if (/^\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}$/.test(s)) return true
   return false
+}
+
+/** True if status or validity date shows a real PVC / Medical / Training document. */
+export function guardDocPresent(status: string, validity = ''): boolean {
+  return docPresent(status) || docPresent(validity)
 }
 
 /** Guard register row counts toward PVC / Medical compliance totals. */
@@ -256,13 +351,13 @@ export type MisSummary = {
   collectionPct: string
   /** Weekly collection achievement % (Mon–Sat ÷ weekly budget) */
   weeklyCollectionPct?: string
-  /** Consolidated collection % (monthly billing vs outstanding — finance upload) */
+  /** Consolidated collection % — Friday OST current-month billing collected only (10th–10th). Weekly must not change this. */
   consolidatedCollectionPct?: string
   /** Operations day visits (from Agile Mobile or manual) */
   dayVisits?: string
-  /** Night checks (from Agile Mobile or manual) */
+  /** Night checks — Night Visit (check) report, else Agile Mobile */
   nightChecks?: string
-  /** Training visits / trained sites (from Agile Mobile or manual) */
+  /** Training visits / trained sites (from Agile Mobile or Night Visit / OJT) */
   trainedSites?: string
   medicalFitnessPct: string
   pvcPct: string
@@ -297,8 +392,13 @@ export type MisReport = {
   submittedBy: string
   /** Work email of person who submitted — used for acknowledgment. */
   submitterEmail?: string
+  /** HOD certified figures verified before final submit. */
+  certified?: boolean
+  certifiedAt?: string
   rows: MisDeployRow[]
   summary: MisSummary
+  /** Step 2 — role-wise manpower shortage (branch entry). */
+  manpowerShortage?: MisManpowerShortage
 }
 
 const misAckKey = (branchId: string, dateFor: string) => `mis:ack:${branchId}:${dateFor}`
@@ -313,6 +413,7 @@ export async function getMisAckSent(branchId: string, dateFor: string): Promise<
 
 const BRANCHES_KEY = 'mis:branches'
 const CLIENTS_KEY = 'mis:clients'
+const CLIENT_BOOK_FREEZE_KEY = 'mis:client-books:frozen'
 const clientsKey = (branchId: string) => `mis:clients:${branchId}`
 const STAFF_KEY = 'mis:staff'
 /** Legacy import slug (e.g. b_tirupathi) for guard docs stored before br1… ids. */
@@ -325,9 +426,9 @@ function legacyBranchStorageId(branchId: string, branchName: string): string[] {
   if (/tirupati/i.test(n)) ids.add('b_tirupathi')
   if (/karnataka/i.test(n)) ids.add('b_karnataka')
   if (/kerala/i.test(n)) ids.add('b_kerala')
-  if (/gujarat|surat/i.test(n)) ids.add('b_maharashtra')
+  if (/gujarat|surat/i.test(n) && !/mumbai|maharashtra/i.test(n)) ids.add('b_surat')
   if (/madhya/i.test(n)) ids.add('b_madhya')
-  if (/maharashtra/i.test(n)) ids.add('b_maharashtra')
+  if (/maharashtra|mumbai/i.test(n) && !/surat|gujarat/i.test(n)) ids.add('b_maharashtra')
   if (/nellore/i.test(n)) ids.add('b_nellore')
   if (/puducherry|pondicherry/i.test(n)) ids.add('b_puducherry')
   if (/tamil/i.test(n)) ids.add('b_tamilnadu')
@@ -424,6 +525,23 @@ const VISIT_DATES_KEY = 'mis:visitdates'
 const dutyKey = (date: string) => `mis:duty:${date}`
 const DUTY_DATES_KEY = 'mis:dutydates'
 const collectionsKey = (weekStart: string) => `mis:collections:${weekStart}`
+const collectionBaselineKey = (weekStart: string) => `mis:collection-baseline:${weekStart}`
+
+/** June'26 OST footer baseline — branches + banking consolidated totals. */
+export type MisCollectionBaseline = {
+  weekStart: string
+  /** Footer totals in ₹ thousands (K) — all branches + banking */
+  billingK: number
+  collectedK: number
+  /** Total Amount column (multi-month outstanding) in ₹ thousands */
+  outstandingK?: number
+  recoveryPct: number
+  /** Banking slice from OST (₹ lakhs) — included in company % but not branch grid */
+  bankingBillingL?: number
+  bankingOutstandingL?: number
+  source: string
+  importedAt: string
+}
 const complaintsKey = (branchId: string) => `mis:complaints:${branchId}`
 const DIRECTOR_INBOX_KEY = 'mis:complaints:director-inbox'
 const PROCESSED_COMPLAINT_EMAILS_KEY = 'mis:complaint-emails'
@@ -431,9 +549,11 @@ const COMPLAINT_SEQ_KEY = 'mis:complaint-seq'
 const reportKey = (branchId: string, dateFor: string) => `mis:report:${branchId}:${dateFor}`
 const reportIndexKey = (dateFor: string) => `mis:reportindex:${dateFor}`
 const lastReportKey = (branchId: string) => `mis:lastreport:${branchId}`
-const mdSummaryCacheKey = (key: string) => `mis:mdsummary:${key}`
 const MD_SUMMARY_CACHE_MS = 600_000
 const MD_SUMMARY_CACHE_HISTORICAL_MS = 3_600_000
+/** Bump when dashboard payload shape changes (forces Redis cache refresh). */
+const MD_SUMMARY_CACHE_VERSION = 15
+const mdSummaryCacheKey = (key: string) => `mis:mdsummary:v${MD_SUMMARY_CACHE_VERSION}:${key}`
 const REPORT_DATES_KEY = 'mis:reportdates'
 const USERS_KEY = 'mis:users'
 const DOCS_KEY = 'mis:docs'
@@ -465,23 +585,98 @@ export type MisDoc = {
   date: string
   active: boolean
 }
-export const USER_ROLES = ['Director', 'Admin', 'CGM', 'Vice President (VP)', 'AVP', 'General Manager (GM)', 'Regional Manager (RM)', 'Branch Manager', 'Operations Manager', 'Area Manager', 'Field Officer', 'Sales Executive', 'Training Team', 'Accounts', 'HR']
+export const USER_ROLES = [
+  'Director',
+  'President',
+  'Admin',
+  'CGM',
+  'Vice President (VP)',
+  'AVP',
+  'General Manager (GM)',
+  'Regional Manager (RM)',
+  'Branch Manager',
+  'Operations Manager',
+  'Area Manager',
+  'Field Officer',
+  'Sales Executive',
+  'Training Team',
+  'Accounts',
+  'HR',
+]
 export const DOC_CATEGORIES = ['Master Agreement', 'MW Notification', 'Tender Document', 'PSARA Licence', 'GST / PF / ESI', 'Client Contract', 'Policy / SOP', 'Previous Tender Data', 'Other']
 
 export const DEFAULT_BRANCHES: MisBranch[] = [
   'Bangalore',
   'Bhopal',
-  'Chennai & Pondicherry',
+  'Chennai',
+  'Corporate Office',
   'Hi-Tech City',
   'Hyderabad-A',
   'Hyderabad-B',
+  'Kakinada',
   'Kochi',
-  'Mumbai & Surat',
-  'Nellore & Tada',
-  'Tirupati & Tadipatri',
+  'Mumbai',
+  'Nellore',
+  'Puducherry',
+  'Surat',
+  'Tada',
+  'Tadipatri',
+  'Tirupati',
+  'Training Academy',
   'Vijayawada',
-  'Visakhapatnam & Kakinada',
+  'Visakhapatnam',
 ].map((name, i) => ({ id: `br${i + 1}`, name, pin: suiteBranchPin(), active: true }))
+
+/** Ensure Corporate Office exists for Fleet / branch login (idempotent). */
+export async function ensureCorporateOfficeBranch(): Promise<MisBranch | null> {
+  const all = await getBranches(false)
+  const existing = all.find((b) => /corporate\s*office/i.test(String(b.name || '')))
+  if (existing) {
+    if (existing.active === false) {
+      const next = all.map((b) => (b.id === existing.id ? { ...b, active: true, name: 'Corporate Office' } : b))
+      await saveBranches(next)
+      return { ...existing, active: true, name: 'Corporate Office' }
+    }
+    return existing
+  }
+  const row: MisBranch = {
+    id: 'br-corporate-office',
+    name: 'Corporate Office',
+    pin: suiteBranchPin(),
+    active: true,
+  }
+  await saveBranches([...all, row])
+  return row
+}
+
+/** Ensure Training Academy exists for Fleet weekly report login (not daily MIS). */
+export async function ensureTrainingAcademyBranch(): Promise<MisBranch | null> {
+  const all = await getBranches(false)
+  const existing = all.find((b) => /training\s*academy/i.test(String(b.name || '')))
+  if (existing) {
+    if (existing.active === false) {
+      const next = all.map((b) =>
+        b.id === existing.id ? { ...b, active: true, name: 'Training Academy' } : b,
+      )
+      await saveBranches(next)
+      return { ...existing, active: true, name: 'Training Academy' }
+    }
+    if (existing.name !== 'Training Academy') {
+      const next = all.map((b) => (b.id === existing.id ? { ...b, name: 'Training Academy' } : b))
+      await saveBranches(next)
+      return { ...existing, name: 'Training Academy' }
+    }
+    return existing
+  }
+  const row: MisBranch = {
+    id: 'br-training-academy',
+    name: 'Training Academy',
+    pin: suiteBranchPin(),
+    active: true,
+  }
+  await saveBranches([...all, row])
+  return row
+}
 
 function redisConfig() {
   const url = process.env.UPSTASH_REDIS_REST_URL?.trim()
@@ -552,6 +747,14 @@ async function setJson(key: string, value: unknown): Promise<boolean> {
   return r?.result === 'OK'
 }
 
+export async function getClientBookFreeze(): Promise<ClientBookFreeze | null> {
+  return getJson<ClientBookFreeze | null>(CLIENT_BOOK_FREEZE_KEY, null)
+}
+
+export async function saveClientBookFreeze(stamp: ClientBookFreeze): Promise<boolean> {
+  return setJson(CLIENT_BOOK_FREEZE_KEY, stamp)
+}
+
 // ---- Branches ---------------------------------------------------------------
 export async function getBranches(onlyActive = false): Promise<MisBranch[]> {
   const b = await getJson<MisBranch[]>(BRANCHES_KEY, [])
@@ -562,10 +765,60 @@ export async function getBranches(onlyActive = false): Promise<MisBranch[]> {
   return onlyActive ? sorted.filter((x) => x.active !== false) : sorted
 }
 
+/**
+ * Non-operations units — not Daily MIS reporting.
+ * Training / Recruitment / IT / Corporate keep their own apps (OJT, DRR, Fleet, etc.).
+ */
+const NON_MIS_REPORTING_NAME =
+  /corporate\s*office|training\s*(academy|department|dept)|recruitment\s*(department|dept)|it\s*department|^lucknow$/i
+
+export function isMisReportingBranch(branch: Pick<MisBranch, 'id' | 'name'> | string): boolean {
+  if (typeof branch === 'string') {
+    return !NON_MIS_REPORTING_NAME.test(branch.trim())
+  }
+  const name = String(branch.name ?? '').trim()
+  const id = String(branch.id ?? '').trim()
+  if (NON_MIS_REPORTING_NAME.test(name)) return false
+  if (
+    id === 'br-corporate-office' ||
+    id === 'br-training-academy' ||
+    id === 'br-training-department' ||
+    id === 'br-lucknow' ||
+    id.startsWith('recruit-dept:') ||
+    id.startsWith('recruit-centre:')
+  ) {
+    return false
+  }
+  return true
+}
+
+/** Active operations branches that submit Daily MIS (excludes Training / Recruitment / HQ). */
+export async function getMisReportBranches(onlyActive = true): Promise<MisBranch[]> {
+  return (await getBranches(onlyActive)).filter(isMisReportingBranch)
+}
+
 export async function getActiveBranch(branchId: string): Promise<MisBranch | null> {
   const id = String(branchId ?? '').trim()
   if (!id) return null
-  return (await getBranches(true)).find((b) => b.id === id) ?? null
+  const list = await getBranches(true)
+  const byId = list.find((b) => b.id === id)
+  if (byId) return byId
+  const lower = id.toLowerCase()
+  const byName = list.find((b) => String(b.name ?? '').trim().toLowerCase() === lower)
+  if (byName) return byName
+  const hyd = id.match(/hyd(?:erabad)?[\s_-]*(?:zone[\s_-]*)?([ab])\b/i)
+  if (hyd) {
+    const want = hyd[1].toUpperCase() === 'A' ? 'hyderabad-a' : 'hyderabad-b'
+    return (
+      list.find((b) =>
+        String(b.name ?? '')
+          .trim()
+          .toLowerCase()
+          .replace(/[\s_]+/g, '-') === want,
+      ) ?? null
+    )
+  }
+  return null
 }
 
 export async function isActiveBranch(branchId: string): Promise<boolean> {
@@ -683,34 +936,172 @@ async function getLastReportFlexible(
   return null
 }
 
+function clientSiteKey(name: string, location: string): string {
+  return `${String(name ?? '')
+    .trim()
+    .toUpperCase()}|${String(location ?? '')
+    .trim()
+    .toUpperCase()}`
+}
+
+function deployRowsSanTotal(rows: { sanA?: number; sanG?: number; sanB?: number; sanC?: number }[]): number {
+  return rows.reduce(
+    (sum, r) => sum + num(r.sanA) + num(r.sanG) + num(r.sanB) + num(r.sanC),
+    0,
+  )
+}
+
+function clientsSanTotal(list: MisClient[]): number {
+  return list.reduce((sum, c) => sum + num(c.sanA) + num(c.sanG) + num(c.sanB) + num(c.sanC), 0)
+}
+
+/** Director 18 Aug 2026: every branch Master Directory stays A–Z by client name, then site. */
+export function sortClientsAlpha(list: MisClient[]): MisClient[] {
+  return [...list].sort((a, b) => {
+    const an = String(a.name || '')
+      .trim()
+      .toUpperCase()
+    const bn = String(b.name || '')
+      .trim()
+      .toUpperCase()
+    if (an < bn) return -1
+    if (an > bn) return 1
+    const al = String(a.location || '')
+      .trim()
+      .toUpperCase()
+    const bl = String(b.location || '')
+      .trim()
+      .toUpperCase()
+    if (al < bl) return -1
+    if (al > bl) return 1
+    return String(a.id || '').localeCompare(String(b.id || ''))
+  })
+}
+
+/**
+ * Fill missing Master Directory sites from the strongest recent Daily MIS report.
+ * Must merge even when some sites already exist — a partial shard (e.g. Hyd-B 591 of 862)
+ * used to stop restore early and leave clients permanently missing from Step 1.
+ */
 async function restoreClientsFromLastReport(
   branchId: string,
   branches: MisBranch[],
   all: MisClient[],
 ): Promise<MisClient[]> {
-  const has = filterClientsForBranch(all, branchId, branches).filter((c) => c.active !== false)
-  if (has.length) return all
-
-  const last = await getLastReportFlexible(branchId, '9999-12-31', branches)
+  const frozenBook = await getClientBookFreeze()
+  // 12-08 Kakinada file is NRI/SRMT only — do not rebuild the plant/bank book from it.
+  if (isKakinadaBranch(branchId, branches) && frozenBook?.date) return all
+  let last = frozenBook?.date
+    ? await getReport(branchId, frozenBook.date)
+    : await getLastReportFlexible(branchId, '9999-12-31', branches)
+  if (frozenBook?.date && (!last?.rows?.length || !String(last.submittedAt || '').trim())) {
+    last = await getLastReportFlexible(branchId, '9999-12-31', branches)
+  }
+  if (!frozenBook?.date) {
+    try {
+      const base = new Date()
+      const dates: string[] = []
+      for (let i = 0; i <= 21; i++) {
+        const d = new Date(base)
+        d.setDate(d.getDate() - i)
+        dates.push(d.toISOString().slice(0, 10))
+      }
+      const reports = await Promise.all(dates.map((key) => getReport(branchId, key)))
+      let bestSan = last ? deployRowsSanTotal(last.rows || []) : -1
+      let bestRows = last?.rows?.length || 0
+      for (const r of reports) {
+        if (!r?.rows?.length) continue
+        const san = deployRowsSanTotal(r.rows)
+        if (san > bestSan || (san === bestSan && r.rows.length > bestRows)) {
+          last = r
+          bestSan = san
+          bestRows = r.rows.length
+        }
+      }
+    } catch {
+      /* keep flexible last */
+    }
+  }
   if (!last?.rows?.length) return all
+
+  const freezeKeys = new Set(
+    (last.rows || []).map((row) =>
+      clientSiteKey(String(row.clientName ?? ''), String(row.location ?? '')),
+    ),
+  )
+  /**
+   * Director 18 Aug 2026: HODs may add / edit / deactivate their branch Master Directory.
+   * Do NOT auto-deactivate sites missing from the freeze-date report — that wiped HOD work.
+   * Freeze date remains the heal source only. Hyd-A still excludes Hyd-B contested keys below.
+   */
+  const scopeBranch = branches.find((b) => b.id === branchId || b.name === branchId)
+  if (
+    frozenBook?.date &&
+    scopeBranch &&
+    /hyderabad\s*-?\s*a/i.test(scopeBranch.name)
+  ) {
+    const hydB = branches.find((b) => /hyderabad\s*-?\s*b/i.test(String(b.name || '')))
+    if (hydB) {
+      const bReport = await getReport(hydB.id, frozenBook.date)
+      if (bReport?.rows?.length && String(bReport.submittedAt || '').trim()) {
+        for (const row of bReport.rows) {
+          freezeKeys.delete(
+            clientSiteKey(String(row.clientName ?? ''), String(row.location ?? '')),
+          )
+        }
+      }
+    }
+  }
+
+  const existing = filterClientsForBranch(all, branchId, branches).filter((c) => c.active !== false)
+  const keys = new Set(existing.map((c) => clientSiteKey(c.name, c.location)))
+  const existingSan = clientsSanTotal(existing)
+  /** When frozen, expected book = freezeKeys (Hyd-A already excludes Hyd-B contested sites). */
+  const expectedRows =
+    frozenBook?.date && freezeKeys.size > 0
+      ? (last.rows || []).filter((row) =>
+          freezeKeys.has(clientSiteKey(String(row.clientName ?? ''), String(row.location ?? ''))),
+        )
+      : last.rows || []
+  const lastSan = deployRowsSanTotal(expectedRows)
+  // Nothing missing and strength already at/above best report — leave alone.
+  if (existing.length >= expectedRows.length && existingSan >= lastSan) return all
 
   const out = [...all]
   let added = false
-  for (const row of last.rows) {
+  for (const row of expectedRows) {
     const name = String(row.clientName ?? '').trim()
     if (!name) continue
-    const exists = out.some(
-      (c) =>
-        c.active !== false &&
-        clientMatchesBranch(c.branchId, branchId, branches) &&
-        c.name.trim().toUpperCase() === name.toUpperCase(),
-    )
-    if (exists) continue
+    const location = String(row.location ?? '').slice(0, 120)
+    // Never re-import non-KRC sites onto Hi-Tech City from an old fat report.
+    if (
+      isHiTechCityBranch(branchId, branches) &&
+      !isKrcHiTechClient({ name, location })
+    ) {
+      continue
+    }
+    if (isVisakhapatnamBranch(branchId, branches) && isKakinadaBookClient({ name, location })) {
+      continue
+    }
+    if (isKakinadaBranch(branchId, branches) && isKakinadaLeftoverClient({ name, location })) {
+      continue
+    }
+    if (isKakinadaBranch(branchId, branches) && isSrmtClient({ name, location })) {
+      continue
+    }
+    if (isTadaBranch(branchId, branches) && !isTadaBookClient({ name, location })) {
+      continue
+    }
+    const key = clientSiteKey(name, location)
+    /** Frozen books: never re-add contested / pruned keys (Hyd-A must not regain Hyd-B sites). */
+    if (frozenBook?.date && freezeKeys.size > 0 && !freezeKeys.has(key)) continue
+    if (keys.has(key)) continue
+    keys.add(key)
     out.push({
       id: nid('cl'),
       branchId,
       name,
-      location: String(row.location ?? '').slice(0, 120),
+      location,
       staffName: String(row.staffName ?? '').slice(0, 120),
       sanA: num(row.sanA),
       sanG: num(row.sanG),
@@ -724,14 +1115,17 @@ async function restoreClientsFromLastReport(
       starRating: 2,
       highValue: false,
       active: true,
+      branchFrozen: Boolean(frozenBook?.date),
     })
     added = true
   }
   if (added) {
-    const branches = await getBranches()
-    await saveClients(ensureUniqueClientIds(out).list)
+    const fixed = ensureUniqueClientIds(out).list
+    const branchOnlyRows = fixed.filter((c) => clientMatchesBranch(c.branchId, branchId, branches))
+    await saveClients(branchOnlyRows, { branchOnly: branchId })
+    return fixed
   }
-  return added ? ensureUniqueClientIds(out).list : all
+  return all
 }
 
 /** Normalize branch ids and rebuild missing clients from the latest saved report per branch. */
@@ -807,16 +1201,34 @@ export async function restoreMasterDirectoryIfNeeded(): Promise<{
     compacted = true
   }
   let branchesMerged = false
-  const active = branches.filter((b) => b.active !== false)
-  const hasPair = active.some((b) => /kakinada/i.test(b.name)) && active.some((b) => /visakhapatnam|vizag/i.test(b.name))
-  if (hasPair || active.length > 12) {
-    try {
-      const { dedupeMisBranches } = await import('./branch-dedupe.js')
-      const deduped = await dedupeMisBranches()
-      branchesMerged = deduped.ok && (deduped.removed?.length ?? 0) > 0
-    } catch {
-      /* non-fatal */
+  // LOCK 13 Aug 2026: never call dedupeMisBranches here — that re-joined Nellore+Tada etc.
+  try {
+    const { splitLegacyCombinedBranchNames, ensureIndependentOpsBranches } = await import('./branch-dedupe.js')
+    await ensureIndependentOpsBranches()
+    const split = await splitLegacyCombinedBranchNames()
+    branchesMerged = (split.renamed?.length ?? 0) + (split.deactivated?.length ?? 0) > 0
+  } catch {
+    /* non-fatal */
+  }
+  try {
+    const { freezeClientBooksFromReport, CLIENT_BOOK_FREEZE_DATE } = await import('./client-book-freeze.js')
+    const frozen = await getClientBookFreeze()
+    if (!frozen?.date) {
+      await freezeClientBooksFromReport(CLIENT_BOOK_FREEZE_DATE)
     }
+  } catch {
+    /* non-fatal */
+  }
+  try {
+    const frozen = await getClientBookFreeze()
+    if (frozen?.date) return { sites, staff, compacted, branchesMerged }
+    const fresh = await getBranches()
+    const { reassignClientsBySiteGeo } = await import('./client-branch-geo-resolve.js')
+    const allClients = await loadAllClientsMerged(fresh)
+    const moved = reassignClientsBySiteGeo(allClients, fresh)
+    if (moved.moved > 0) await saveClients(moved.clients, { force: true })
+  } catch {
+    /* non-fatal */
   }
   return { sites, staff, compacted, branchesMerged }
 }
@@ -845,11 +1257,47 @@ export async function repairAllBranchClients(): Promise<{
   return { normalized: normalized.changed || fixed.changed, branchesSeeded, clientsAdded }
 }
 
+/** Fast read: one branch shard (+ legacy keys) — no full-directory rewrite. */
+async function loadBranchClientShard(
+  branchId: string,
+  branches: MisBranch[],
+): Promise<MisClient[]> {
+  const branch = branches.find((b) => b.id === branchId)
+  const keys = new Set<string>([clientsKey(branchId)])
+  if (branch) {
+    for (const id of legacyBranchStorageId(branchId, branch.name)) {
+      keys.add(clientsKey(id))
+    }
+  }
+  const raw = await redisMget([...keys])
+  const byId = new Map<string, MisClient>()
+  for (const s of raw) {
+    for (const c of parseJson<MisClient[]>(s, [])) {
+      const id = String(c.id ?? '').trim()
+      if (id) byId.set(id, c)
+      else byId.set(`${c.name}|${c.location}|${byId.size}`, c)
+    }
+  }
+  return [...byId.values()]
+}
+
 export async function getClients(
   branchId?: string,
-  opts?: { skipRepair?: boolean; branches?: MisBranch[] },
+  opts?: { skipRepair?: boolean; allowRestore?: boolean; branches?: MisBranch[] },
 ): Promise<MisClient[]> {
   const branches = opts?.branches ?? (await getBranches())
+
+  /**
+   * Director 18 Aug 2026: Daily MIS / skipRepair must NEVER auto-heal or reshape the client list.
+   * Incomplete-vs-report fall-through used to re-add freeze sites mid-submit and break HODs.
+   */
+  if (branchId && opts?.skipRepair) {
+    const shard = await loadBranchClientShard(branchId, branches)
+    const forBranch = sortClientsAlpha(sitesForBranch(shard, branchId, branches, false))
+    if (forBranch.filter((c) => c.active !== false).length > 0) return forBranch
+    // Empty shard only — fall through to merged load (still no restore unless allowRestore).
+  }
+
   let all = await loadAllClientsMerged(branches)
   const normalized = normalizeClientBranchIds(all, branches)
   const fixed = ensureUniqueClientIds(normalized.list)
@@ -858,10 +1306,13 @@ export async function getClients(
     await saveClients(all)
   }
   if (branchId) {
-    all = await restoreClientsFromLastReport(branchId, branches, all)
-    return sitesForBranch(all, branchId, branches, false)
+    /** Auto-restore only when explicitly requested (repair jobs) — never on Daily MIS / portal reads. */
+    if (opts?.allowRestore === true) {
+      all = await restoreClientsFromLastReport(branchId, branches, all)
+    }
+    return sortClientsAlpha(sitesForBranch(all, branchId, branches, false))
   }
-  return all
+  return sortClientsAlpha(all)
 }
 export async function saveClients(list: MisClient[], options?: SaveClientsOptions): Promise<boolean> {
   const branches = await getBranches()
@@ -880,16 +1331,21 @@ export async function saveClients(list: MisClient[], options?: SaveClientsOption
   }
   const normalized = normalizeClientBranchIds(toSave, branches)
   const fixed = ensureUniqueClientIds(normalized.list)
-  const ok = await setJson(CLIENTS_KEY, fixed.list)
+  const freezeOn = await getClientBookFreeze()
+  const stamped = freezeOn?.date
+    ? fixed.list.map((c) => (c.branchFrozen ? c : { ...c, branchFrozen: true }))
+    : fixed.list
+  /** Persist each branch bucket in alphabetical order (stable Daily MIS + Master Directory). */
+  const ok = await setJson(CLIENTS_KEY, sortClientsAlpha(stamped))
   const buckets = new Map<string, MisClient[]>()
-  for (const c of fixed.list) {
+  for (const c of stamped) {
     const bid = String(c.branchId ?? '').trim()
     if (!bid) continue
     if (!buckets.has(bid)) buckets.set(bid, [])
     buckets.get(bid)!.push(c)
   }
   for (const [bid, part] of buckets) {
-    await setJson(clientsKey(bid), part)
+    await setJson(clientsKey(bid), sortClientsAlpha(part))
   }
   return ok
 }
@@ -922,10 +1378,11 @@ function normalizeMwCompliant(v: unknown): 'yes' | 'no' | '' {
   return ''
 }
 
-/** Add or update one client in the Data Bank (HOD branch report). */
+/** Add or update one client in the Data Bank (HOD branch Master Directory). Never deletes history. */
 export async function upsertClient(client: MisClient): Promise<MisClient | null> {
   if (!client.branchId) return null
-  const all = await getClients()
+  const branches = await getBranches()
+  const all = await getClients(undefined, { skipRepair: true, branches })
   const id = String(client.id ?? '').trim() || nid('cl')
   const prev = all.find((c) => c.id === id)
   const sanTotal = num(client.sanA) + num(client.sanG) + num(client.sanB) + num(client.sanC)
@@ -939,6 +1396,7 @@ export async function upsertClient(client: MisClient): Promise<MisClient | null>
     name: String(client.name ?? prev?.name ?? '').slice(0, 120),
     location: String(client.location ?? prev?.location ?? '').slice(0, 120),
     staffName: String(client.staffName ?? prev?.staffName ?? '').slice(0, 120),
+    clientEmail: String(client.clientEmail ?? prev?.clientEmail ?? '').trim().toLowerCase().slice(0, 200),
     sanA: num(client.sanA ?? prev?.sanA),
     sanG: num(client.sanG ?? prev?.sanG),
     sanB: num(client.sanB ?? prev?.sanB),
@@ -958,11 +1416,34 @@ export async function upsertClient(client: MisClient): Promise<MisClient | null>
       client.monthlyBillLacs !== undefined ? num(client.monthlyBillLacs) : num(prev?.monthlyBillLacs),
     balanceToPayLacs:
       client.balanceToPayLacs !== undefined ? num(client.balanceToPayLacs) : num(prev?.balanceToPayLacs),
+    geoLat:
+      client.geoLat !== undefined && Number.isFinite(Number(client.geoLat))
+        ? Number(client.geoLat)
+        : prev?.geoLat !== undefined && Number.isFinite(Number(prev.geoLat))
+          ? Number(prev.geoLat)
+          : undefined,
+    geoLng:
+      client.geoLng !== undefined && Number.isFinite(Number(client.geoLng))
+        ? Number(client.geoLng)
+        : prev?.geoLng !== undefined && Number.isFinite(Number(prev.geoLng))
+          ? Number(prev.geoLng)
+          : undefined,
+    geoCapturedAt: String(client.geoCapturedAt ?? prev?.geoCapturedAt ?? '').slice(0, 40) || undefined,
+    geoSource: String(client.geoSource ?? prev?.geoSource ?? '').slice(0, 40) || undefined,
+    branchFrozen: prev?.branchFrozen === true || client.branchFrozen === true,
   }
   const idx = all.findIndex((c) => c.id === id)
-  if (idx >= 0) all[idx] = row
-  else all.push(row)
-  const ok = await saveClients(all)
+  if (idx >= 0) {
+    if (prev && prev.branchId !== client.branchId) {
+      /** Do not silently move another branch’s row — HOD edits stay on their branch. */
+      return null
+    }
+    all[idx] = row
+  } else {
+    all.push(row)
+  }
+  const branchOnly = all.filter((c) => clientMatchesBranch(c.branchId, client.branchId, branches))
+  const ok = await saveClients(branchOnly, { branchOnly: client.branchId, force: true })
   return ok ? row : null
 }
 
@@ -995,11 +1476,45 @@ export async function saveClientPerfFinance(
   return { ok, updated }
 }
 
+/** Save GPS from HDFC SSA onto Master Directory client (for India road map). Does not move branch. */
+export async function saveClientGeoFromAssessment(opts: {
+  clientId: string
+  branchId: string
+  lat: number
+  lng: number
+  capturedAt?: string
+  source?: string
+}): Promise<{ ok: boolean; error?: string }> {
+  const clientId = String(opts.clientId || '').trim()
+  const branchId = String(opts.branchId || '').trim()
+  const lat = Number(opts.lat)
+  const lng = Number(opts.lng)
+  if (!clientId || !branchId) return { ok: false, error: 'Missing client or branch.' }
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return { ok: false, error: 'Invalid coordinates.' }
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) return { ok: false, error: 'Coordinates out of range.' }
+  const branches = await getBranches()
+  const all = await getClients(undefined, { skipRepair: true, branches })
+  const idx = all.findIndex((c) => c.id === clientId && c.branchId === branchId)
+  if (idx < 0) return { ok: false, error: 'Client not found on this branch.' }
+  const now = opts.capturedAt || new Date().toISOString()
+  all[idx] = {
+    ...all[idx],
+    geoLat: Math.round(lat * 1e6) / 1e6,
+    geoLng: Math.round(lng * 1e6) / 1e6,
+    geoCapturedAt: now.slice(0, 40),
+    geoSource: String(opts.source || 'hdfc-ssa').slice(0, 40),
+  }
+  const branchRows = all.filter((c) => c.branchId === branchId)
+  const ok = await saveClients(branchRows, { branchOnly: branchId, force: true })
+  return ok ? { ok: true } : { ok: false, error: 'Could not save client geo.' }
+}
+
 export async function setClientActive(branchId: string, clientId: string, active: boolean): Promise<boolean> {
-  const all = await getClients()
+  const branches = await getBranches()
+  const all = await getClients(undefined, { skipRepair: true, branches })
   const id = String(clientId ?? '').trim()
   if (!id) return false
-  const matches = all.filter((x) => x.id === id && x.branchId === branchId)
+  const matches = all.filter((x) => x.id === id && clientMatchesBranch(x.branchId, branchId, branches))
   if (!matches.length) return false
   let changed = false
   for (const c of matches) {
@@ -1008,7 +1523,9 @@ export async function setClientActive(branchId: string, clientId: string, active
       changed = true
     }
   }
-  return changed ? saveClients(all) : true
+  if (!changed) return true
+  const branchRows = all.filter((c) => clientMatchesBranch(c.branchId, branchId, branches))
+  return saveClients(branchRows, { branchOnly: branchId, force: true })
 }
 
 // ---- Staff ------------------------------------------------------------------
@@ -1029,7 +1546,15 @@ export async function saveStaff(list: MisStaff[], options?: SaveStaffOptions): P
 
 // ---- Guards (stored per-branch to stay within value-size limits) ------------
 export async function getGuards(branchId: string): Promise<MisGuard[]> {
-  return getJson<MisGuard[]>(guardsKey(branchId), [])
+  const branches = await getBranches()
+  const branch = branches.find((b) => b.id === branchId)
+  const ids = branch ? legacyBranchStorageId(branchId, branch.name) : [branchId]
+  let best: MisGuard[] = []
+  for (const id of ids) {
+    const list = await getJson<MisGuard[]>(guardsKey(id), [])
+    if (list.length > best.length) best = list
+  }
+  return best
 }
 export async function saveGuards(branchId: string, list: MisGuard[]): Promise<boolean> {
   return setJson(guardsKey(branchId), list)
@@ -1088,8 +1613,62 @@ export async function getDutyDates(): Promise<string[]> {
 export async function getCollections(weekStart: string): Promise<MisCollection[]> {
   return getJson<MisCollection[]>(collectionsKey(weekStart), [])
 }
+export async function getCollectionBaseline(weekStart: string): Promise<MisCollectionBaseline | null> {
+  return getJson<MisCollectionBaseline | null>(collectionBaselineKey(weekStart), null)
+}
+
+/**
+ * Latest Friday OST footer — this week, then previous weeks.
+ * Weekly collection rows must not be used as a stand-in.
+ */
+export async function getLatestOstBaseline(weekStart?: string): Promise<MisCollectionBaseline | null> {
+  const weeks: string[] = []
+  let w = String(weekStart || '').slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(w)) {
+    const { misTodayIst, misWeekStartMonday } = await import('./dates.js')
+    w = misWeekStartMonday(misTodayIst())
+  }
+  weeks.push(w)
+  for (let i = 0; i < 4; i++) {
+    const prev = weeks[weeks.length - 1]
+    const [yy, mm, dd] = prev.split('-').map(Number)
+    const d = new Date(yy, mm - 1, dd)
+    d.setDate(d.getDate() - 7)
+    weeks.push(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+    )
+  }
+  let best: MisCollectionBaseline | null = null
+  for (const key of weeks) {
+    const b = await getCollectionBaseline(key)
+    const pct = Number(b?.recoveryPct) || 0
+    if (!b || !(pct > 0) || pct >= 99) continue
+    if (!best || String(b.importedAt || '') > String(best.importedAt || '')) best = b
+  }
+  if (best) return best
+  const { LATEST_OST_FOOTER } = await import('./collection-import.js')
+  return {
+    weekStart: w,
+    billingK: LATEST_OST_FOOTER.billingK,
+    collectedK: LATEST_OST_FOOTER.collectedK,
+    outstandingK: LATEST_OST_FOOTER.outstandingK,
+    recoveryPct: LATEST_OST_FOOTER.recoveryPct,
+    source: LATEST_OST_FOOTER.source,
+    importedAt: LATEST_OST_FOOTER.asOn,
+  }
+}
+export async function saveCollectionBaseline(baseline: MisCollectionBaseline): Promise<boolean> {
+  return setJson(collectionBaselineKey(baseline.weekStart), baseline)
+}
 export async function saveCollections(weekStart: string, list: MisCollection[]): Promise<boolean> {
-  return setJson(collectionsKey(weekStart), list)
+  const existing = await getCollections(weekStart)
+  const byId: Record<string, MisCollection> = {}
+  for (const c of existing) byId[c.branchId] = c
+  for (const c of list) byId[c.branchId] = c
+  const merged = Object.values(byId)
+  const ok = await setJson(collectionsKey(weekStart), merged)
+  if (ok) await invalidateMdSummaryCache(weekStart)
+  return ok
 }
 export async function getComplaints(branchId: string): Promise<MisComplaint[]> {
   return getJson<MisComplaint[]>(complaintsKey(branchId), [])
@@ -1098,20 +1677,84 @@ export async function saveComplaints(branchId: string, list: MisComplaint[]): Pr
   return setJson(complaintsKey(branchId), list)
 }
 
-/** Next global complaint reference number. */
-export async function nextComplaintCode(): Promise<string> {
+const MONTH_CODES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'] as const
+
+/** First 3 letters of client name (A–Z), padded with X if short. */
+export function clientCodeLetters(clientName: string): string {
+  const letters = String(clientName ?? '')
+    .replace(/[^a-zA-Z]/g, '')
+    .toUpperCase()
+  return (letters + 'XXX').slice(0, 3)
+}
+
+function parseComplaintWhen(iso?: string): Date {
+  const raw = String(iso ?? '').trim()
+  if (!raw) return new Date()
+  const d = new Date(raw.includes('T') || raw.includes(' ') ? raw : `${raw}T12:00:00`)
+  return Number.isNaN(d.getTime()) ? new Date() : d
+}
+
+/** DD/MM/YYYY in Asia/Kolkata for the mail / phone received moment. */
+export function complaintCodeDatePart(iso?: string): string {
+  const d = parseComplaintWhen(iso)
+  try {
+    const parts = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }).formatToParts(d)
+    const day = parts.find((p) => p.type === 'day')?.value || '01'
+    const month = parts.find((p) => p.type === 'month')?.value || '01'
+    const year = parts.find((p) => p.type === 'year')?.value || String(d.getFullYear())
+    return `${day}/${month}/${year}`
+  } catch {
+    const day = String(d.getDate()).padStart(2, '0')
+    const month = String(d.getMonth() + 1).padStart(2, '0')
+    return `${day}/${month}/${d.getFullYear()}`
+  }
+}
+
+/** 3-letter month code when mail was received (Asia/Kolkata). */
+export function complaintCodeMonthPart(iso?: string): string {
+  const d = parseComplaintWhen(iso)
+  try {
+    const m = Number(
+      new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kolkata', month: 'numeric' }).format(d),
+    )
+    return MONTH_CODES[(m || 1) - 1] || 'XXX'
+  } catch {
+    return MONTH_CODES[d.getMonth()] || 'XXX'
+  }
+}
+
+/**
+ * Agile - &lt;3 client letters&gt;-&lt;MMM&gt;-&lt;00000&gt; &lt;DD/MM/YYYY&gt;
+ * Example: Agile - TCS-JUL-00042 22/07/2026
+ */
+export function formatAgileComplaintCode(clientName: string, mailReceivedAt: string | undefined, seq: number): string {
+  const client = clientCodeLetters(clientName)
+  const mon = complaintCodeMonthPart(mailReceivedAt)
+  const n = String(Math.max(0, seq)).padStart(5, '0')
+  const datePart = complaintCodeDatePart(mailReceivedAt)
+  return `Agile - ${client}-${mon}-${n} ${datePart}`
+}
+
+/** Next global complaint reference — Agile - ABC-JUL-00042 22/07/2026 */
+export async function nextComplaintCode(clientName?: string, mailReceivedAt?: string): Promise<string> {
   const d = await redis(['INCR', COMPLAINT_SEQ_KEY])
   const seq = typeof d?.result === 'number' ? d.result : Math.floor(Date.now() / 1000) % 100000
-  const year = new Date().getFullYear()
-  return `AGM-OPS-${year}-${String(seq).padStart(5, '0')}`
+  return formatAgileComplaintCode(clientName || 'XXX', mailReceivedAt || new Date().toISOString(), seq)
 }
 
 export async function ensureComplaintCodes(list: MisComplaint[]): Promise<MisComplaint[]> {
   const out: MisComplaint[] = []
   for (const c of list) {
-    const code = String(c.code ?? '').trim() || (await nextComplaintCode())
-    const registeredAt = String(c.registeredAt ?? '').trim() || new Date().toISOString()
-    out.push({ ...c, code, registeredAt })
+    const when = String(c.mailReceivedAt || c.registeredAt || c.incidentDate || '').trim() || new Date().toISOString()
+    const code =
+      String(c.code ?? '').trim() || (await nextComplaintCode(c.clientName || 'XXX', when))
+    const registeredAt = String(c.registeredAt ?? '').trim() || when
+    out.push({ ...c, code, registeredAt, mailReceivedAt: c.mailReceivedAt || when })
   }
   return out
 }
@@ -1184,6 +1827,226 @@ export async function submitReport(report: MisReport): Promise<boolean> {
   }
   await setJson(lastReportKey(report.branchId), { dateFor: report.dateFor, at: report.submittedAt })
   await invalidateMdSummaryCache(report.dateFor)
+  return true
+}
+
+/** Director/Admin: unlock a submitted report so the branch can edit and resubmit (keeps saved data). */
+export async function reopenSubmittedMisReport(
+  branchId: string,
+  dateFor: string,
+): Promise<{ ok: true; branchName: string } | { ok: false; error: string }> {
+  const report = await getReport(branchId, dateFor)
+  if (!report) return { ok: false, error: 'No report found for this branch and date.' }
+  if (!String(report.submittedAt ?? '').trim()) {
+    return { ok: false, error: 'Report is already open as a draft — branch can edit and submit.' }
+  }
+  const { normalizeDeployRow } = await import('./deploy-math.js')
+  const rows = (report.rows || []).map((r) => normalizeDeployRow({ ...r }) as typeof r)
+  const draft: MisReport = { ...report, rows, submittedAt: '' }
+  const ok = await saveDraftReport(draft)
+  if (!ok) return { ok: false, error: 'Could not reopen report. Please try again.' }
+  await invalidateMdSummaryCache(dateFor)
+  return { ok: true, branchName: report.branchName || branchId }
+}
+
+const VACANCY_CARRY_LOOKBACK_DAYS = 7
+
+function ymdDaysBefore(beforeDate: string, days: number): string[] {
+  const base = new Date(beforeDate + 'T00:00:00')
+  const dates: string[] = []
+  for (let i = 1; i <= days; i++) {
+    const d = new Date(base)
+    d.setDate(d.getDate() - i)
+    dates.push(d.toISOString().slice(0, 10))
+  }
+  return dates
+}
+
+/** Recent Daily MIS rows before a date (nearest first). Used to unwrap copied Absent. */
+export async function getReportsBefore(
+  branchId: string,
+  beforeDate: string,
+  days = VACANCY_CARRY_LOOKBACK_DAYS,
+): Promise<MisReport[]> {
+  const dates = ymdDaysBefore(beforeDate, days)
+  const raw = await redisMget(dates.map((d) => reportKey(branchId, d)))
+  const out: MisReport[] = []
+  for (const s of raw) {
+    const r = parseJson<MisReport | null>(s, null)
+    if (r) out.push(r)
+  }
+  return out
+}
+
+async function persistRepairedReport(report: MisReport): Promise<boolean> {
+  const ok = await setJson(reportKey(report.branchId, report.dateFor), report)
+  if (ok) await invalidateMdSummaryCache(report.dateFor)
+  return ok
+}
+
+function applyCarriedAbsentRepair(
+  report: MisReport,
+  priorReports: MisReport[],
+  helpers: {
+    reportDeployTotals: (rows: Record<string, unknown>[], branchId?: string) => { vac: number }
+    undoCarriedAbsentWithoutOt: (
+      todayRows: Record<string, unknown>[],
+      priorDaysRows: Record<string, unknown>[][] | Record<string, unknown>[],
+    ) => { rows: Record<string, unknown>[]; changed: boolean }
+    emptyManpowerShortage: (total?: number) => MisReport['manpowerShortage']
+    normaliseManpowerShortage: (
+      raw: MisReport['manpowerShortage'],
+      opts: { defaultTotal: number },
+    ) => NonNullable<MisReport['manpowerShortage']>
+    reconcileManpowerShortageToTotal: (
+      shortage: NonNullable<MisReport['manpowerShortage']>,
+      total: number,
+    ) => NonNullable<MisReport['manpowerShortage']>
+  },
+): MisReport | null {
+  const today = helpers.reportDeployTotals((report.rows || []) as Record<string, unknown>[], report.branchId)
+  if (today.vac <= 0) return null
+  const priorDays = priorReports
+    .filter((r) => r.dateFor < report.dateFor && r.rows?.length)
+    .sort((a, b) => (a.dateFor < b.dateFor ? 1 : a.dateFor > b.dateFor ? -1 : 0))
+    .map((r) => r.rows as Record<string, unknown>[])
+  if (!priorDays.length) return null
+  const undone = helpers.undoCarriedAbsentWithoutOt(
+    (report.rows || []) as Record<string, unknown>[],
+    priorDays,
+  )
+  if (!undone.changed) return null
+  const rows = undone.rows as MisReport['rows']
+  const after = helpers.reportDeployTotals(rows as Record<string, unknown>[], report.branchId)
+  const manpowerShortage =
+    after.vac <= 0
+      ? helpers.emptyManpowerShortage(0)
+      : helpers.reconcileManpowerShortageToTotal(
+          helpers.normaliseManpowerShortage(report.manpowerShortage, { defaultTotal: after.vac }),
+          after.vac,
+        )
+  return { ...report, rows, manpowerShortage }
+}
+
+/**
+ * Every branch: copied Absent + wiped OT = false vacant.
+ * Keep only the last real vacant (Absent − OT). Real vacant posts stay.
+ */
+export async function repairFalseVacancyFromCarriedAbsent(
+  report: MisReport,
+  priorReports?: MisReport[],
+): Promise<MisReport> {
+  const { reportDeployTotals, undoCarriedAbsentWithoutOt } = await import('./deploy-math.js')
+  const { emptyManpowerShortage, normaliseManpowerShortage, reconcileManpowerShortageToTotal } =
+    await import('./manpower-shortage.js')
+  const priors = priorReports ?? (await getReportsBefore(report.branchId, report.dateFor))
+  const fixed = applyCarriedAbsentRepair(report, priors, {
+    reportDeployTotals,
+    undoCarriedAbsentWithoutOt,
+    emptyManpowerShortage,
+    normaliseManpowerShortage,
+    reconcileManpowerShortageToTotal,
+  })
+  if (!fixed) return report
+  const ok = await persistRepairedReport(fixed)
+  return ok ? fixed : report
+}
+
+async function repairReportMap(byDate: Map<string, MisReport[]>): Promise<Map<string, MisReport[]>> {
+  const lists = [...byDate.values()]
+  const all = lists.flat()
+  if (!all.length) return byDate
+  const branchIds = [...new Set(all.map((r) => r.branchId).filter(Boolean))]
+  const minDate = [...byDate.keys()].reduce((a, b) => (a && a < b ? a : b))
+  const extraDates = ymdDaysBefore(minDate, VACANCY_CARRY_LOOKBACK_DAYS)
+  const extraKeys: string[] = []
+  const extraMeta: { branchId: string; date: string }[] = []
+  for (const d of extraDates) {
+    for (const branchId of branchIds) {
+      extraKeys.push(reportKey(branchId, d))
+      extraMeta.push({ branchId, date: d })
+    }
+  }
+  const extraRaw = extraKeys.length ? await redisMget(extraKeys) : []
+  const index = new Map<string, MisReport>()
+  for (let i = 0; i < extraMeta.length; i++) {
+    const r = parseJson<MisReport | null>(extraRaw[i], null)
+    if (r) index.set(`${r.branchId}|${r.dateFor}`, r)
+  }
+  for (const r of all) index.set(`${r.branchId}|${r.dateFor}`, r)
+
+  const { reportDeployTotals, undoCarriedAbsentWithoutOt } = await import('./deploy-math.js')
+  const { emptyManpowerShortage, normaliseManpowerShortage, reconcileManpowerShortageToTotal } =
+    await import('./manpower-shortage.js')
+  const helpers = {
+    reportDeployTotals,
+    undoCarriedAbsentWithoutOt,
+    emptyManpowerShortage,
+    normaliseManpowerShortage,
+    reconcileManpowerShortageToTotal,
+  }
+  const saves: Promise<boolean>[] = []
+  const out = new Map<string, MisReport[]>()
+  for (const d of [...byDate.keys()].sort()) {
+    const list = byDate.get(d) || []
+    const next: MisReport[] = []
+    for (const report of list) {
+      const priors: MisReport[] = []
+      for (const day of ymdDaysBefore(report.dateFor, VACANCY_CARRY_LOOKBACK_DAYS)) {
+        const prev = index.get(`${report.branchId}|${day}`)
+        if (prev) priors.push(prev)
+      }
+      const fixed = applyCarriedAbsentRepair(report, priors, helpers)
+      if (!fixed) {
+        next.push(report)
+        continue
+      }
+      index.set(`${fixed.branchId}|${fixed.dateFor}`, fixed)
+      next.push(fixed)
+      saves.push(persistRepairedReport(fixed))
+    }
+    out.set(d, next)
+  }
+  if (saves.length) await Promise.all(saves)
+  return out
+}
+
+/** Director/Admin: recalculate OT on a submitted report (clamp rules) without reopening. */
+export async function repairSubmittedMisReportOt(
+  branchId: string,
+  dateFor: string,
+): Promise<
+  | { ok: true; branchName: string; otBefore: number; otAfter: number }
+  | { ok: false; error: string }
+> {
+  const report = await getReport(branchId, dateFor)
+  if (!report) return { ok: false, error: 'No report found for this branch and date.' }
+  const { normalizeDeployRow, reportDeployTotals } = await import('./deploy-math.js')
+  const before = reportDeployTotals((report.rows || []) as Record<string, unknown>[], branchId)
+  const rows = (report.rows || []).map((r) => normalizeDeployRow({ ...r }) as typeof r)
+  const after = reportDeployTotals(rows as Record<string, unknown>[], branchId)
+  const fixed: MisReport = { ...report, rows }
+  const ok = report.submittedAt ? await submitReport(fixed) : await saveDraftReport(fixed)
+  if (!ok) return { ok: false, error: 'Could not save corrected OT.' }
+  await invalidateMdSummaryCache(dateFor)
+  return {
+    ok: true,
+    branchName: report.branchName || branchId,
+    otBefore: before.ot,
+    otAfter: after.ot,
+  }
+}
+
+/** Director/Admin: remove a report completely so the branch starts fresh. */
+export async function deleteMisReport(branchId: string, dateFor: string): Promise<boolean> {
+  const report = await getReport(branchId, dateFor)
+  if (!report) return false
+  const del = await redis(['DEL', reportKey(branchId, dateFor)])
+  if (!del) return false
+  const idx = await getJson<string[]>(reportIndexKey(dateFor), [])
+  const next = idx.filter((id) => id !== branchId)
+  if (next.length !== idx.length) await setJson(reportIndexKey(dateFor), next)
+  await invalidateMdSummaryCache(dateFor)
   return true
 }
 
@@ -1295,7 +2158,7 @@ Agile Security Force Private Limited`,
 export async function getReportsForDate(dateFor: string, branchesCached?: MisBranch[]): Promise<MisReport[]> {
   const branches = branchesCached ?? (await getBranches())
   const idx = await getJson<string[]>(reportIndexKey(dateFor), [])
-  const scanIds = idx.length ? idx : branches.map((b) => b.id)
+  const scanIds = [...new Set([...idx, ...branches.map((b) => b.id)].filter(Boolean))]
   const keys = scanIds.map((branchId) => reportKey(branchId, dateFor))
   const raw = await redisMget(keys)
 
@@ -1315,25 +2178,44 @@ export async function getReportsForDate(dateFor: string, branchesCached?: MisBra
   }
 
   const nameById = new Map(branches.map((b) => [b.id, b.name]))
-  return found.map((r) => ({
+  const named = found.map((r) => ({
     ...r,
     branchName: nameById.get(r.branchId) ?? r.branchName,
   }))
+  const repaired = await repairReportMap(new Map([[dateFor, named]]))
+  return repaired.get(dateFor) ?? named
 }
 
 export async function invalidateMdSummaryCache(dateFor: string): Promise<void> {
-  const prefix = `mis:mdsummary:`
-  await redis(['DEL', `${prefix}day:${dateFor}`, `${prefix}week:${misWeekStartMonday(dateFor)}`, `${prefix}month:${dateFor.slice(0, 7)}`])
+  const prefix = `mis:mdsummary:v${MD_SUMMARY_CACHE_VERSION}:`
+  const week = misWeekStartMonday(dateFor)
+  const month = dateFor.slice(0, 7)
+  await redis([
+    'DEL',
+    `${prefix}day:${dateFor}`,
+    `${prefix}week:${week}`,
+    `${prefix}month:${month}`,
+    `${prefix}reports:day:${dateFor}`,
+    `${prefix}reports:week:${week}`,
+    `${prefix}reports:month:${month}`,
+    `${prefix}mdmail-v2:${dateFor}`,
+  ])
+  await redis(['DEL', `mis:mdsummary:day:${dateFor}`, `mis:mdsummary:week:${week}`, `mis:mdsummary:month:${month}`])
 }
 
 export async function getCachedMdSummary<T>(cacheKey: string, build: () => Promise<T>, anchorDate?: string): Promise<T> {
-  const cached = await getJson<{ ts: number; data: T } | null>(mdSummaryCacheKey(cacheKey), null)
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
   const ttl = anchorDate && anchorDate < today ? MD_SUMMARY_CACHE_HISTORICAL_MS : MD_SUMMARY_CACHE_MS
+  const cached = await getJson<{ ts: number; data: T } | null>(mdSummaryCacheKey(cacheKey), null)
   if (cached && Date.now() - cached.ts < ttl) return cached.data
-  const data = await build()
-  await setJson(mdSummaryCacheKey(cacheKey), { ts: Date.now(), data })
-  return data
+  try {
+    const data = await build()
+    await setJson(mdSummaryCacheKey(cacheKey), { ts: Date.now(), data })
+    return data
+  } catch (err) {
+    if (cached?.data) return cached.data
+    throw err
+  }
 }
 
 /** Parallel fetch visits for multiple dates (dashboard week/month). */
@@ -1366,7 +2248,7 @@ export async function getReportsForDates(
   const meta: { date: string; branchId: string }[] = []
   for (let i = 0; i < scanDates.length; i++) {
     const d = scanDates[i]
-    const ids = indexes[i].length ? indexes[i] : dates.length <= 6 ? branches.map((b) => b.id) : []
+    const ids = [...new Set([...(indexes[i] || []), ...branches.map((b) => b.id)].filter(Boolean))]
     for (const branchId of ids) {
       keys.push(reportKey(branchId, d))
       meta.push({ date: d, branchId })
@@ -1388,7 +2270,7 @@ export async function getReportsForDates(
     list.push({ ...r, branchName: nameById.get(r.branchId) ?? r.branchName })
     byDate.set(meta[i].date, list)
   }
-  return byDate
+  return repairReportMap(byDate)
 }
 
 /** Parallel fetch guard docs — single MGET batch. */

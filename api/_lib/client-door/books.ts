@@ -1,11 +1,21 @@
 /**
  * Client Door books only — does not change Master Directory / Daily MIS.
- * HDFC · Canara · IDBI = one book per state. Other Apex clients = one book each.
+ * HDFC · Canara · IDBI = one book per state.
+ * Ultra Tech (UTCL) = one book per plant (Tadipatri · Shankarpalli · Ginigera · Arakonam).
+ * Other Apex clients = one book each.
  */
 import { stateForMisBranch } from '../mis/hdfc-ssa-state.js'
 import type { ClientDoorSite } from './lookup.js'
 
 export const CLIENT_DOOR_STATEWISE_KEYS = ['hdfc', 'canara', 'idbi'] as const
+export const CLIENT_DOOR_UNITWISE_KEYS = ['ultra'] as const
+
+const UTCL_UNITS = [
+  { id: 'tadipatri', label: 'Tadipatri', office: 'Tadipatri', re: /tadipatri/ },
+  { id: 'shankarpalli', label: 'Shankarpalli', office: 'Hyderabad-A', re: /shankar\s*pall[yi]|shanker\s*pall[yi]/ },
+  { id: 'ginigera', label: 'Ginigera', office: 'Bangalore', re: /ginigera/ },
+  { id: 'arakonam', label: 'Arakonam', office: 'Chennai', re: /arak+onam/ },
+] as const
 
 export type ClientDoorBook = {
   id: string
@@ -35,10 +45,29 @@ export function isClientDoorStatewise(groupKey: string): boolean {
   return (CLIENT_DOOR_STATEWISE_KEYS as readonly string[]).includes(groupKey)
 }
 
+export function isClientDoorUnitwise(groupKey: string): boolean {
+  return (CLIENT_DOOR_UNITWISE_KEYS as readonly string[]).includes(groupKey)
+}
+
+function utclUnit(site: ClientDoorSite): { id: string; label: string; office: string } {
+  const hay = `${site.name || ''} ${site.location || ''} ${site.branchName || ''} ${site.branchId || ''}`
+    .trim()
+    .toLowerCase()
+    .replace(/[_–]+/g, ' ')
+  for (const u of UTCL_UNITS) {
+    if (u.re.test(hay)) {
+      return { id: u.id, label: u.label, office: site.branchName || u.office }
+    }
+  }
+  const office = String(site.branchName || '').trim() || 'UTCL'
+  return { id: slug(site.branchId || office), label: office, office }
+}
+
 /**
  * Client Door only. Does not change Daily MIS or SSA.
  * Telangana = Hyderabad-A + Hyderabad-B (+ Hi-Tech City).
- * Andhra Pradesh = Vizag, Kakinada, Vijayawada, Nellore, Tirupati, Tada.
+ * Andhra Pradesh = Visakhapatnam (Vizag), Kakinada, Vijayawada, Nellore, Tirupati, Tada.
+ * Corporate Office and Training Academy are not operations — they are dropped in lookup.
  */
 export function clientDoorStateForBranch(branchName: string, branchId?: string): string {
   const hay = `${branchName || ''} ${branchId || ''}`
@@ -47,7 +76,7 @@ export function clientDoorStateForBranch(branchName: string, branchId?: string):
     .replace(/[_–]+/g, '-')
   if (/tadipatri/.test(hay)) return 'Andhra Pradesh'
   if (/\btada\b/.test(hay)) return 'Andhra Pradesh'
-  if (/visakhapatnam|\bvizag\b/.test(hay)) return 'Andhra Pradesh'
+  if (/visakhapatnam|vishakhapatnam|visakapatnam|\bvizag\b|b_visakhapatnam/.test(hay)) return 'Andhra Pradesh'
   if (/kakinada/.test(hay)) return 'Andhra Pradesh'
   if (/vijayawada/.test(hay)) return 'Andhra Pradesh'
   if (/nellore/.test(hay)) return 'Andhra Pradesh'
@@ -61,6 +90,9 @@ export function clientDoorBookId(site: ClientDoorSite): string {
   if (isClientDoorStatewise(site.groupKey)) {
     return `${site.groupKey}:${slug(clientDoorStateForBranch(site.branchName, site.branchId))}`
   }
+  if (isClientDoorUnitwise(site.groupKey)) {
+    return `${site.groupKey}:${utclUnit(site).id}`
+  }
   return site.groupKey
 }
 
@@ -68,6 +100,10 @@ export function clientDoorBookName(site: ClientDoorSite): { name: string; stateL
   if (isClientDoorStatewise(site.groupKey)) {
     const state = clientDoorStateForBranch(site.branchName, site.branchId)
     return { name: `${site.groupLabel} — ${state}`, stateLabel: state }
+  }
+  if (isClientDoorUnitwise(site.groupKey)) {
+    const u = utclUnit(site)
+    return { name: `${site.groupLabel} — ${u.label}`, stateLabel: u.office }
   }
   return { name: site.groupLabel, stateLabel: 'All sites' }
 }

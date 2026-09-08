@@ -1,5 +1,7 @@
 /** Simple Security Staff words. Built from code points so scripts stay clean. */
 
+import { LIVE_I18N_MAJOR } from './i18n-major.js'
+
 export type LiveLang = 'en' | 'hi' | 'te' | 'ta' | 'ml' | 'kn' | 'mr' | 'gu' | 'as' | 'or' | 'ur'
 
 const cp = (...n: number[]) => String.fromCodePoint(...n)
@@ -71,8 +73,12 @@ export type LiveI18nKey =
   | 'newsOpen'
   | 'staffRole'
   | 'branchLine'
+  | 'name'
+  | 'idCardLine'
+  | 'designation'
 
-type Pack = Record<LiveI18nKey, string>
+export type LiveI18nPack = Record<LiveI18nKey, string>
+type Pack = LiveI18nPack
 
 const EN: Pack = {
   lang: 'Language',
@@ -130,6 +136,9 @@ const EN: Pack = {
   newsOpen: 'Open Security News',
   staffRole: 'Security Staff',
   branchLine: 'Branch:',
+  name: 'Name',
+  idCardLine: 'ID card validity',
+  designation: 'Designation',
 }
 
 function overlay(part: Partial<Pack>): Pack {
@@ -377,18 +386,22 @@ const UR = overlay({
   branchLine: cp(0x0628, 0x0631, 0x0627, 0x0646, 0x0686, 0x3a),
 })
 
+function withMajor(lang: LiveLang, pack: Pack): Pack {
+  return { ...pack, ...(LIVE_I18N_MAJOR[lang] || {}) } as Pack
+}
+
 export const LIVE_I18N: Record<LiveLang, Pack> = {
   en: EN,
-  hi: HI,
-  te: TE,
-  ta: TA,
-  ml: ML,
-  kn: KN,
-  mr: MR,
-  gu: GU,
-  as: AS,
-  or: OR,
-  ur: UR,
+  hi: withMajor('hi', HI),
+  te: withMajor('te', TE),
+  ta: withMajor('ta', TA),
+  ml: withMajor('ml', ML),
+  kn: withMajor('kn', KN),
+  mr: withMajor('mr', MR),
+  gu: withMajor('gu', GU),
+  as: withMajor('as', AS),
+  or: withMajor('or', OR),
+  ur: withMajor('ur', UR),
 }
 
 export function liveLangOptionsHtml(): string {
@@ -419,14 +432,17 @@ function loadLang(){
 function applyLang(){
   document.documentElement.lang=CUR_LANG==='or'?'or':CUR_LANG;
   document.documentElement.setAttribute('data-live-lang',CUR_LANG);
-  document.querySelectorAll('[data-i18n]').forEach(function(n){
-    var k=n.getAttribute('data-i18n'); if(!k)return;
-    var raw=t(k);
-    if(n.getAttribute('data-i18n-placeholder')==='1'){n.setAttribute('placeholder',raw);return;}
-    if(n.getAttribute('data-i18n-br')==='1'){n.innerHTML=raw.replace(/\\n/g,'<br>');return;}
-    n.textContent=raw;
+  var roots=['home','app'].map(function(id){return document.getElementById(id);}).filter(Boolean);
+  roots.forEach(function(root){
+    root.querySelectorAll('[data-i18n]').forEach(function(n){
+      var k=n.getAttribute('data-i18n'); if(!k)return;
+      var raw=t(k);
+      if(n.getAttribute('data-i18n-placeholder')==='1'){n.setAttribute('placeholder',raw);return;}
+      if(n.getAttribute('data-i18n-br')==='1'){n.innerHTML=raw.replace(/\\n/g,'<br>');return;}
+      n.textContent=raw;
+    });
   });
-  ['langPickGate','langPickHome'].forEach(function(id){
+  ['langPickHome','langPickStaff'].forEach(function(id){
     var s=document.getElementById(id); if(s) s.value=CUR_LANG;
   });
   var ban=document.getElementById('banner');

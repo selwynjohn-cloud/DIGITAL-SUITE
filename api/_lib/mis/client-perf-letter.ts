@@ -26,6 +26,14 @@ export type ClientPerfLetterData = {
   outOfPost?: number
   mwCompliant?: string
   mwCompliantLabel?: string
+  pvcPct?: number | null
+  medicalPct?: number | null
+  pvcCount?: number
+  medicalCount?: number
+  complianceSan?: number
+  pvcLabel?: string
+  medicalLabel?: string
+  accuracyNote?: string
   monthlyBillLacs?: number | null
   balanceToPayLacs?: number | null
   collectedLacs?: number | null
@@ -99,9 +107,9 @@ export function buildClientPerfLetterHtml(d: ClientPerfLetterData): string {
     clientPerfChartsBlockHtml(d) +
     sectionTable(
       '1. Deployment',
-      dataRow('Sanctioned', String(d.san)) +
-        dataRow('Deployed', String(d.dep)) +
-        dataRow('Vacant', String(d.vac)) +
+      dataRow('Sanctioned strength (unit)', String(d.san)) +
+        dataRow('Deployed (avg daily)', String(d.dep)) +
+        dataRow('Vacant (avg daily)', String(d.vac)) +
         dataRow('Average Deployment %', `${d.avgDeploy}%`) +
         dataRow('Days with data', String(d.daysWithData)),
     ) +

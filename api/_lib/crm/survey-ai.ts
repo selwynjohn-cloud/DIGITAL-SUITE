@@ -1,4 +1,4 @@
-import { CONTRACT_START_STEPS, DEFAULT_UNIFORM_REQUIREMENTS, SURVEY_PARTS, riskBand, surveyGrandTotal, surveyPartTotal } from './survey-template.js'
+import { DEFAULT_UNIFORM_REQUIREMENTS, SURVEY_PARTS, riskBand, surveyGrandTotal, surveyPartTotal } from './survey-template.js'
 import type { CrmSiteInputs } from './store.js'
 
 export type SurveyAiInput = {
@@ -13,6 +13,8 @@ export type SurveyAiInput = {
   siteInputs?: CrmSiteInputs
   siteObservations: string
   deploymentPlan?: string
+  industry?: string
+  hodSuggestions?: string
 }
 
 function ruleBasedReport(input: SurveyAiInput): {
@@ -23,6 +25,7 @@ function ruleBasedReport(input: SurveyAiInput): {
   uniformRequirements: string
   securityRecommendations: string
   recommendations: string
+  systemSuggestions: string
 } {
   const total = surveyGrandTotal(input.scores)
   const band = riskBand(total)
@@ -52,6 +55,7 @@ function ruleBasedReport(input: SurveyAiInput): {
 
   const executiveSummary = [
     `${input.company} invited Agile Security Force Pvt Ltd to conduct a comprehensive Security Survey and Risk Assessment at ${input.locationName || input.address || 'the site'}.`,
+    input.industry ? `Industry type: ${input.industry}.` : '',
     input.natureOfBusiness ? `Nature of business: ${input.natureOfBusiness}.` : '',
     inp?.scopeOfWork ? `Scope: ${inp.scopeOfWork}.` : '',
     `Survey conducted on ${input.surveyDate || '—'} by ${input.surveyedBy || 'Agile survey team'} including day and evening site visits.`,
@@ -82,10 +86,26 @@ function ruleBasedReport(input: SurveyAiInput): {
     '',
     'Professional recommendations:',
     '• Implement layered security: deterrence (uniformed presence) → detection (CCTV/patrol) → delay (locks/fencing) → response (SOP/incident register)',
-    '• Complete Agile 12-step Contract Start Process before deployment go-live',
     '• Daily Security Report (DSR) to client · weekly supervisor audit',
-    CONTRACT_START_STEPS.slice(0, 4).map((s) => s.title).join(' → '),
   ].join('\n')
+
+  const systemSuggestions = [
+    `System review of Site Security Assessment (SSA) for ${input.company || 'site'} (${band.level} risk · ${total}/180).`,
+    input.industry ? `Industry: ${input.industry}.` : '',
+    input.hodSuggestions?.trim()
+      ? `HOD suggestions considered:\n${input.hodSuggestions.trim()}`
+      : 'HOD has not yet entered suggestions — system view is based on checklist and site inputs only.',
+    '',
+    'Additional system suggestions:',
+    highItems.length
+      ? `• Prioritise mitigation on high-score items:\n${highItems.join('\n')}`
+      : '• Maintain current controls; schedule next periodical survey.',
+    `• Manning: ${manning}`,
+    equipment.length ? `• Equipment focus: ${equipment.slice(0, 3).join('; ')}` : '',
+    '• Confirm client briefing and Director approval before implementing changes.',
+  ]
+    .filter(Boolean)
+    .join('\n')
 
   return {
     executiveSummary,
@@ -95,6 +115,7 @@ function ruleBasedReport(input: SurveyAiInput): {
     uniformRequirements: DEFAULT_UNIFORM_REQUIREMENTS,
     securityRecommendations,
     recommendations: securityRecommendations,
+    systemSuggestions,
   }
 }
 
@@ -136,6 +157,7 @@ export async function generateSurveyAiReport(input: SurveyAiInput): Promise<{
   uniformRequirements: string
   securityRecommendations: string
   recommendations: string
+  systemSuggestions: string
   aiUsed: boolean
 }> {
   const fallback = ruleBasedReport(input)
@@ -154,11 +176,13 @@ export async function generateSurveyAiReport(input: SurveyAiInput): Promise<{
 
   const system = `You are a senior physical security consultant for Agile Security Force Pvt Ltd, India.
 Write professional CLIENT-FACING survey reports. Use scientific risk language. Scores 0=low risk, 5=high risk. Max 180.
-Include uniform standards, equipment, manning (ASO/LSG/SG shifts), and actionable mitigation.`
+Include uniform standards, equipment, manning (ASO/LSG/SG shifts), and actionable mitigation.
+Also write systemSuggestions that review the HOD suggestions and add independent professional advice.`
 
   const user = `Company: ${input.company}
 Location: ${input.locationName}
 Address: ${input.address}
+Industry: ${input.industry || '—'}
 Business: ${input.natureOfBusiness}
 Survey date: ${input.surveyDate}
 Surveyed by: ${input.surveyedBy}
@@ -176,11 +200,14 @@ Vulnerable areas: ${inp?.vulnerableAreas || '—'}
 Observations: ${input.siteObservations || '—'}
 Deployment plan: ${input.deploymentPlan || '—'}
 
+HOD suggestions:
+${input.hodSuggestions || '—'}
+
 Checklist:
 ${scoreDetail}
 
 Respond JSON only:
-executiveSummary, riskAnalysis (scientific 2-3 paragraphs), manning, equipment (numbered), uniformRequirements (bullet uniform/grooming), securityRecommendations (professional bullets), recommendations (same as securityRecommendations shortened).`
+executiveSummary, riskAnalysis (scientific 2-3 paragraphs), manning, equipment (numbered), uniformRequirements (bullet uniform/grooming), securityRecommendations (professional bullets), recommendations (same as securityRecommendations shortened), systemSuggestions (review HOD suggestions then add system recommendations in plain English).`
 
   const raw = await callLlm(system, user)
   if (raw) {
@@ -194,8 +221,11 @@ executiveSummary, riskAnalysis (scientific 2-3 paragraphs), manning, equipment (
           manning: String(j.manning || fallback.manning),
           equipment: String(j.equipment || fallback.equipment),
           uniformRequirements: String(j.uniformRequirements || fallback.uniformRequirements),
-          securityRecommendations: String(j.securityRecommendations || j.recommendations || fallback.securityRecommendations),
+          securityRecommendations: String(
+            j.securityRecommendations || j.recommendations || fallback.securityRecommendations,
+          ),
           recommendations: String(j.recommendations || j.securityRecommendations || fallback.recommendations),
+          systemSuggestions: String(j.systemSuggestions || fallback.systemSuggestions),
           aiUsed: true,
         }
       }
@@ -208,6 +238,7 @@ executiveSummary, riskAnalysis (scientific 2-3 paragraphs), manning, equipment (
         uniformRequirements: fallback.uniformRequirements,
         securityRecommendations: fallback.securityRecommendations,
         recommendations: fallback.recommendations,
+        systemSuggestions: fallback.systemSuggestions,
         aiUsed: true,
       }
     }
@@ -215,3 +246,4 @@ executiveSummary, riskAnalysis (scientific 2-3 paragraphs), manning, equipment (
 
   return { ...fallback, aiUsed: false }
 }
+

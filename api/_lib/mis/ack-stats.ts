@@ -6,21 +6,33 @@ import {
   getCollections,
   getComplaints,
   getGuardDocs,
+  getReport,
   getVisits,
   guardRecordEligible,
   type MisComplaint,
   type MisGuardDoc,
 } from './store.js'
 import { getJoinBacks, getRequisitions } from '../recruitment/store.js'
+import { branchSanctionedPosts } from './guard-compliance-math.js'
+import { formatInrThousandsFromLacs } from '../inr-money.js'
 
 export type BranchAckStats = {
+  branchId?: string
+  branchName?: string
   guardsTotal: number
+  sanctionedStrength: number
   pvcValid: number
   medicalValid: number
+  /** PVC % of active guards (capped 100). */
+  pvcPct: number
+  /** Medical / MC % of active guards (capped 100). */
+  mcPct: number
   dayVisits: number
   nightChecks: number
   srMgmtVisits: number
   resigned: number
+  /** Guards recruited / joined (from MIS summary). */
+  recruited: number
   recruitmentOpen: number
   weeklyCollected: number
   weeklyBudget: number
@@ -97,18 +109,20 @@ export async function buildBranchAckStats(
   branchName: string,
   dateFor: string,
 ): Promise<BranchAckStats> {
-  const [guardDocs, complaints, clients, visits, collections, requisitions, joinBacks] =
+  const [guardDocs, complaints, clients, visits, collections, requisitions, joinBacks, report] =
     await Promise.all([
       getGuardDocs(branchId),
       getComplaints(branchId),
-      getClients(branchId),
+      getClients(branchId, { skipRepair: true }),
       getVisits(dateFor),
       getCollections(weekStartMonday(dateFor)),
       getRequisitions(),
       getJoinBacks(),
+      getReport(branchId, dateFor),
     ])
 
   const comp = guardCompliance(guardDocs)
+  const sanctionedStrength = branchSanctionedPosts(branchId, report, clients)
   const clientNames = new Set(
     clients.filter((c) => c.active !== false).map((c) => c.name.trim().toLowerCase()),
   )
@@ -155,14 +169,25 @@ export async function buildBranchAckStats(
       branchNameLoose(String(j.branchId ?? ''), branchName),
   ).length
 
+  const recruited =
+    parseInt(String(report?.summary?.recruitment ?? '').replace(/\D/g, ''), 10) || 0
+  const pvcPct = comp.total ? Math.min(100, Math.round((comp.pvc * 100) / comp.total)) : 0
+  const mcPct = comp.total ? Math.min(100, Math.round((comp.medical * 100) / comp.total)) : 0
+
   return {
+    branchId,
+    branchName,
     guardsTotal: comp.total,
+    sanctionedStrength,
     pvcValid: comp.pvc,
     medicalValid: comp.medical,
+    pvcPct,
+    mcPct,
     dayVisits,
     nightChecks,
     srMgmtVisits,
     resigned: comp.resigned + resignedJoinBack,
+    recruited,
     recruitmentOpen,
     weeklyCollected,
     weeklyBudget,
@@ -191,12 +216,16 @@ function mergeComplaintSide(
 export function aggregateBranchAckStats(list: BranchAckStats[]): BranchAckStats {
   const out: BranchAckStats = {
     guardsTotal: 0,
+    sanctionedStrength: 0,
     pvcValid: 0,
     medicalValid: 0,
+    pvcPct: 0,
+    mcPct: 0,
     dayVisits: 0,
     nightChecks: 0,
     srMgmtVisits: 0,
     resigned: 0,
+    recruited: 0,
     recruitmentOpen: 0,
     weeklyCollected: 0,
     weeklyBudget: 0,
@@ -205,28 +234,55 @@ export function aggregateBranchAckStats(list: BranchAckStats[]): BranchAckStats 
   }
   for (const s of list) {
     out.guardsTotal += s.guardsTotal
+    out.sanctionedStrength += s.sanctionedStrength
     out.pvcValid += s.pvcValid
     out.medicalValid += s.medicalValid
     out.dayVisits += s.dayVisits
     out.nightChecks += s.nightChecks
     out.srMgmtVisits += s.srMgmtVisits
     out.resigned += s.resigned
+    out.recruited += s.recruited || 0
     out.recruitmentOpen += s.recruitmentOpen
     out.weeklyCollected += s.weeklyCollected
     out.weeklyBudget += s.weeklyBudget
     out.guardComplaints = mergeComplaintSide(out.guardComplaints, s.guardComplaints)
     out.clientComplaints = mergeComplaintSide(out.clientComplaints, s.clientComplaints)
   }
+  out.pvcPct = out.guardsTotal ? Math.min(100, Math.round((out.pvcValid * 100) / out.guardsTotal)) : 0
+  out.mcPct = out.guardsTotal
+    ? Math.min(100, Math.round((out.medicalValid * 100) / out.guardsTotal))
+    : 0
   return out
+}
+
+/** Per-branch + company aggregate acknowledgment metrics. */
+export async function buildAllBranchAckStats(dateFor: string): Promise<{
+  aggregate: BranchAckStats
+  byBranchId: Record<string, BranchAckStats>
+  list: BranchAckStats[]
+}> {
+  const branches = await getBranches()
+  const perBranch = await Promise.all(
+    branches.map(async (b) => {
+      try {
+        return await buildBranchAckStats(b.id, b.name, dateFor)
+      } catch {
+        return null
+      }
+    }),
+  )
+  const list = perBranch.filter((s): s is BranchAckStats => s !== null)
+  const byBranchId: Record<string, BranchAckStats> = {}
+  for (const s of list) {
+    if (s.branchId) byBranchId[s.branchId] = s
+  }
+  return { aggregate: aggregateBranchAckStats(list), byBranchId, list }
 }
 
 /** Build combined status dashboard from every active branch. */
 export async function buildConsolidatedAckStats(dateFor: string): Promise<BranchAckStats> {
-  const branches = await getBranches()
-  const perBranch = await Promise.all(
-    branches.map((b) => buildBranchAckStats(b.id, b.name, dateFor).catch(() => null)),
-  )
-  return aggregateBranchAckStats(perBranch.filter((s): s is BranchAckStats => s !== null))
+  const { aggregate } = await buildAllBranchAckStats(dateFor)
+  return aggregate
 }
 
 export function fmtRatio(n: number, total: number): string {
@@ -258,13 +314,15 @@ export function ackStatsTableHtml(stats: BranchAckStats): string {
   const guardLabel = `Guard complaints solved${gc.avgResponseHrs != null ? ' · ' + fmtResponseHrs(gc.avgResponseHrs) : ''}`
   const clientLabel = `Client complaints solved${cc.avgResponseHrs != null ? ' · ' + fmtResponseHrs(cc.avgResponseHrs) : ''}`
 
+  const pvcDenom = stats.sanctionedStrength || stats.guardsTotal
+  const medDenom = stats.sanctionedStrength || stats.guardsTotal
   return `<div style="margin:0 0 18px">
     <div style="padding:10px 0 4px;font-weight:700;color:#14224f;font-size:14px">Branch Status Dashboard</div>
     ${misAckRowDivider()}
     <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:8px 10px">
       <tr>
-        ${tile(fmtRatio(stats.pvcValid, stats.guardsTotal), 'PVC (valid / total)', '#eff6ff', '#1d4ed8', '25%')}
-        ${tile(fmtRatio(stats.medicalValid, stats.guardsTotal), 'Medical (valid / total)', '#f0fdf4', '#16a34a', '25%')}
+        ${tile(fmtRatio(stats.pvcValid, pvcDenom), 'PVC (valid / sanctioned)', '#eff6ff', '#1d4ed8', '25%')}
+        ${tile(fmtRatio(stats.medicalValid, medDenom), 'Medical (valid / sanctioned)', '#f0fdf4', '#16a34a', '25%')}
         ${tile(String(stats.dayVisits), 'Day visits', '#fefce8', '#ca8a04', '25%')}
         ${tile(String(stats.srMgmtVisits), 'Sr. Management visits', '#f5f3ff', '#7c3aed', '25%')}
       </tr>
@@ -274,7 +332,7 @@ export function ackStatsTableHtml(stats: BranchAckStats): string {
       <tr>
         ${tile(String(stats.resigned), 'Resigned', '#fef2f2', '#dc2626')}
         ${tile(String(stats.recruitmentOpen), 'Recruitment (open)', '#ecfdf5', '#059669')}
-        ${tile(`${fmtLakhs(stats.weeklyCollected)} / ${fmtLakhs(stats.weeklyBudget)}`, 'Weekly collection (₹ Lakhs)', '#eff6ff', '#1d4ed8')}
+        ${tile(`${formatInrThousandsFromLacs(stats.weeklyCollected)} / ${formatInrThousandsFromLacs(stats.weeklyBudget)}`, 'Weekly collection (₹ thousands)', '#eff6ff', '#1d4ed8')}
         ${tile(guardCmp, guardLabel, '#fff7ed', '#ea580c')}
         ${tile(clientCmp, clientLabel, '#fdf4ff', '#9333ea')}
       </tr>

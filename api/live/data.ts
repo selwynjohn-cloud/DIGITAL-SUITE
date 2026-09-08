@@ -20,7 +20,8 @@ import {
   type OpsGuard,
 } from '../_lib/ops-mobile/store.js'
 import { liveBranchOptions, liveRoomKey, resolveLiveBranchName } from '../_lib/agile-live/branches.js'
-import { liveDutyGeo, matchLiveDutyPost } from '../_lib/agile-live/duty-post.js'
+import { buildLiveOpsPhoneLists } from '../_lib/agile-live/ops-phone.js'
+import { foldLiveSite, liveDutyGeo, matchLiveDutyPost } from '../_lib/agile-live/duty-post.js'
 import { earlyDutyHoursMessage, istMonthEnd, istMonthStart, istNow, istYmd, istYmdFromIso, lateDutyHoursMessage, liveDutyWindow } from '../_lib/agile-live/duty-window.js'
 import { buildLiveAttendanceReports } from '../_lib/agile-live/attendance-reports.js'
 import { liveWageSlip } from '../_lib/agile-live/wage-slip.js'
@@ -52,6 +53,8 @@ import {
   listLiveStatus,
   listLiveStatusBetween,
   listLiveVacantAllots,
+  listLiveOffExtrasForMobile,
+  saveLiveOffExtra,
   liveChatRateOk,
   mapLiveUnitWeekOffs,
   muteLiveSender,
@@ -66,7 +69,7 @@ import {
   unmuteLiveSender,
   upsertLiveExtraMobile,
 } from '../_lib/agile-live/store.js'
-import { getBranches, getClients, getUsers, type MisClient } from '../_lib/mis/store.js'
+import { getBranches, getClients, getGuardDocs, getStaff, getUsers, type MisClient } from '../_lib/mis/store.js'
 import {
   LIVE_APP_ID,
   LIVE_BREAK_REASONS,
@@ -76,11 +79,34 @@ import {
   LIVE_DEMO_MOBILE,
   LIVE_LEAVE_POST_MSG,
   REPORT_EARLY_MIN,
+  type LiveOffExtraDuty,
   type LiveReminderKind,
   type LiveStatusKind,
 } from '../_lib/agile-live/types.js'
 
 export const maxDuration = 60
+
+/** Operations reports / processes — Staff + Management session only. Not the Security Staff phone. */
+const LIVE_OPS_STAFF_ACTIONS = [
+  'opsPhoneLists',
+  'weekRoster',
+  'setUnitWeekOff',
+  'portalAttend',
+  'sendReminder',
+  'allotVacant',
+  'attReports',
+  'board',
+  'monthDuties',
+  'saveSiteNote',
+  'saveSoftSkill',
+  'mute',
+] as const
+
+function isLiveOpsStaffAction(action: string): boolean {
+  return (LIVE_OPS_STAFF_ACTIONS as readonly string[]).includes(action)
+}
+
+const LIVE_OPS_STAFF_DENIED = 'Security Staff have no access to operations reports or processes.'
 
 function liveDemoGuard(): OpsGuard {
   const now = new Date().toISOString()
@@ -216,9 +242,13 @@ function dutyView(
   hereLat?: number | null,
   hereLng?: number | null,
   offWeekday = 0,
+  extras: LiveOffExtraDuty[] = [],
 ) {
+  const todayYmd = istYmd()
+  const extraToday = extras.find((e) => e.date === todayYmd) || null
+  const dutySite = String(open?.clientSite || extraToday?.clientSite || g.clientSite || '').trim()
   const post = matchLiveDutyPost({
-    clientSite: g.clientSite,
+    clientSite: dutySite,
     branch: g.branch,
     clients,
     startLat: open?.startLat ?? null,
@@ -233,11 +263,12 @@ function dutyView(
   }
   const week = livePersonWeek({
     idNo: g.idNo,
-    clientSite: [post.clientName, post.location].filter(Boolean).join(' — ') || g.clientSite,
+    clientSite: [post.clientName, post.location].filter(Boolean).join(' — ') || dutySite || g.clientSite,
     designation: g.designation,
     shiftRaw: g.shift,
     at,
     offWeekday,
+    extras,
   })
   const win = liveDutyWindow(week.dutyStart, at)
   const here = {
@@ -270,6 +301,8 @@ function dutyView(
     todayShift: week.todayShift,
     tomorrowShift: week.tomorrowShift,
     shiftLabel: week.todayOff ? 'Weekly off' : week.shiftLabel,
+    extraDuty: extras,
+    extraToday: Boolean(week.todayExtra),
     shiftHours: week.hours,
     rank: week.rank,
     week,
@@ -313,8 +346,30 @@ function publicDuty(
   hereLat?: number | null,
   hereLng?: number | null,
   offWeekday = 0,
+  extras: LiveOffExtraDuty[] = [],
 ) {
-  return dutyView(g, open, clients, hereLat, hereLng, offWeekday)
+  return dutyView(g, open, clients, hereLat, hereLng, offWeekday, extras)
+}
+
+function liveOffSites(clients: MisClient[], ownSite: string) {
+  const own = String(ownSite || '').trim()
+  const rows = clients
+    .filter((c) => c.active !== false && String(c.name || '').trim())
+    .map((c) => ({
+      name: String(c.name || '').trim(),
+      location: String(c.location || '').trim(),
+      label: [c.name, c.location].filter(Boolean).join(' — '),
+    }))
+  const seen = new Set<string>()
+  const out: { name: string; location: string; label: string }[] = []
+  if (own) out.push({ name: own, location: '', label: `Same site — ${own}` })
+  for (const r of rows) {
+    const key = r.label.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(r)
+  }
+  return out.slice(0, 80)
 }
 
 function breakReasonOk(raw: string): string {
@@ -653,6 +708,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const clients = await loadLiveClients(g.branch)
       const woMap = await mapLiveUnitWeekOffs()
       const off = offWeekdayFromMap(woMap, g.branch, g.clientSite)
+      const extras = await listLiveOffExtrasForMobile(g.mobile)
       const guardToken = await issueLiveGuardToken({
         guardId: g.id,
         idNo: g.idNo,
@@ -666,7 +722,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({
         ok: true,
         guardToken,
-        duty: publicDuty(g, open, clients, null, null, off),
+        duty: publicDuty(g, open, clients, null, null, off, extras),
+        offSites: liveOffSites(clients, g.clientSite),
         roomKey: liveRoomKey(g.branch),
         chatRule: LIVE_CHAT_RULE,
         ...(await phoneInbox(g, off, sessions)),
@@ -687,9 +744,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       action === 'siteNote' ||
       action === 'softSkills' ||
       action === 'saveIdCard' ||
-      action === 'staffAlarm'
-    const sharedChat = action === 'chatList' || action === 'chatSend'
-    if (guardOnly || (sharedChat && guardTok)) {
+      action === 'staffAlarm' ||
+      action === 'scheduleOffExtra'
+    const sharedChat = action === 'chatList' || action === 'chatSend' || action === 'chatDelete'
+    if ((guardOnly || (sharedChat && guardTok)) && !isLiveOpsStaffAction(action)) {
       const g = await guardFromBody(body)
       if ('error' in g) return res.status(401).json({ error: g.error })
       const roomKey = liveRoomKey(g.branch)
@@ -699,12 +757,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const clients = action === 'chatList' ? [] : await loadLiveClients(g.branch)
       const woMap = await mapLiveUnitWeekOffs()
       const off = offWeekdayFromMap(woMap, g.branch, g.clientSite)
+      const extras = await listLiveOffExtrasForMobile(g.mobile)
+
+      if (action === 'scheduleOffExtra') {
+        const week = publicDuty(g, open, clients, null, null, off, extras).week
+        const date = String(body.date || today).trim()
+        const allowed = new Set([...(week?.upcomingOffs || []), ...(week?.days || []).filter((d: { isOff?: boolean; isExtra?: boolean }) => d.isOff || d.isExtra).map((d: { ymd: string }) => d.ymd)])
+        if (!date || date < today || !allowed.has(date)) {
+          return res.status(400).json({ error: 'Pick a weekly off day (today or the next weekly off).' })
+        }
+        const picked = String(body.clientSite || '').replace(/\s+/g, ' ').trim()
+        const sites = liveOffSites(clients, g.clientSite)
+        const hit = sites.find((s) => s.label === picked || s.name === picked) || (picked ? { name: picked, location: '', label: picked } : null)
+        const clientSite = String(hit?.label || hit?.name || g.clientSite || '').replace(/^Same site — /, '').trim()
+        if (!clientSite) return res.status(400).json({ error: 'Pick the site for extra duty (same place or another location).' })
+        const shiftCode = String(body.shiftCode || '').trim().toUpperCase()
+        const hdfc = /hdfc/i.test(clientSite) || /facility.?attendant/i.test(g.designation || '')
+        if (hdfc && (shiftCode === 'B' || shiftCode === 'C' || shiftCode === 'N')) {
+          return res.status(400).json({ error: 'HDFC 2FA has no night Facility Attendant duty.' })
+        }
+        const saved = await saveLiveOffExtra({
+          date,
+          branch: g.branch,
+          clientSite,
+          sameSite: foldLiveSite(clientSite) === foldLiveSite(g.clientSite) || clientSite === g.clientSite,
+          shiftCode: shiftCode || (hdfc ? 'M' : 'A'),
+          idNo: g.idNo,
+          name: g.name,
+          mobile: g.mobile,
+        })
+        const next = await listLiveOffExtrasForMobile(g.mobile)
+        return res.status(200).json({
+          ok: true,
+          extra: saved,
+          duty: publicDuty(g, open, clients, null, null, off, next),
+          offSites: sites,
+          message: 'Extra duty scheduled on weekly off. Use Start Duty at that site.',
+        })
+      }
 
       if (action === 'guardHome') {
         const mine = (await listLiveStatus(today)).filter((s) => s.guardId === g.id)
         return res.status(200).json({
           ok: true,
-          duty: publicDuty(g, open, clients, null, null, off),
+          duty: publicDuty(g, open, clients, null, null, off, extras),
+          offSites: liveOffSites(clients, g.clientSite),
           roomKey,
           chatRule: LIVE_CHAT_RULE,
           myStatus: mine[0] || null,
@@ -716,7 +813,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!open) return res.status(400).json({ error: 'Start Duty first.' })
         const lat = numOrNull(body.lat)
         const lng = numOrNull(body.lng)
-        const view = publicDuty(g, open, clients, lat, lng, off)
+        const view = publicDuty(g, open, clients, lat, lng, off, extras)
         if (view.outOfPost) {
           await flagDutyException({
             today,
@@ -776,7 +873,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       if (action === 'weather') {
-        const view = publicDuty(g, open, clients, numOrNull(body.lat), numOrNull(body.lng), off)
+        const view = publicDuty(g, open, clients, numOrNull(body.lat), numOrNull(body.lng), off, extras)
         const wx = await liveWeatherReport({
           branch: g.branch,
           lat: view.postLat ?? view.hereLat,
@@ -816,7 +913,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!level) return res.status(400).json({ error: 'Pick Low, Medium, or High.' })
         const lat = numOrNull(body.lat)
         const lng = numOrNull(body.lng)
-        const view = publicDuty(g, open, clients, lat, lng, off)
+        const view = publicDuty(g, open, clients, lat, lng, off, extras)
         const siteLine = [view.clientName, view.location, view.shiftLabel].filter(Boolean).join(' · ')
         await addLiveStatus({
           date: today,
@@ -870,12 +967,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         if (kind === 'in') {
           if (open) return res.status(400).json({ error: 'Already on duty. End Duty first.' })
-          const check = publicDuty(g, null, clients, lat, lng, off)
+          const check = publicDuty(g, null, clients, lat, lng, off, extras)
           const vacantToday = (await listLiveVacantAllots()).some(
             (v) => v.date === today && normaliseMobile(v.mobile) === normaliseMobile(g.mobile),
           )
-          if (check.week?.todayOff && !vacantToday) {
-            return res.status(400).json({ error: 'Today is Off Duty. Start Duty is only on a scheduled duty day (or a Vacant Post allotment).', duty: check })
+          const extraToday = extras.some((e) => e.date === today)
+          if (check.week?.todayOff && !vacantToday && !extraToday) {
+            return res.status(400).json({ error: 'Today is weekly off. Schedule extra duty first (same site or another location), then Start Duty.', duty: check })
           }
           if (check.hdfcNightBlocked) {
             return res.status(400).json({
@@ -883,7 +981,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               duty: check,
             })
           }
-          if (!vacantToday && check.minutesBeforeReport > 90) {
+          if (!vacantToday && !extraToday && check.minutesBeforeReport > 90) {
             return res.status(400).json({
               error: `This is not your scheduled duty time. Today: ${check.todayTime || check.shiftLabel}. Report 30 minutes early.`,
               duty: check,
@@ -903,7 +1001,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             name: g.name,
             mobile: g.mobile,
             branch: g.branch,
-            clientSite: g.clientSite,
+            clientSite: extras.find((e) => e.date === today)?.clientSite || g.clientSite,
             shiftHours: check.shiftHours === 8 ? 8 : 12,
             startedAt: nowIso,
             endedAt: '',
@@ -918,7 +1016,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           sessions.unshift(row)
           const saved = await saveDutySessions(sessions.slice(0, 5000))
           if (!saved) return res.status(503).json({ error: 'Could not save Start Duty. Try again.' })
-          const view = publicDuty(g, row, clients, lat, lng, off)
+          const view = publicDuty(g, row, clients, lat, lng, off, extras)
           if (view.lateStart) {
             await flagDutyException({
               today,
@@ -974,7 +1072,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         open.endPhotoAt = nowIso
         const saved = await saveDutySessions(sessions)
         if (!saved) return res.status(503).json({ error: 'Could not save End Duty. Try again.' })
-        const endView = publicDuty(g, open, clients, lat, lng, off)
+        const endView = publicDuty(g, open, clients, lat, lng, off, extras)
         if (endView.outOfPost) {
           await flagDutyException({
             today,
@@ -1013,7 +1111,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({
           ok: true,
           message: earlyMessage || 'End Duty saved. Thank you.',
-          duty: publicDuty(g, null, clients, lat, lng, off),
+          duty: publicDuty(g, null, clients, lat, lng, off, extras),
         })
       }
 
@@ -1033,7 +1131,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return res.status(400).json({ error: 'Pick a reason for Break Duty.' })
         }
         const remark = (reason || String(body.remark ?? '').trim()).slice(0, 200)
-        const view = publicDuty(g, open, clients, null, null, off)
+        const view = publicDuty(g, open, clients, null, null, off, extras)
         if (kind === 'break_duty') {
           await flagDutyException({
             today,
@@ -1135,7 +1233,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const lat = numOrNull(body.lat)
         const lng = numOrNull(body.lng)
         if (open && lat != null && lng != null) {
-          const chatView = publicDuty(g, open, clients, lat, lng, off)
+          const chatView = publicDuty(g, open, clients, lat, lng, off, extras)
           if (chatView.outOfPost) {
             await flagDutyException({
               today,
@@ -1167,10 +1265,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!out.ok) return res.status(out.status).json({ error: out.error, blocked: out.blocked })
         return res.status(200).json({ ok: true, message: out.message })
       }
+
+      if (action === 'chatDelete') {
+        const ok = await deleteLiveChat(roomKey, String(body.messageId ?? ''))
+        return res.status(ok ? 200 : 404).json(ok ? { ok: true } : { error: 'Message not found.' })
+      }
     }
 
     const staff = await staffSession(body, req)
-    if (!staff) return res.status(401).json({ error: 'Please sign in to Agile Live.' })
+    if (!staff) {
+      if (isLiveOpsStaffAction(action) || guardTok) {
+        return res.status(403).json({ error: LIVE_OPS_STAFF_DENIED })
+      }
+      return res.status(401).json({ error: 'Please sign in to Agile Live.' })
+    }
 
     const allBranches = await liveBranchOptions()
     const hodName =
@@ -1239,6 +1347,87 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         weekdays: LIVE_WEEKDAYS,
         units: [...new Map(rows.map((r) => [r.clientSite, { clientSite: r.clientSite, weekday: offWeekdayFromMap(woMap, r.branch, r.clientSite) }])).values()],
         rows,
+      })
+    }
+
+    if (action === 'opsPhoneLists') {
+      const room = await pickRoom()
+      if (room === 'ALL') {
+        return res.status(400).json({ error: 'Pick one branch first.' })
+      }
+      if (!(await getOpsGuards()).length) await syncOpsGuardsFromMis({ branchFilter: '*' })
+      const branchHit = allBranches.find((b) => liveRoomKey(b.name) === room)
+      const branchId = branchHit?.id || (staff.role === 'staff' ? staff.branchId || '' : '')
+      const people = (await getOpsGuards()).filter((g) => g.active !== false && sameRoom(g.branch, room))
+      const today = istYmd()
+      const [woMap, clients, opsStaff, users, docs, branches, sessions, vacantAll] = await Promise.all([
+        mapLiveUnitWeekOffs(),
+        loadLiveClients(room),
+        branchId ? getStaff(branchId, true) : Promise.resolve([]),
+        getUsers(),
+        branchId ? getGuardDocs(branchId) : Promise.resolve([]),
+        getBranches(true),
+        getDutySessions(),
+        listLiveVacantAllots(),
+      ])
+      const pack = buildLiveOpsPhoneLists({
+        room,
+        branchId,
+        people,
+        clients,
+        opsStaff,
+        users,
+        branches,
+        docs,
+        offWeekday: (branch, clientSite) => offWeekdayFromMap(woMap, branch, clientSite),
+      })
+      const onDutyIds = new Set(
+        sessions.filter((s) => s.status === 'on_duty' && sameRoom(s.branch, room)).map((s) => s.guardId),
+      )
+      const vacantToday = vacantAll.filter((v) => v.date === today && sameRoom(v.branch, room))
+      const vacantMob = new Set(vacantToday.map((v) => normaliseMobile(v.mobile)))
+      const attendance = people
+        .map((g) => {
+          const view = publicDuty(g, null, clients, null, null, offWeekdayFromMap(woMap, g.branch, g.clientSite))
+          const onDuty = onDutyIds.has(g.id)
+          const todayOff = Boolean(view.week?.todayOff)
+          const vacant = vacantMob.has(normaliseMobile(g.mobile))
+          let status = 'Not on duty'
+          if (onDuty) status = 'On duty'
+          else if (todayOff) status = 'Weekly off'
+          return {
+            name: g.name,
+            idNo: g.idNo,
+            mobile: g.mobile,
+            clientSite: view.clientName || g.clientSite,
+            rank: view.rank,
+            onDuty,
+            todayOff,
+            vacant,
+            status,
+          }
+        })
+        .sort(
+          (a, b) =>
+            String(a.clientSite).localeCompare(String(b.clientSite)) || String(a.name).localeCompare(String(b.name)),
+        )
+      return res.status(200).json({
+        ok: true,
+        ...pack,
+        attendance,
+        vacant: vacantToday
+          .map((v) => ({
+            name: v.name,
+            mobile: v.mobile,
+            idNo: v.idNo,
+            clientSite: v.clientSite,
+            date: v.date,
+          }))
+          .sort(
+            (a, b) =>
+              String(a.clientSite).localeCompare(String(b.clientSite)) || String(a.name).localeCompare(String(b.name)),
+          ),
+        free: attendance.filter((r) => !r.onDuty && !r.vacant),
       })
     }
 

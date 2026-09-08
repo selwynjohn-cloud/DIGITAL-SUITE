@@ -74,11 +74,12 @@ a{color:#c9a84c}
     <img src="${MIS_BRAND.logoUrl}" alt="Agile">
     <h1>User Manual — Agile MIS</h1>
     <div class="sub">Daily Deployment, Compliance &amp; Command Centre<br>For all Team Agile — Branch HODs, Operations, Management &amp; Support</div>
-    <div class="badge">Share this page with every branch · ${MIS_BRAND.siteLabel}</div>
+    <div class="badge">Share this page with every branch · ${MIS_BRAND.siteLabel} · Updated 18 Aug 2026</div>
     <div style="margin-top:18px">
       <a href="${SITE}/mis-report" class="btn btn-gold" style="font-size:16px;padding:14px 22px">✅ Submit Today's Daily MIS — Open Report Page</a>
     </div>
     <p style="margin-top:10px;font-size:13px;color:#86efac">Reading this manual is not enough — you must open the link above, fill the report, and press <b>Submit Daily Report</b>.</p>
+    <p style="margin-top:8px;font-size:13px;color:#fde68a">SSA (Site Security Assessment) is after Daily MIS — use <b>Start Assessment</b> for General / HDFC; mobile ops use the public HDFC link.</p>
   </div>
 
   <div class="callout">
@@ -95,16 +96,14 @@ a{color:#c9a84c}
     <div class="habit-grid">
       <div class="habit"><div class="time">By 2:00 PM</div><div class="who">Branch HOD</div><div class="task">Submit Daily Branch Report at <a href="${SITE}/mis-report">/mis-report</a> — check the <b>report date is TODAY</b> before you press Submit.</div></div>
       <div class="habit"><div class="time">Same day</div><div class="who">Branch HOD</div><div class="task">Update Unit Issue Register (equipment tab) from the report page — note next issue date &amp; remark.</div></div>
-      <div class="habit"><div class="time">5 visits/day</div><div class="who">Operations Staff</div><div class="task">Log client visits in MIS. Strategic &amp; High Value clients need day + night checks per SLA.</div></div>
+      <div class="habit"><div class="time">5 visits/day</div><div class="who">Operations Staff</div><div class="task">Log client visits in MIS. Apex &amp; Enterprise clients need day + night checks per SLA.</div></div>
       <div class="habit"><div class="time">When it happens</div><div class="who">Everyone</div><div class="task">Register complaints immediately — do not wait for weekly meetings.</div></div>
       <div class="habit"><div class="time">Saturday</div><div class="who">Management / Accounts</div><div class="task"><b>Outstanding statement</b> (client names, month-wise) — uploaded separately in Collection (DSO). <b>Weekly budget</b> for branches is taken from that statement.</div></div>
       <div class="habit"><div class="time">Each week</div><div class="who">Branch HOD</div><div class="task">On Daily Branch Report — enter <b>Weekly Budget</b> + Mon–Sat collected only (not client outstanding).</div></div>
       <div class="habit"><div class="time">6:00 AM &amp; 6:00 PM</div><div class="who">System</div><div class="task">Auto-sync <b>client visits</b>, <b>late start</b> &amp; <b>out-of-post</b> from Agile Mobile into MIS (shows on branch report; NA if no data).</div></div>
       <div class="habit"><div class="time">8:00 AM &amp; 8:00 PM</div><div class="who">System</div><div class="task">Sync <b>client complaints</b> from director mail inbox + <b>guard complaints</b> from Agile Guards into MIS.</div></div>
-      <div class="habit"><div class="time">5:00 PM</div><div class="who">Pending HODs</div><div class="task">Email reminder — submit daily MIS before <b>2:00 PM</b> (same day).</div></div>
-      <div class="habit"><div class="time">2:00 PM</div><div class="who">Director</div><div class="task">Alert email listing branches still <b>not submitted</b>.</div></div>
-      <div class="habit"><div class="time">4:00 PM</div><div class="who">Director + HODs</div><div class="task">Consolidated MIS response email (all branches).</div></div>
-      <div class="habit"><div class="time">7:00 PM</div><div class="who">Director</div><div class="task">Daily MIS summary — deployment %, pending branches, complaints.</div></div>
+      <div class="habit"><div class="time">11:00 AM &amp; 2:00 PM</div><div class="who">Pending HODs + Director</div><div class="task">Reminders if daily MIS is not submitted. Director gets the pending-branch list.</div></div>
+      <div class="habit"><div class="time">4:30 PM</div><div class="who">All HODs · CC Director</div><div class="task">Command Centre daily MIS report — dashboard, consolidated, vacancy, OT, late start / out of post, visits, finance, and AI conclusion (every day including Saturday and Sunday).</div></div>
       <div class="habit"><div class="time">On submit</div><div class="who">Branch HOD</div><div class="task">Thank-you email with branch dashboard (PVC, visits, complaints) — sent to HOD email in User Management + Director.</div></div>
     </div>
   </div>
@@ -208,7 +207,7 @@ a{color:#c9a84c}
 
   <div class="card">
     <h2>📸 Screen Guide — Unit Issue &amp; SLA</h2>
-    <p><span class="role-tag role-hod">HOD</span> Enter on daily report page. <span class="role-tag role-mgmt">Management</span> reads SLA analysis at <a href="${SITE}/mis-unit-issue">/mis-unit-issue</a>.</p>
+    <p><span class="role-tag role-hod">HOD</span> Enter on daily report page. <span class="role-tag role-mgmt">Management</span> reads <b>SLA- Analysis &amp; Compliance</b> at <a href="${SITE}/mis-unit-issue">/mis-unit-issue</a>.</p>
     <div class="snap">
       <div class="snap-bar"><span class="snap-dot r"></span><span class="snap-dot y"></span><span class="snap-dot g"></span><span class="snap-title">Unit Equipment Issue Register</span></div>
       <div class="snap-body">
@@ -221,9 +220,21 @@ a{color:#c9a84c}
   <div class="card">
     <h2>⭐ Client Categories (MIS-wide)</h2>
     <ul>
-      <li><b>Strategic Client</b> — 5★ — highest SLA, MD visibility, priority visits.</li>
-      <li><b>High Value Client</b> — 3–4★ — strong SLA, regular ops visits.</li>
-      <li><b>Valued Client</b> — 1–2★ — standard service, still fully tracked.</li>
+      <li><b>Apex Tier</b> — flagship national / Strategic accounts (5★) with strict compliance and premium SLAs.</li>
+      <li><b>Enterprise Tier</b> — same client across multiple cities or states.</li>
+      <li><b>Cluster Tier</b> — multiple sites within one city or branch.</li>
+      <li><b>Standard Tier</b> — single-site / core guarding operations.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>🛡️ Site Security Assessment (SSA) — updated 18 Aug 2026</h2>
+    <p><span class="role-tag role-hod">HOD</span> Menu after Daily MIS: <b>Site Security Assessment (SSA)</b>. <span class="role-tag role-mgmt">Management</span> has the same menu.</p>
+    <ul>
+      <li><b>General</b> — tap yellow button, then <b>Start Assessment</b> (desktop / tablet) → Industry → fill pages → Send for approval.</li>
+      <li><b>HDFC SSA</b> — public mobile link for ops (Android &amp; iPhone): <a href="${SITE}/mis-hdfc-survey">${SITE}/mis-hdfc-survey</a>. Risk Analyst must complete <b>all 15 pages</b>, then Submit to HOD. Phone asks for <b>GPS</b> — coordinates save on the assessment and on <b>client master</b> (for India road map later). Thank-you goes to analyst email + WhatsApp (CC Director + HOD).</li>
+      <li>In portal HDFC: also tap <b>Start Assessment</b> to fill on desktop / tablet.</li>
+      <li><b>HDFC SSA submitted List</b> — Review → Edit → Re-assessment → Forward for Approval → Director Approval → Send to client.</li>
     </ul>
   </div>
 
@@ -240,6 +251,8 @@ a{color:#c9a84c}
         <tr><td>Complaints Board</td><td><a href="${SITE}/mis-complaints">${SITE}/mis-complaints</a></td></tr>
         <tr><td>Collection / DSO</td><td><a href="${SITE}/mis-collection">${SITE}/mis-collection</a></td></tr>
         <tr><td>Client Performance</td><td><a href="${SITE}/mis-client">${SITE}/mis-client</a></td></tr>
+        <tr><td>Site Security Assessment (SSA)</td><td><a href="${SITE}/mis-staff-special-survey">${SITE}/mis-staff-special-survey</a> (HOD) · <a href="${SITE}/mis-special-survey">${SITE}/mis-special-survey</a> (Management)</td></tr>
+        <tr><td>HDFC SSA (public mobile link)</td><td><a href="${SITE}/mis-hdfc-survey">${SITE}/mis-hdfc-survey</a></td></tr>
         <tr><td>User Manual (this page)</td><td><a href="${SITE}/mis-manual">${SITE}/mis-manual</a></td></tr>
         <tr><td>Troubleshooting Booklet</td><td><a href="${SITE}/mis-troubleshooting">${SITE}/mis-troubleshooting</a></td></tr>
       </tbody>

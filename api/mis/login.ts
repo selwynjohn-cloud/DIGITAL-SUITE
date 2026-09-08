@@ -10,19 +10,22 @@ import {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
     const ok = verifyMisSessionToken(misSessionFromRequest(req))
     return res.status(ok ? 200 : 401).json({ ok, storage: ok ? misStorageOk() : false })
   }
 
   if (req.method === 'POST') {
     const body = (req.body ?? {}) as Record<string, unknown>
+    /** Management OTP from any suite app (MIS, Fleet, Guards, …). */
     const session = await verifyManagementSuiteSession(String(body.sessionToken ?? ''))
-    if (!session) {
+    if (!session || session.role !== 'management') {
       return res.status(401).json({
-        error: 'Please sign in to a Management portal with your @agilegroup.co.in email OTP.',
+        error: 'Please sign in to Agile MIS with your work email and the 6-digit PIN.',
       })
     }
-    res.setHeader('Set-Cookie', misSessionSetCookie(req.headers.host, session.email))
+    const host = String(req.headers['x-forwarded-host'] || req.headers.host || '')
+    res.setHeader('Set-Cookie', misSessionSetCookie(host, session.email))
     return res.status(200).json({ ok: true, storage: misStorageOk(), email: session.email })
   }
 

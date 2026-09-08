@@ -99,6 +99,8 @@ export type GuardComplaint = {
   isDelayed: boolean
   delayedAt: string
   delayedNotifiedAt: string
+  /** Once set, delayed WhatsApp apology to the guard must not re-send. */
+  delayedGuardNotifiedAt: string
   status: GuardComplaintStatus
   opsResolution: string
   deptResolution: string
@@ -131,6 +133,8 @@ export type GuardOpsStaff = {
   whatsApp: string
   active: boolean
   createdAt: string
+  /** HOD / Operations Manager — from User Management when present */
+  roleLabel?: string
 }
 
 export type GuardPortalUser = {
@@ -235,6 +239,7 @@ export function normalizeComplaint(c: Partial<GuardComplaint> & { id?: string })
     isDelayed: Boolean(c.isDelayed) || overdue,
     delayedAt: String(c.delayedAt || (overdue ? new Date().toISOString() : '')),
     delayedNotifiedAt: String(c.delayedNotifiedAt || ''),
+    delayedGuardNotifiedAt: String(c.delayedGuardNotifiedAt || ''),
     status,
     opsResolution: String(c.opsResolution || ''),
     deptResolution: String(c.deptResolution || ''),
@@ -259,6 +264,7 @@ export function normalizeOps(o: Partial<GuardOpsStaff> & { id?: string }): Guard
     whatsApp: String(o.whatsApp || o.mobile || ''),
     active: o.active !== false,
     createdAt: String(o.createdAt || new Date().toISOString()),
+    roleLabel: String(o.roleLabel || ''),
   }
 }
 
@@ -430,17 +436,22 @@ const BRANCH_ALIAS_NAMES: Record<string, string> = {
   'b-tirupathi': 'Tirupati',
   'b-tirupati': 'Tirupati',
   'b-karnataka': 'Bangalore',
+  karnataka: 'Bangalore',
+  bengaluru: 'Bangalore',
+  bangalore: 'Bangalore',
+  'bangalore-karnataka': 'Bangalore',
+  'bengaluru-karnataka': 'Bangalore',
   'b-kerala': 'Kochi',
-  'b-gujarat': 'Mumbai & Surat',
+  'b-gujarat': 'Surat',
   'b-madhya': 'Bhopal',
-  'b-maharashtra': 'Mumbai & Surat',
-  'b-nellore': 'Nellore & Tada',
-  'b-puducherry': 'Chennai & Pondicherry',
-  'b-tamilnadu': 'Chennai & Pondicherry',
+  'b-maharashtra': 'Mumbai',
+  'b-nellore': 'Nellore',
+  'b-puducherry': 'Puducherry',
+  'b-tamilnadu': 'Chennai',
   'b-vijayawada': 'Vijayawada',
-  'b-visakhapatnam': 'Visakhapatnam & Kakinada',
-  'b-vizag': 'Visakhapatnam & Kakinada',
-  'b-kakinada': 'Visakhapatnam & Kakinada',
+  'b-visakhapatnam': 'Visakhapatnam',
+  'b-vizag': 'Visakhapatnam',
+  'b-kakinada': 'Kakinada',
   'b-hitech': 'Hi-Tech City',
 }
 
@@ -460,9 +471,10 @@ export function branchLookupKey(label: string): string {
   if (/^HYD\s*ZONE\s*A$/i.test(n) || /^HYDERABAD[\s_-]*A$/i.test(n)) return 'HYDERABAD-A'
   if (/^HYD\s*ZONE\s*B$/i.test(n) || /^HYDERABAD[\s_-]*B$/i.test(n)) return 'HYDERABAD-B'
   if (/HI[\s-]*TECH/i.test(n)) return 'HI-TECH-CITY'
-  if (/^GUJARAT$/i.test(n) || /^SURAT$/i.test(n) || /^MUMBAI[\s&]*SURAT$/i.test(n) || /^MAHARASHTRA$/i.test(n)) {
-    return 'MUMBAI-SURAT'
-  }
+  if (/^SURAT$/i.test(n) || /^GUJARAT$/i.test(n)) return 'SURAT'
+  if (/^MUMBAI$/i.test(n) || /^MAHARASHTRA$/i.test(n)) return 'MUMBAI'
+  // Bangalore book — legacy MIS / QR labels (Karnataka, Bengaluru)
+  if (/^BANGALORE$/i.test(n) || /^BENGALURU$/i.test(n) || /^KARNATAKA$/i.test(n)) return 'BANGALORE'
   return n
 }
 
@@ -651,18 +663,13 @@ export async function healComplaintAssignments(
     const dept = deptStaff.find((d) => d.id === c.deptStaffId)
     let changed = false
     const patch: Partial<GuardComplaint> = {}
-    if (ops && !complaintMatchesBranch(ops.branchId, c.branchId, branches)) {
+    if (ops && String(ops.branchId || '').trim() && !complaintMatchesBranch(ops.branchId, c.branchId, branches)) {
       patch.opsStaffId = ''
       patch.opsStaffName = ''
       patch.opsStaffEmail = ''
       changed = true
     }
-    if (dept && !complaintMatchesBranch(dept.branchId, c.branchId, branches)) {
-      patch.deptStaffId = ''
-      patch.deptStaffName = ''
-      patch.deptStaffEmail = ''
-      changed = true
-    }
+    // Department staff is company-wide (HR and other HQ names stay on every branch).
     if (!changed) return c
     fixed++
     const merged = normalizeComplaint({ ...c, ...patch })

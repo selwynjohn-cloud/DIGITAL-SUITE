@@ -9,16 +9,28 @@ export const DEPLOYMENT_URL =
 export const REVIEWS_URL =
   'https://script.google.com/macros/s/AKfycby0MYZkRDiXONTxUi2h-a9CEZYRIuN1h4Sw_7ENTPX_1s7vmrs62pWsD0RCMV-lRvDp/exec'
 
-const TRAINING_LMS =
-  process.env.TRAINING_LMS_URL?.trim() ||
-  process.env.VITE_TRAINING_URL?.trim() ||
-  'https://guard-training-app.vercel.app/'
+const DEFAULT_TRAINING_LMS = 'https://guard-training-app.vercel.app/'
+
+/** Never point the Digital Learning LMS at the suite gate itself (causes login loops). */
+function resolveTrainingLmsBase(): string {
+  const raw = (
+    process.env.TRAINING_LMS_URL?.trim() ||
+    process.env.VITE_TRAINING_URL?.trim() ||
+    DEFAULT_TRAINING_LMS
+  ).replace(/\/?$/, '/')
+  if (/agilegroup-digital\.co\.in\/training\/?/i.test(raw)) return DEFAULT_TRAINING_LMS
+  return raw || DEFAULT_TRAINING_LMS
+}
+
+const TRAINING_LMS = resolveTrainingLmsBase()
 
 const TRAINING_ACADEMY = process.env.TRAINING_ACADEMY_URL?.trim() || process.env.VITE_TRAINING_ACADEMY_URL?.trim() || ''
 
 export function trainingTargetUrl(portal = ''): string {
   const p = String(portal ?? '').toLowerCase()
-  if (TRAINING_ACADEMY) return TRAINING_ACADEMY
+  if (TRAINING_ACADEMY && !/agilegroup-digital\.co\.in\/training\/?/i.test(TRAINING_ACADEMY)) {
+    return TRAINING_ACADEMY.replace(/\/?$/, '/')
+  }
   const base = TRAINING_LMS.replace(/\/?$/, '/')
   if (p === 'trainee') return `${base}?portal=trainee`
   if (p === 'management') return `${base}?portal=management`
@@ -37,9 +49,10 @@ export const SUITE_GATES: Record<string, Omit<SuiteGateMeta, 'targetUrl'> & { ta
   recruitment: {
     appId: 'recruitment',
     title: 'Agile Recruitment',
-    number: '01',
+    number: '02',
     accent: '#7c3aed',
-    targetUrl: RECRUITMENT_URL,
+    // Suite SPA (DRR + pipeline) — never the old Google Apps Script
+    targetUrl: '/recruitment/?portal=management',
   },
   deployment: {
     appId: 'deployment',

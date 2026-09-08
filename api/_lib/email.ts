@@ -1,5 +1,6 @@
 import { Resend } from 'resend'
-import { isNoMailRecipientEmail, isSuperAdminEmail } from './auth.js'
+import { isLeftCompanyEmail, isNoMailRecipientEmail, LEFT_COMPANY_LOGIN_ERROR } from './auth.js'
+import { notifyDirectorOfPinIssued } from './login-alert.js'
 import { pinMailFrom, pinMailReplyTo, resolveSuiteUserName, sendSuiteEmail } from './suite-mail.js'
 
 export type SendPinEmailResult =
@@ -21,17 +22,22 @@ export async function sendPinEmail(
   pin: string,
   appTitle: string,
   role: string,
+  opts?: { requireDelivery?: boolean; appId?: string },
 ): Promise<SendPinEmailResult> {
   const apiKey = process.env.RESEND_API_KEY?.trim()
   const from = pinMailFrom()
   const replyTo = pinMailReplyTo()
   const userEmail = email.trim().toLowerCase()
+  if (isLeftCompanyEmail(userEmail)) {
+    return { ok: false, error: LEFT_COMPANY_LOGIN_ERROR }
+  }
   if (isNoMailRecipientEmail(userEmail)) {
     return { ok: true, devMode: false }
   }
   const displayName = await resolveSuiteUserName(userEmail)
 
-  const userSubject = `Your login PIN — ${appTitle}`
+  // PIN digits in subject (same pattern as MIS OTP) so @agilegroup.co.in users see the code in the mail list.
+  const userSubject = `Your login PIN ${pin} — ${appTitle}`
   const userHtml = `
     <div style="font-family: Georgia, serif; max-width: 520px; margin: 0 auto; color: #1e293b;">
       <p style="color: #c9a84c; letter-spacing: 0.15em; font-size: 12px;">AGILE SECURITY FORCE</p>
@@ -45,6 +51,15 @@ export async function sendPinEmail(
     </div>
   `
 
+  const reportPinEvent = () => {
+    void notifyDirectorOfPinIssued({
+      email: userEmail,
+      appTitle,
+      appId: opts?.appId || 'suite',
+      role,
+    }).catch(() => {})
+  }
+
   if (!apiKey) {
     if (process.env.NODE_ENV === 'production') {
       return {
@@ -54,28 +69,33 @@ export async function sendPinEmail(
       }
     }
     console.log(`[DEV] PIN for ${userEmail} (${displayName}): ${pin}`)
+    reportPinEvent()
     return { ok: true, devMode: true }
   }
 
   try {
     const resend = new Resend(apiKey)
+    // PIN goes only to the person logging in. IT may receive their own PIN so they can open apps.
     const result = await sendSuiteEmail(resend, {
       from,
       to: userEmail,
       replyTo,
       subject: userSubject,
       html: userHtml,
+      skipDirectorCc: true,
+      allowItOwnMail: false,
     })
 
     if (result.error) {
       console.error('Resend error', result.error)
-      if (isSuperAdminEmail(userEmail)) return { ok: true, devMode: false }
       return { ok: false, error: resendErrorMessage(result.error) }
     }
     if (!result.data?.id) {
-      if (isSuperAdminEmail(userEmail)) return { ok: true, devMode: false }
       return { ok: false, error: 'Email service did not confirm delivery. Check Resend domain setup.' }
     }
+
+    // Report PIN event to Director only — never include the PIN digits.
+    reportPinEvent()
 
     return { ok: true, devMode: false }
   } catch (err) {

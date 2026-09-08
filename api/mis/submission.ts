@@ -37,7 +37,7 @@ ${MIS_LAYOUT_CSS}
 ${misPageWrap(MIS_ACTIVE, MIS_TITLE, `
 <div class="m-wrap" id="app">
   <div class="m-card">
-    <p class="hint" style="margin-top:0">Auto reminders: <b style="color:#c9a84c">11:00 AM</b> and <b style="color:#c9a84c">2:00 PM</b> to HOD + branch staff (not submitted) — submit before <b>4:00 PM</b>. Director gets pending summary at 11 AM &amp; 2 PM. <b>5:00 PM</b> full consolidated dashboard to Director only. Non-submission by 4 PM = zero performance.</p>
+    <p class="hint" style="margin-top:0">Auto reminders: <b style="color:#c9a84c">11:00 AM</b> and <b style="color:#c9a84c">2:00 PM</b> to HOD + branch staff (not submitted) — submit before <b>4:00 PM</b>. Director gets pending summary at 11 AM &amp; 2 PM. <b>4:30 PM</b> Command Centre daily MIS report to all HODs (CC Director). Non-submission by 4 PM = zero performance.</p>
     <div style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;margin-top:12px">
       <div><label class="m-lbl">Date</label><input class="m-inp" id="date" type="date"></div>
       <button class="m-btn m-btn-gold" onclick="load()">Show</button>
@@ -55,6 +55,7 @@ ${misPageWrap(MIS_ACTIVE, MIS_TITLE, `
   <div class="m-card">
     <h4>Branch-wise Status</h4>
     <div class="m-branch-list" id="allRows"></div>
+    <p class="hint" id="pendingNote" style="margin-top:10px;display:none"></p>
   </div>
 </div>
 `, ACTIONS)}
@@ -76,7 +77,9 @@ function rowHtml(r){
   if(r.noClients)meta+='<br><span class="warn">⚠ No clients in Data Bank</span>';
   var actions='';
   if(r.submitted){
-    actions='<span class="m-tag m-tag-ok">Submitted</span>';
+    actions='<span class="m-tag m-tag-ok">Submitted</span>'+
+      '<button type="button" class="m-btn m-btn-navy noprint" style="padding:6px 10px;font-size:12px" data-fixot="'+h(r.branchId)+'">Fix OT</button>'+
+      '<button type="button" class="m-btn m-btn-gold noprint" style="padding:6px 10px;font-size:12px" data-reopen="'+h(r.branchId)+'">Reopen</button>';
   }else if(r.wrongDate){
     actions='<span class="m-tag m-tag-warn">Wrong Date</span>';
   }else{
@@ -100,9 +103,19 @@ function render(d){
   var pc=d.total?Math.round(d.submitted*100/d.total):0;
   el('prog').style.width=pc+'%';
   el('progText').textContent=d.submitted+'/'+d.total+' submitted · '+d.pending+' pending · '+(d.wrongDate||0)+' wrong date · '+(d.submitted-d.onTime)+' late · refreshes every 3 min';
-  var sorted=ROWS.slice().sort(function(a,b){if(a.submitted!==b.submitted)return a.submitted?-1:1;return a.branch.localeCompare(b.branch);});
-  el('allRows').innerHTML=sorted.length?sorted.map(rowHtml).join(''):'<div class="hint">No branches configured.</div>';
+  var sorted=ROWS.filter(function(a){return a.submitted;}).slice().sort(function(a,b){return a.branch.localeCompare(b.branch);});
+  el('allRows').innerHTML=sorted.length?sorted.map(rowHtml).join(''):'<div class="hint">No Daily MIS submitted yet.</div>';
+  var note=el('pendingNote');
+  if(d.pending){
+    note.style.display='block';
+    note.textContent=d.pending+' branch'+(d.pending===1?' has':'es have')+' not submitted today — not shown on this list. Use Send All Reminders if needed.';
+  }else{
+    note.style.display='none';
+    note.textContent='';
+  }
   el('allRows').querySelectorAll('[data-remind]').forEach(function(btn){btn.addEventListener('click',function(){remindOne(btn.getAttribute('data-remind'));});});
+  el('allRows').querySelectorAll('[data-reopen]').forEach(function(btn){btn.addEventListener('click',function(){reopenOne(btn.getAttribute('data-reopen'));});});
+  el('allRows').querySelectorAll('[data-fixot]').forEach(function(btn){btn.addEventListener('click',function(){fixOtOne(btn.getAttribute('data-fixot'));});});
   var nc=el('noClients');
   if(d.noClientBranches&&d.noClientBranches.length){nc.style.display='block';nc.innerHTML='<b style="color:#fbbf24">Data Bank alert:</b> These branches have no clients — HODs cannot submit until clients are added: '+d.noClientBranches.map(h).join(', ');}
   else nc.style.display='none';
@@ -112,6 +125,26 @@ function render(d){
 }
 function remindAll(){if(!confirm('Send reminder email to Branch HODs of all pending branches? Director will be copied on each email.'))return;api('remindPending',{date:el('date').value}).then(function(res){if(res.status===200){var s=res.body.sent||[];var sk=res.body.skipped||[];alert('Reminders sent to '+s.length+' branch(es).'+(sk.length?'\\nNo HOD email on file for: '+sk.join(', '):'')+(res.body.directorCc?'\\nDirector copied: '+res.body.directorCc:''));load();}else alert(res.body.error||'Could not send.');});}
 function remindOne(bid){if(!bid)return;api('remindBranchHod',{date:el('date').value,branchId:bid}).then(function(res){if(res.status===200){var s=res.body.sent||[];if(s.length){var msg='Reminder sent for '+s[0]+'.';if(res.body.emailed&&res.body.emailed[0])msg+='\\nTo: '+res.body.emailed[0].to.join(', ');if(res.body.directorCc)msg+='\\nDirector copied: '+res.body.directorCc;alert(msg);}else alert('No HOD email found for this branch — contact IT to register HOD in User Management.');load();}else alert(res.body.error||'Could not send.');});}
+function reopenOne(bid){
+  if(!bid)return;
+  var row=ROWS.find(function(r){return r.branchId===bid;});
+  var name=row?row.branch:bid;
+  if(!confirm('Reopen MIS for '+name+'?\\n\\nThe HOD can edit and submit again today. OT numbers are auto-corrected when reopened.'))return;
+  api('reopenReport',{dateFor:el('date').value,branchId:bid}).then(function(res){
+    if(res.status===200){alert(res.body.message||('Reopened — '+name+' can resubmit.'));load();}
+    else alert(res.body.error||'Could not reopen.');
+  });
+}
+function fixOtOne(bid){
+  if(!bid)return;
+  var row=ROWS.find(function(r){return r.branchId===bid;});
+  var name=row?row.branch:bid;
+  if(!confirm('Fix overtime totals for '+name+'?\\n\\nUses correct OT rules — report stays submitted.'))return;
+  api('repairReportOt',{dateFor:el('date').value,branchId:bid}).then(function(res){
+    if(res.status===200){alert(res.body.message||('OT fixed for '+name+'.'));load();}
+    else alert(res.body.error||'Could not fix OT.');
+  });
+}
 function shareMail(){var to=prompt('Send submission status to (email):', 'director@agilegroup.co.in');if(!to)return;api('sendConsolidatedMail',{date:el('date').value,to:to}).then(function(res){alert(res.status===200?'Email sent ✓':(res.body.error||'Could not send'));});}
 misStart();
 </script>

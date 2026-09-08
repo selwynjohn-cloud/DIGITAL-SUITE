@@ -56,27 +56,28 @@ a{color:#0d9488}
     <p>Week number, branch name, each vehicle: insurance, PUC, KM run, fuel, maintenance, condition, next service, driver and licence renewal.</p>
     <h3>Weekly Vehicle Report</h3>
     <p>Submit every <b>Saturday before 5:00 PM</b>. Opening/closing meter, KM, fuel litres and cost, maintenance, tyre/battery change KM, traffic penalty.</p>
-    <h3>Branch Vehicles Data</h3>
-    <p>View your branch vehicles (read-only). Management Portal adds and updates vehicle data.</p>
-    <h3>Drivers Details</h3>
-    <p>View branch drivers (read-only). Management Portal maintains all driver records.</p>
+    <h3>Vehicle Data</h3>
+    <p>Add and edit vehicles for your branch. Tap Save Vehicles. Management can also add vehicles for every branch.</p>
+    <h3>Drivers Data</h3>
+    <p>Add and edit drivers for your branch. Tap Save Drivers. Use these names in Daily Trip and Weekly Report.</p>
     <h3>Fuel Charges &amp; Maintenance</h3>
     <p>View this week's fuel and maintenance from your submitted report.</p>
-    <h3>Daily Pre-Trip Report</h3>
-    <p>Complete before every trip (PTC-01 checklist). Branch is locked — you cannot see other branches.</p>
-    <h3>Post-Trip Report</h3>
-    <p>Complete after every trip. Pairs with pre-trip.</p>
+    <h3>Daily Pre &amp; Post Trip</h3>
+    <p>Fill trip details, then save <b>Pre-Trip</b> and <b>Post-Trip</b> separately. After Pre-Trip is saved, it comes back so you can see it when you fill Post-Trip — you cannot change it. You do not type the trip code. Pick the same Branch, Date, Vehicle and Trip no. Vehicle and driver are a dropdown — pick Other Vehicle / New Driver to type a new number or name and licence expiry date. License Expiry is a calendar date. Start time fills automatically as 00.00hrs. Diesel Level is Full Tank / Half tank / less than half tank. Share the driver phone link by WhatsApp or mail (enter number and mail id). Each save mails the HOD. Director and Control get a copy. A New Driver is mailed to HOD (Director is copied).</p>
+    <h3>Submitted Daily Report</h3>
+    <p>All Pre-Trip and Post-Trip reports, listed date-wise. HOD / Management may <b>Edit</b> or <b>Delete</b> after confirming twice. Drivers cannot change a saved Pre-Trip from the phone link.</p>
     <h3>Branch Admin</h3>
     <p>Your branch summary and whether this week's report is submitted. <b>User Management</b> is in the Management Portal only — not in the branch menu.</p>
   </div>
   <div class="card">
     <h2>3. Management Portal (Director / Fleet Admin)</h2>
     <ol>
-      <li><b>All Branch Dashboard</b> — all branches or pick one branch; fuel, KM, mileage (km/L), traffic penalties, renewal alerts.</li>
+      <li><b>All Branch Dashboard</b> — all branches or pick one branch; fuel, KM, mileage (km/L), traffic penalties, renewal alerts. Use <b>Send weekly vehicle report reminder</b> to mail HOD (Director and Control copied) with the regular Fleet header and footer.</li>
       <li><b>Saturday:</b> Branch submits weekly report → HOD gets analysis email immediately.</li>
       <li><b>Sunday 10 AM:</b> Consolidated report to Director/Management.</li>
-      <li><b>Drivers Details</b> — add and maintain all company drivers (HOD portal is view-only).</li>
-      <li><b>Vehicle Details</b> — add and maintain all vehicles (HOD portal is view-only).</li>
+      <li><b>Drivers Data</b> — add and maintain drivers. Branch teams can also add drivers for their own branch.</li>
+      <li><b>Vehicle Data</b> — add and maintain vehicles. Branch teams can also add vehicles for their own branch.</li>
+      <li><b>Daily Pre &amp; Post Trip</b> — save Pre-Trip and Post-Trip separately. Each save mails the HOD (Director and Control copied). <b>Submitted Daily Report</b> is date-wise (All Branches first).</li>
       <li><b>User Management</b> — register Director, Admin, HOD, Staff users (Management Portal only).</li>
     </ol>
   </div>

@@ -251,6 +251,94 @@ export function clientPerfMwBannerHtml(d: { mwCompliant?: string; mwCompliantLab
   )
 }
 
+function pctBannerStyle(pct: number | null): { bg: string; color: string; border?: string } {
+  if (pct == null) return { bg: '#f1f5f9', color: '#64748b', border: '1px dashed #cbd5e1' }
+  if (pct >= 90) return { bg: 'linear-gradient(135deg,#15803d,#22c55e)', color: '#fff' }
+  if (pct >= 70) return { bg: 'linear-gradient(135deg,#b45309,#f59e0b)', color: '#fff' }
+  return { bg: 'linear-gradient(135deg,#b91c1c,#ef4444)', color: '#fff' }
+}
+
+function clientPerfPctBannerHtml(opts: {
+  title: string
+  pct: number | null
+  count?: number
+  san?: number
+  label?: string
+  pendingText: string
+}): string {
+  const pct = opts.pct == null || Number.isNaN(Number(opts.pct)) ? null : Math.max(0, Math.min(100, Math.round(Number(opts.pct))))
+  const style = pctBannerStyle(pct)
+  const detail =
+    pct == null
+      ? opts.pendingText
+      : opts.label ||
+        `${opts.title} — ${pct}%` +
+          (opts.san != null && opts.san > 0 ? ` (${opts.count ?? 0} / ${opts.san} posts)` : '')
+  const shadow =
+    pct == null
+      ? ''
+      : pct >= 90
+        ? 'box-shadow:0 4px 14px rgba(22,163,74,.35);'
+        : pct >= 70
+          ? 'box-shadow:0 4px 14px rgba(245,158,11,.35);'
+          : 'box-shadow:0 4px 14px rgba(239,68,68,.35);'
+  const border = style.border ? `border:${style.border};` : ''
+  return (
+    `<div style="margin:10px 0;padding:14px 18px;border-radius:10px;text-align:center;font-weight:800;font-size:15px;letter-spacing:.2px;` +
+    `background:${style.bg};color:${style.color};${shadow}${border}">` +
+    (pct == null ? esc(detail) : `✓ ${esc(detail)}`) +
+    `</div>`
+  )
+}
+
+/** PVC compliance banner for Client Performance (all clients). */
+export function clientPerfPvcBannerHtml(d: {
+  pvcPct?: number | null
+  pvcCount?: number
+  complianceSan?: number
+  pvcLabel?: string
+}): string {
+  return clientPerfPctBannerHtml({
+    title: 'PVC Compliant',
+    pct: d.pvcPct ?? null,
+    count: d.pvcCount,
+    san: d.complianceSan,
+    label: d.pvcLabel,
+    pendingText: 'PVC — Guard Docs not linked for this client yet',
+  })
+}
+
+/** Medical Certificate (MC) banner for Client Performance (all clients). */
+export function clientPerfMcBannerHtml(d: {
+  medicalPct?: number | null
+  medicalCount?: number
+  complianceSan?: number
+  medicalLabel?: string
+}): string {
+  return clientPerfPctBannerHtml({
+    title: 'MC (Medical Fitness)',
+    pct: d.medicalPct ?? null,
+    count: d.medicalCount,
+    san: d.complianceSan,
+    label: d.medicalLabel,
+    pendingText: 'MC (Medical) — Guard Docs not linked for this client yet',
+  })
+}
+
+export function clientPerfComplianceBannersHtml(d: {
+  mwCompliant?: string
+  mwCompliantLabel?: string
+  pvcPct?: number | null
+  pvcCount?: number
+  medicalPct?: number | null
+  medicalCount?: number
+  complianceSan?: number
+  pvcLabel?: string
+  medicalLabel?: string
+}): string {
+  return clientPerfPvcBannerHtml(d) + clientPerfMcBannerHtml(d) + clientPerfMwBannerHtml(d)
+}
+
 function kpiTile(grad: string, value: string, label: string): string {
   return (
     `<td width="33%" valign="top" style="padding:6px">` +
@@ -263,19 +351,39 @@ function kpiTile(grad: string, value: string, label: string): string {
 export function clientPerfComplianceSectionHtml(d: {
   mwCompliant?: string
   mwCompliantLabel?: string
+  pvcPct?: number | null
+  pvcCount?: number
+  medicalPct?: number | null
+  medicalCount?: number
+  complianceSan?: number
+  san?: number
+  pvcLabel?: string
+  medicalLabel?: string
+  accuracyNote?: string
   monthlyBillLacs?: number | null
   collectedLacs?: number | null
   balanceToPayLacs?: number | null
 }): string {
+  const strength = Number(d.complianceSan || d.san || 0)
+  const strengthLine =
+    strength > 0
+      ? `<div style="margin:8px 0 4px;padding:10px 12px;border-radius:8px;background:#eff6ff;border:1px solid #93c5fd;color:#1e3a8a;font-size:13px;font-weight:700;text-align:center">Unit sanctioned strength: ${esc(String(strength))} posts — PVC &amp; MC counted only against this strength (cannot exceed)</div>`
+      : ''
+  const accuracy =
+    d.accuracyNote
+      ? `<div style="font-size:11px;color:#475569;text-align:center;margin:8px 0 10px;line-height:1.45">${esc(d.accuracyNote)}</div>`
+      : ''
   return (
     `<h3 style="color:#fde68a;font-size:14px;margin:20px 0 10px;padding:8px 12px;background:linear-gradient(135deg,#14224f,#1e3a8a);border-radius:8px;border-left:4px solid #c9a84c">3. Compliance &amp; Billing</h3>` +
-    clientPerfMwBannerHtml(d) +
+    strengthLine +
+    clientPerfComplianceBannersHtml(d) +
+    accuracy +
     `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:8px 0 14px"><tr>` +
     kpiTile('#1d4ed8,#3b82f6', formatInrFromLacs(d.monthlyBillLacs), 'Monthly bill') +
     kpiTile('#b45309,#f59e0b', formatInrFromLacs(d.collectedLacs), 'Collected') +
     kpiTile('#7c3aed,#a855f7', formatInrFromLacs(d.balanceToPayLacs), 'Balance to be paid') +
     `</tr></table>` +
-    `<div style="font-size:11px;color:#64748b;text-align:center;margin-bottom:8px">All amounts in ₹ Lakhs (two decimals) · Collected = Monthly bill − Balance</div>`
+    `<div style="font-size:11px;color:#64748b;text-align:center;margin-bottom:8px">Amounts in ₹ thousands · Collected = Monthly bill − Balance</div>`
   )
 }
 
@@ -327,12 +435,31 @@ export function clientPerfColourfulKpiRowHtml(
 export function clientPerfColourfulComplianceHtml(d: {
   mwCompliant?: string
   mwCompliantLabel?: string
+  pvcPct?: number | null
+  pvcCount?: number
+  medicalPct?: number | null
+  medicalCount?: number
+  complianceSan?: number
+  san?: number
+  pvcLabel?: string
+  medicalLabel?: string
+  accuracyNote?: string
   monthlyBillLacs?: number | null
   collectedLacs?: number | null
   balanceToPayLacs?: number | null
 }): string {
+  const strength = Number(d.complianceSan || d.san || 0)
+  const strengthLine =
+    strength > 0
+      ? `<div style="margin:8px 0 6px;padding:10px 12px;border-radius:8px;background:rgba(30,58,138,.35);border:1px solid #3b82f6;color:#93c5fd;font-size:13px;font-weight:700;text-align:center">Unit sanctioned strength: ${esc(String(strength))} posts — PVC &amp; MC capped at this strength</div>`
+      : ''
+  const accuracy = d.accuracyNote
+    ? `<div style="font-size:11px;color:#94a3b8;text-align:center;margin:6px 0 10px;line-height:1.45">${esc(d.accuracyNote)}</div>`
+    : ''
   return (
-    clientPerfMwBannerHtml(d) +
+    strengthLine +
+    clientPerfComplianceBannersHtml(d) +
+    accuracy +
     `<table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:8px 0 10px"><tr>` +
     kpiTile('#1d4ed8,#3b82f6', formatInrFromLacs(d.monthlyBillLacs), 'Monthly bill') +
     kpiTile('#b45309,#f59e0b', formatInrFromLacs(d.collectedLacs), 'Collected') +

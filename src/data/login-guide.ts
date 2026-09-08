@@ -6,27 +6,27 @@ export type LoginGuideEntry = {
   demoNote?: string
 }
 
+/** Matches Command Centre card order (Director sequence). */
 export const suiteLoginGuide: LoginGuideEntry[] = [
   {
     number: '01',
-    title: 'Agile Recruitment',
+    title: 'Agile CRM',
     howToOpen: 'www.agilegroup-digital.co.in → App 01 → HODs/Staff or Management',
-    loginSteps:
-      'Staff portal login — email OTP to your inbox. Manage applicants, camps, Recruited Today. Public apply link for WhatsApp: agile-recruitment.codewords.run',
+    loginSteps: 'Opens Agile CRM directly — one login only. Email OTP sent to your inbox.',
   },
   {
     number: '02',
-    title: 'Agile Training',
-    howToOpen: 'www.agilegroup-digital.co.in → App 02 → choose Trainees / Staff / Management',
+    title: 'Agile Recruitment',
+    howToOpen: 'www.agilegroup-digital.co.in → App 02 → HODs/Staff or Management',
     loginSteps:
-      'Command Centre OTP first (@agilegroup.co.in email or registered mobile). Then the Training app opens — sign in again there if asked.',
+      'HODs / Staff: select branch + work email + Send PIN (code in inbox). Left menu includes Daily Recruitment Report (DRR). Management: work email + Send PIN — same DRR menu. Public apply link: www.securityjob.co.in',
   },
   {
     number: '03',
-    title: 'Agile CRM',
-    howToOpen: 'www.agilegroup-digital.co.in → App 03 → HODs/Staff or Management',
+    title: 'Agile Training',
+    howToOpen: 'www.agilegroup-digital.co.in → App 03 → choose Trainees / Staff / Management',
     loginSteps:
-      'Opens Agile CRM directly — one login only. Email OTP sent to your inbox.',
+      'Staff and Management: work email + Send PIN (code in inbox). Training team use Management with training@agilegroup.co.in. Trainees: mobile login on Digital Learning.',
   },
   {
     number: '04',
@@ -36,78 +36,86 @@ export const suiteLoginGuide: LoginGuideEntry[] = [
   },
   {
     number: '05',
-    title: 'Agile MIS',
-    howToOpen: 'www.agilegroup-digital.co.in → App 05',
+    title: 'Agile Meeting',
+    howToOpen: 'www.agilegroup-digital.co.in → App 05 → HODs/Staff or Management',
     loginSteps:
-      'Opens MIS directly. Sign in with your email — OTP is sent to your inbox (Director, Management, and Staff).',
+      'HOD / Staff: branch password or email PIN (own branch). Management: email PIN (all branches). Left menu: Dashboard, Schedule Meeting (Zoom/Teams), Meetings, Client List (Strategic monthly / others quarterly), Contacts (email), Action Follow-ups, Reminders. Dates use calendar pickers.',
   },
   {
     number: '06',
     title: 'Agile Control (24×7)',
     howToOpen: 'www.agilegroup-digital.co.in → App 06',
-    loginSteps: 'Command Centre OTP first, then the portal welcome page opens.',
+    loginSteps:
+      'Authorised emails only (Command Centre / Help Desk / Director). Staff and Management both have the same left menu: Dashboard, Track 1 · Control (Incident Received, Command Console, Cases, Escalations, Client Checks, Sites, Logbook, HOTO), Track 2 · Help Desk (Night Calls). Sign in with work email PIN — the 6-digit PIN is also in the email subject line. Daily Control Report mail goes at 8:00 AM.',
   },
   {
     number: '07',
-    title: 'Agile Guards',
+    title: 'Agile MIS',
     howToOpen: 'www.agilegroup-digital.co.in → App 07',
-    loginSteps: 'Command Centre OTP first, then the portal welcome page opens.',
+    loginSteps:
+      'Opens MIS directly. Sign in with your email — OTP is sent to your inbox (Director, Management, and Staff).',
   },
   {
     number: '08',
-    title: 'Agile Quality',
+    title: 'Agile Guards',
     howToOpen: 'www.agilegroup-digital.co.in → App 08',
     loginSteps: 'Command Centre OTP first, then the portal welcome page opens.',
   },
   {
     number: '09',
-    title: 'Agile Meeting',
-    howToOpen: 'www.agilegroup-digital.co.in → App 09',
-    loginSteps: 'Command Centre OTP first, then the portal welcome page opens.',
-  },
-  {
-    number: '10',
     title: 'Agile Reviews',
-    howToOpen: 'www.agilegroup-digital.co.in → App 10',
+    howToOpen: 'www.agilegroup-digital.co.in → App 09',
     loginSteps:
       'Command Centre OTP first, then Reviews opens. Sign in again inside the app with email OTP if asked.',
   },
   {
-    number: '11',
-    title: 'Agile Security Force — The Pulse',
-    howToOpen: 'www.agilegroup-digital.co.in → App 11',
+    number: '10',
+    title: 'Agile Licenses',
+    howToOpen: 'www.agilegroup-digital.co.in → App 10 → HODs/Staff or Management',
     loginSteps:
-      'Command Centre OTP first, then The Pulse opens. Sign in again inside the app if asked.',
+      'HOD / Staff: branch password or email PIN (own branch). Management: email PIN (all branches). Left menu: Dashboard, Branch Licences (PSARA / Shop & Est. / Trade), Labour Licences (State & Central), Client List, Renewal Reminders. Dates use calendar pickers.',
+  },
+  {
+    number: '11',
+    title: 'Agile Fleet',
+    howToOpen: 'www.agilegroup-digital.co.in → App 11',
+    loginSteps: 'Command Centre OTP first, then the portal welcome page opens.',
   },
   {
     number: '12',
-    title: 'Agile Fleets',
-    howToOpen: 'www.agilegroup-digital.co.in → App 12',
-    loginSteps: 'Command Centre OTP first, then the portal welcome page opens.',
+    title: 'Agile Facilities',
+    howToOpen: 'www.agilegroup-digital.co.in → App 12 → HODs/Staff or Management',
+    loginSteps:
+      'HOD / Staff: select branch + branch password, or email PIN. Management: work email + PIN from inbox (PIN also in email subject). Left menu: Dashboard, Properties, Leases, Tax & Compliance, Maintenance, Reports, Alerts.',
   },
   {
     number: '13',
     title: 'Agile Assets',
-    howToOpen: 'www.agilegroup-digital.co.in → App 13',
-    loginSteps: 'Command Centre OTP first, then the portal welcome page opens.',
+    howToOpen: 'www.agilegroup-digital.co.in → App 13 → HODs/Staff or Management',
+    loginSteps:
+      'HOD / Staff: select branch + branch password, or email PIN. Management: work email + PIN. Left menu: Dashboard, Asset Directory, Branch Stock, Transfers/HOTO, Maintenance, Write-off, Alerts.',
   },
   {
     number: '14',
-    title: 'Agile Facilities',
-    howToOpen: 'www.agilegroup-digital.co.in → App 14',
-    loginSteps: 'Command Centre OTP first, then the portal welcome page opens.',
+    title: 'Agile Insights',
+    howToOpen: 'www.agilegroup-digital.co.in → App 14 → Accounts or Management',
+    loginSteps:
+      'Opens Agile Insights directly (no Command Centre OTP). Accounts: accounts@agilegroup.in / accounts123. Management: management@agilegroup.in / management123. MD/Director: tap Master PIN and enter the Director Master PIN (same as Command Centre SUPER_ADMIN_PIN).',
+    demoNote: 'Strategic Analysis app — client-branch-profitability.vercel.app',
   },
   {
     number: '15',
-    title: 'Agile Licenses',
-    howToOpen: 'www.agilegroup-digital.co.in → App 15',
-    loginSteps: 'Command Centre OTP first, then the portal welcome page opens.',
+    title: 'Agile HR Audit',
+    howToOpen: 'www.agilegroup-digital.co.in → App 15 → HODs/Staff or Management',
+    loginSteps:
+      'HOD / Staff: branch password or email PIN (own branch). Management: email PIN (all branches). Left menu: Dashboard, Apex Clients (Monthly e.g. KRC on fixed day / Quarterly e.g. HDFC), Audits (PF/ESIC/wages pack + checklist), Pending Issues (close), Reminders. Dates use calendar pickers. Sample document formats can be added later.',
   },
   {
     number: '16',
-    title: 'Agile Facebook',
+    title: 'Agile Security News',
     howToOpen: 'www.agilegroup-digital.co.in → App 16',
-    loginSteps: 'Opens Facebook in a new tab. No Agile login — use your Facebook account if you manage the page.',
+    loginSteps:
+      'Command Centre OTP first, then Security News (The Pulse) opens. Sign in again inside the app if asked.',
   },
   {
     number: '17',
@@ -117,18 +125,22 @@ export const suiteLoginGuide: LoginGuideEntry[] = [
   },
   {
     number: '18',
-    title: 'Agile Mobile (Work360)',
+    title: 'Agile Facebook',
     howToOpen: 'www.agilegroup-digital.co.in → App 18',
-    loginSteps:
-      'Opens Work360 directly — no Command Centre OTP. Sign in inside the app with the details HR/IT gave you.',
+    loginSteps: 'Opens Facebook in a new tab. No Agile login — use your Facebook account if you manage the page.',
   },
   {
     number: '19',
-    title: 'Client & Branch Profitability',
-    howToOpen: 'www.agilegroup-digital.co.in → App 19 → HODs/Staff (Accounts) or Management',
+    title: 'Agile YouTube',
+    howToOpen: 'www.agilegroup-digital.co.in → App 19 → opens company YouTube',
+    loginSteps: 'Opens https://www.youtube.com/@agilegroup1619 (no separate login).',
+  },
+  {
+    number: '20',
+    title: 'Agile Mobile (Work360)',
+    howToOpen: 'www.agilegroup-digital.co.in → App 20',
     loginSteps:
-      'Opens Profitability directly (no Command Centre OTP). Accounts: accounts@agilegroup.in / accounts123. Management: management@agilegroup.in / management123. MD/Director can switch portals with PIN.',
-    demoNote: 'Separate finance app linked from Command Centre via /profitability',
+      'Opens Work360 directly — no Command Centre OTP. Sign in inside the app with the details HR/IT gave you.',
   },
 ]
 
@@ -136,4 +148,4 @@ export const suiteHomeUrl = 'https://www.agilegroup-digital.co.in/'
 
 /** User-facing note: every internal app requires OTP on the Command Centre first. */
 export const suiteAccessNote =
-  'Open www.agilegroup-digital.co.in. Click any app — most apps ask for a 6-digit OTP (email or mobile) before they open. Agile Mobile (Work360), Facebook, LinkedIn, and Client & Branch Profitability (App 19) open directly without Command Centre login.'
+  'Open www.agilegroup-digital.co.in. Click any app — most apps ask for a 6-digit OTP (email or mobile) before they open. Agile Mobile (Work360), Facebook, LinkedIn, and Agile Insights (App 14) open directly without Command Centre login.'

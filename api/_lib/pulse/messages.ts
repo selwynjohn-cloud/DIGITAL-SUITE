@@ -1,48 +1,47 @@
-import { BRAND, BULLETIN_URL, CHANNEL_URL, CURSOR_ATTRIBUTION, JOB_LINKS, SECURITYJOB_REGISTER_URL } from './config.js'
+import { BULLETIN_URL, CHANNEL_URL, JOB_LINKS, SHARE_URL } from './config.js'
+
+/** Kept for thank-you / winner cards. Bulletin Channel + group posts are text only. */
+export const CHANNEL_LOGO_URL = 'https://www.agilegroup-digital.co.in/agile-logo-wa-header.png'
+
+export const CHANNEL_COMPANY_LINE = 'Agile Security Force Private Limited.'
 
 /**
- * Builds the three scheduled messages:
- *  msg1 = simple Channel post (brand + date + Flash News + link)
- *  msg2 = attractive Groups post (headline + contents + jobs + follow + link)
- *  msg3 = approval prompt
+ * Short WhatsApp posts — must fit on one phone screen (no “Read more” / second page).
+ *   msg1 = Channel (company + news + Pulse only) — no logo image
+ *   msg2 = Groups (company + news + direct Channel URL + jobs + website) — never the Pulse URL
+ *   msg3 = approval prompt
+ * Do not put the old section menu, awareness essays, or Cursor attribution here.
  */
 export function buildWhatsAppMessages(opts: {
   edition: string
   dateTime: string
   topHeadline: string
+  bullets?: string[]
 }) {
-  const editionBulletin = opts.edition.replace('Edition', 'Bulletin')
-  const divider = '━━━━━━━━━━━━━━━━━━━━━'
-  const headline = opts.topHeadline
-    ? `🔴 ${opts.topHeadline}`
-    : `🔴 Today's top security, crime, traffic & weather updates`
-
-  // Message 1 — simple, for the Channel.
-  const msg1 =
-    `📰 *Security News – Agile Group*\n` +
-    `🗓️ ${opts.dateTime} — ${editionBulletin}\n\n` +
-    `⚡ *Flash News* — open the full news bulletin:\n` +
-    `👉 ${BULLETIN_URL}\n\n` +
-    `🌐 www.agilegroup.co.in`
-
-  // Message 2 — attractive, for the groups.
-  const msg2 =
+  const stamp = shortStamp(opts.edition, opts.dateTime)
+  const headline = clip(opts.topHeadline, 110) || 'Today’s top security, traffic & weather updates'
+  const extra = (opts.bullets ?? [])
+    .map((b) => clip(b, 110))
+    .filter((b) => b && !sameLine(b, headline))
+    .slice(0, 2)
+  const news =
+    `🔴 ${headline}` + (extra.length ? `\n${extra.map((b) => `• ${b}`).join('\n')}` : '')
+  const head =
+    `${CHANNEL_COMPANY_LINE}\n` +
     `🚨 *SECURITY NEWS – AGILE GROUP* 🚨\n` +
-    `🗓️ ${opts.dateTime} — ${editionBulletin}\n` +
-    `${divider}\n\n` +
-    `${headline}\n\n` +
-    `📢 *Inside today's bulletin:*\n` +
-    `  ▸ 🛣️ Highway & Road Closure Alerts\n` +
-    `  ▸ 🏙️ Indian City Security News\n` +
-    `  ▸ 🚨 Incidents, Fire, Terror & Bank/ATM\n` +
-    `  ▸ ⛈️ Weather & IMD Alerts\n` +
-    `  ▸ 🧠 Security Question of the Day\n` +
-    `  ▸ 🏆 Weekly Quiz Winner & Guard News\n\n` +
-    `💼 *Immediate Security Jobs — Register FREE:*\n👉 ${JOB_LINKS.registerLabel}\n${SECURITYJOB_REGISTER_URL}\n\n` +
-    `⭐ *Flash News, Weather, Jobs & Daily Quiz:*\n👉 ${BULLETIN_URL}\n\n` +
-    `*Follow our Channel:* ${CHANNEL_URL}\n\n` +
-    `🌐 ${BRAND.websiteLabel}\n\n` +
-    `${CURSOR_ATTRIBUTION}`
+    `🗓️ ${stamp.date} — ${stamp.bulletin}`
+
+  const msg1 =
+    `${head}\n` +
+    `${news}\n` +
+    `👉 Full bulletin: ${BULLETIN_URL}.`
+
+  const msg2 =
+    `${head}\n` +
+    `${news}\n` +
+    `🔔 Follow our Security News Channel, test your security skills, and win rewards!\n${CHANNEL_URL}\n${SHARE_URL}\n` +
+    `\nFor immediate Job Vacancies - ${JOB_LINKS.registerLabel}\n` +
+    `our full range of services - www.agilegroup.co.in`
 
   const msg3 =
     `✅ Above is today's bulletin preview.\n` +
@@ -50,4 +49,27 @@ export function buildWhatsAppMessages(opts: {
     `No reply = edition skipped.`
 
   return { msg1, msg2, msg3 }
+}
+
+function shortStamp(edition: string, dateTime: string): { date: string; bulletin: string } {
+  const date = String(dateTime || '')
+    .replace(/\s*\([^)]*\)\s*/g, ' ')
+    .replace(/\s+—.*$/, '')
+    .replace(/\s+\d{1,2}:\d{2}\s*[AP]M.*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (/morning/i.test(edition)) return { date, bulletin: 'Morning Bulletin' }
+  if (/afternoon/i.test(edition)) return { date, bulletin: 'Afternoon Bulletin' }
+  return { date, bulletin: '10:00 PM Bulletin' }
+}
+
+function clip(s: string, max: number): string {
+  const t = String(s || '').replace(/\s+/g, ' ').trim()
+  if (t.length <= max) return t
+  return `${t.slice(0, Math.max(0, max - 1)).trim()}…`
+}
+
+function sameLine(a: string, b: string): boolean {
+  const n = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '')
+  return Boolean(n(a)) && n(a) === n(b)
 }

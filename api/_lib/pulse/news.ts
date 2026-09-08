@@ -1,4 +1,4 @@
-import { BLOCKED_SOURCES, INDIAN_HIGHWAY_CORRIDORS, INDIAN_NEWS_CITIES, NEWS_CATEGORIES } from './config.js'
+import { BLOCKED_SOURCES, INDIAN_HIGHWAY_CORRIDORS, INDIAN_NEWS_CITIES, INDIAN_NEWS_REGIONS, NEWS_CATEGORIES } from './config.js'
 import {
   MAX_NEWS_AGE_MS,
   NEWS_CACHE_MINUTES,
@@ -18,7 +18,7 @@ import type { NewsItem, NewsSection } from './types.js'
 const TIMEOUT_MS = 8000
 const ITEMS_PER_SECTION = 6
 const CACHE_FRESH_MS = NEWS_CACHE_MINUTES * 60 * 1000
-const NEWS_CACHE_KEY = 'pulse:news:cache:v6'
+const NEWS_CACHE_KEY = 'pulse:news:cache:v8'
 const PUBLISHED_HISTORY_KEY = 'pulse:news:history:v1'
 const HISTORY_KEEP_MS = PUBLISHED_HISTORY_DAYS * 24 * 60 * 60 * 1000
 
@@ -28,9 +28,9 @@ const STOP_WORDS = new Set([
   'india', 'indian', 'latest', 'report', 'reports',
 ])
 
-/** Words that suggest a follow-up on an earlier story — may be shown again. */
-const FOLLOW_UP_RE =
-  /\b(update|updates|latest|fresh|new twist|turns|escalat|continues|probe|investigation|arrested|arrests|killed|dies|dead|death toll|injured|hospitalised|hospitalized|second|third|day two|day 2|more on|breaking|developments|what we know|just in|now says|claims|confirms|denies)\b/i
+/** Only a real new development may repeat a story. “Killed / injured / latest” is the same accident. */
+const STRONG_FOLLOW_UP_RE =
+  /\b(death toll|arrested|arrests|probe|investigation|day two|day 2)\b/i
 
 type PublishedRecord = { fp: string; title: string; at: number }
 
@@ -90,6 +90,18 @@ function isFresh(publishedAt: number, now = Date.now()): boolean {
   return now - publishedAt <= MAX_NEWS_AGE_MS
 }
 
+/** Drop archive reprints (e.g. “Mumbai rains 2020”, “Updated On: 15 July, 2020”). */
+export function titleLooksDated(title: string, now = new Date()): boolean {
+  const t = String(title || '')
+  if (/updated\s+on\s*:/i.test(t)) return true
+  const year = now.getFullYear()
+  for (const m of t.matchAll(/\b(19\d{2}|20\d{2})\b/g)) {
+    const y = Number(m[1])
+    if (y < year) return true
+  }
+  return false
+}
+
 function normalizeUrl(url: string): string {
   try {
     const u = new URL(url.trim())
@@ -115,18 +127,97 @@ export function storyFingerprint(title: string): string {
   return words.slice(0, 10).join('|')
 }
 
-function storiesSimilar(a: string, b: string): boolean {
+export function storiesSimilar(a: string, b: string): boolean {
   const A = new Set(significantWords(a))
   const B = new Set(significantWords(b))
   if (!A.size || !B.size) return false
   let inter = 0
   for (const w of A) if (B.has(w)) inter++
   const union = new Set([...A, ...B]).size
-  return inter / union >= 0.55
+  const shorter = Math.min(A.size, B.size)
+  if (inter / union >= 0.42) return true
+  if (shorter >= 3 && inter / shorter >= 0.65) return true
+  return storyClusterKey(a) === storyClusterKey(b) && storyClusterKey(a) !== ''
 }
 
-function isFollowUp(title: string): boolean {
-  return FOLLOW_UP_RE.test(title)
+const CLUSTER_TYPES = [
+  'landslide',
+  'earthquake',
+  'bandh',
+  'hartal',
+  'cyclone',
+  'flood',
+  'cloudburst',
+  'gas leak',
+]
+
+function firstCityOrRegion(title: string): string {
+  const lower = title.toLowerCase()
+  const hit =
+    INDIAN_NEWS_CITIES.find((c) => lower.includes(c.toLowerCase())) ||
+    INDIAN_NEWS_REGIONS.find((c) => c !== 'India' && c !== 'Indian' && lower.includes(c.toLowerCase()))
+  return hit ? hit.toLowerCase() : ''
+}
+
+function foldedTitle(title: string): string {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+/** One Mumbai–Pune crash (or one corridor incident) — not four rewrites of the same accident. */
+function highwayIncidentCluster(title: string): string {
+  const lower = foldedTitle(title)
+  const incident =
+    /\b(accident|crash|collision|mishap|pile|killed|injured|dead|closed|landslide|blocked|shut)\b/.test(
+      lower,
+    )
+  if (!incident) return ''
+  if (
+    (/\bmumbai\b/.test(lower) && /\bpune\b/.test(lower) && /\b(highway|expressway|express)\b/.test(lower)) ||
+    (/\blonavala\b|\blonavla\b/.test(lower) && /\b(highway|expressway|express|accident|crash)\b/.test(lower))
+  ) {
+    return 'hwy:mumbai-pune'
+  }
+  const corridors: Array<[string, string]> = [
+    ['yamuna expressway', 'hwy:yamuna'],
+    ['delhi jaipur', 'hwy:delhi-jaipur'],
+    ['mumbai nashik', 'hwy:mumbai-nashik'],
+    ['eastern express', 'hwy:eastern-express'],
+    ['western express', 'hwy:western-express'],
+    ['chennai bengaluru', 'hwy:chennai-bengaluru'],
+    ['hyderabad vijayawada', 'hwy:hyd-vijayawada'],
+    ['pune bengaluru', 'hwy:pune-bengaluru'],
+  ]
+  for (const [needle, key] of corridors) {
+    if (lower.includes(needle)) return key
+  }
+  return ''
+}
+
+/** One slot per city+event (stops 4 Mumbai landslide / Mumbai–Pune accident rewrites). */
+export function storyClusterKey(title: string): string {
+  const hwy = highwayIncidentCluster(title)
+  if (hwy) return hwy
+  const lower = title.toLowerCase()
+  const type = CLUSTER_TYPES.find((k) => lower.includes(k))
+  if (!type) return ''
+  const place = firstCityOrRegion(title)
+  return place ? `${place}|${type}` : type
+}
+
+const FOREIGN_RE =
+  /\b(yemen|pentagon|north korea|florida|lynn haven|pakistan|faisalabad|malta|washington dc|white house|gaza|ukraine)\b/i
+
+function isIndiaStory(title: string): boolean {
+  const t = title.toLowerCase()
+  if (FOREIGN_RE.test(t) && !/\bindia\b|\bindian\b|\bair india\b/.test(t)) return false
+  if (INDIAN_NEWS_CITIES.some((c) => t.includes(c.toLowerCase()))) return true
+  if (INDIAN_NEWS_REGIONS.some((c) => t.includes(c.toLowerCase()))) return true
+  if (/\b(imd|ndrf|nhai|ncs|cisf|crpf|bsf|dgca)\b/i.test(t)) return true
+  return false
+}
+
+function isStrongFollowUp(title: string): boolean {
+  return STRONG_FOLLOW_UP_RE.test(title)
 }
 
 function isBlocked(item: NewsItem): boolean {
@@ -165,16 +256,23 @@ async function savePublishedHistory(records: PublishedRecord[]) {
 }
 
 function wasPublishedBefore(title: string, history: PublishedRecord[]): boolean {
-  if (isFollowUp(title)) return false
   const fp = storyFingerprint(title)
+  const cluster = storyClusterKey(title)
+  const allowAgain = isStrongFollowUp(title)
   for (const h of history) {
-    if (h.fp === fp || storiesSimilar(title, h.title)) return true
+    const same =
+      h.fp === fp ||
+      storiesSimilar(title, h.title) ||
+      (cluster !== '' && storyClusterKey(h.title) === cluster)
+    if (same) return !allowAgain
   }
   return false
 }
 
 function filterFreshItems(items: NewsItem[], now = Date.now()): NewsItem[] {
-  return items.filter((it) => it.title.trim() && isFresh(it.publishedAt, now))
+  return items.filter(
+    (it) => it.title.trim() && isFresh(it.publishedAt, now) && !titleLooksDated(it.title),
+  )
 }
 
 /** Remove duplicates within one fetch and stories already used in past bulletins. */
@@ -208,7 +306,7 @@ function dedupeAndFilterHistory(items: NewsItem[], history: PublishedRecord[]): 
 async function fromNewsDataBatch(): Promise<NewsItem[]> {
   const key = process.env.NEWSDATA_API_KEY?.trim()
   if (!key) return []
-  const url = `https://newsdata.io/api/1/latest?apikey=${key}&country=in&language=en&q=${encodeURIComponent('highway closed OR landslide OR expressway OR Mumbai Pune OR crime OR fire OR accident OR bank OR atm OR terror OR flood OR cyclone')}`
+  const url = `https://newsdata.io/api/1/latest?apikey=${key}&country=in&language=en&q=${encodeURIComponent('earthquake OR bandh OR strike OR landslide OR highway OR flood OR cyclone OR crime OR fire OR terror OR flight delay OR airport OR police OR gallantry')}`
   const data = await fetchJson(url)
   const results: any[] = Array.isArray(data?.results) ? data.results : []
   return results.map((r) => {
@@ -230,7 +328,7 @@ async function fromMediastackBatch(): Promise<NewsItem[]> {
   const url =
     `https://api.mediastack.com/v1/news?access_key=${key}` +
     `&countries=in&languages=en&sort=published_desc&limit=100` +
-    `&keywords=highway,landslide,expressway,road,closure,security,crime,fire,accident,bank,atm,terror,weather,flood,police,robbery`
+    `&keywords=earthquake,bandh,strike,landslide,highway,flood,cyclone,security,crime,fire,police,airport,flight,advisory,gallantry`
   const data = await fetchJson(url)
   const results: any[] = Array.isArray(data?.data) ? data.data : []
   return results.map((r) => {
@@ -277,11 +375,19 @@ async function fromGoogleNewsBatch(): Promise<NewsItem[]> {
     'terror alert OR bomb threat OR high alert India',
     'fire accident OR explosion OR gas leak India',
     'IMD red alert OR orange alert OR cyclone OR flood India',
+    'earthquake OR tremor Leh OR Ladakh OR Himachal OR India NCS',
+    'Karnataka bandh OR Bengaluru bandh OR hartal OR statewide strike India',
+    'flight delay OR flights cancelled OR railway cancelled OR airport advisory India',
+    'gallantry award OR police medal OR CISF OR army honour OR security guard bravery India',
+    'protest agitation OR road blockade OR chakka jam OR public strike India',
   ]
+  const xmls = await Promise.all(
+    queries.map((q) =>
+      fetchText(`https://news.google.com/rss/search?q=${encodeURIComponent(`${q} when:1d`)}&hl=en-IN&gl=IN&ceid=IN:en`),
+    ),
+  )
   const out: NewsItem[] = []
-  for (const q of queries) {
-    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(`${q} when:1d`)}&hl=en-IN&gl=IN&ceid=IN:en`
-    const xml = await fetchText(url)
+  for (const xml of xmls) {
     if (!xml) continue
     const blocks = xml.split('<item>').slice(1)
     for (const raw of blocks.slice(0, 20)) {
@@ -355,12 +461,16 @@ function categorize(items: NewsItem[]): NewsSection[] {
   for (const it of ordered) {
     const title = it.title.trim()
     if (!title) continue
+    if (!isIndiaStory(title)) continue
     const key = itemKey(it)
     if (seen.has(key)) continue
+    const cluster = storyClusterKey(title)
+    if (cluster && [...seen].some((k) => k.startsWith(`cluster:${cluster}`))) continue
     const idx = NEWS_CATEGORIES.findIndex((c) => matchesCategory(title, c))
     if (idx < 0) continue
     if (sections[idx].items.length >= ITEMS_PER_SECTION) continue
     seen.add(key)
+    if (cluster) seen.add(`cluster:${cluster}`)
     sections[idx].items.push(it)
   }
   return sections
@@ -390,7 +500,7 @@ function revalidateCachedSections(sections: NewsSection[]): NewsSection[] {
   return sections
     .map((s) => ({
       ...s,
-      items: s.items.filter((it) => isFresh(it.publishedAt, now)),
+      items: s.items.filter((it) => isFresh(it.publishedAt, now) && !titleLooksDated(it.title)),
     }))
     .filter((s) => s.items.length > 0)
 }
@@ -424,8 +534,9 @@ async function buildFreshSections(): Promise<NewsSection[]> {
     fromNewsDataBatch(),
   ])
   const merged = filterFreshItems([...ms, ...gn, ...nd])
-  const unique = dedupeAndFilterHistory(merged, history)
-  return categorize(unique)
+  const unused = dedupeAndFilterHistory(merged, history)
+  // Never reprint the same accident to fill a later edition.
+  return categorize(unused)
 }
 
 /**

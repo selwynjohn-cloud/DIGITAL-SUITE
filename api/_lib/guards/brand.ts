@@ -13,6 +13,14 @@ export const GUARDS_CURSOR_FOOTER =
 
 export const GUARDS_NAVY_HDR = 'linear-gradient(135deg,#14224f,#1e3a8a)'
 
+/** Optional Google review link after a complaint is closed. Override with GUARDS_GOOGLE_REVIEW_URL. */
+export function guardsGoogleReviewUrl(): string {
+  return (
+    process.env.GUARDS_GOOGLE_REVIEW_URL?.trim() ||
+    'https://www.google.com/maps/search/?api=1&query=Agile+Security+Force+Private+Limited+Hyderabad'
+  )
+}
+
 function esc(s: unknown): string {
   return String(s ?? '')
     .replaceAll('&', '&amp;')

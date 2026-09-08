@@ -2,7 +2,13 @@ function stripStateSuffix(label: string): string {
   return label.replace(/-(AP|TG|MH|GJ|UP|PY|TN|KA|KL|MP)$/i, '').trim()
 }
 
-/** Normalise branch label for duplicate detection and client/report matching. */
+/**
+ * Normalise a branch label for matching.
+ * Standing rule: every ops city is INDEPENDENT.
+ * Nellore ≠ Tada, Tirupati ≠ Tadipatri, Chennai ≠ Puducherry,
+ * Mumbai ≠ Surat, Visakhapatnam ≠ Kakinada.
+ * Legacy "A & B" names keep their own key so they are never folded into a neighbour.
+ */
 export function misBranchGroupKey(name: string): string {
   const raw = String(name ?? '').trim().toUpperCase()
   if (!raw) return ''
@@ -13,45 +19,73 @@ export function misBranchGroupKey(name: string): string {
     .trim()
   const stripped = stripStateSuffix(compact)
 
+  if (/NELLORE/.test(stripped) && /TADA/.test(stripped) && /&|AND/.test(stripped)) return 'LEGACY-NELLORE-TADA'
+  if (/TIRUPAT[HI]/.test(stripped) && /TADIPATRI/.test(stripped) && /&|AND/.test(stripped)) {
+    return 'LEGACY-TIRUPATI-TADIPATRI'
+  }
+  if (/(CHENNAI|TAMIL)/.test(stripped) && /(PONDICHERRY|PUDUCHERRY)/.test(stripped) && /&|AND/.test(stripped)) {
+    return 'LEGACY-CHENNAI-PUDUCHERRY'
+  }
+  if (/MUMBAI/.test(stripped) && /SURAT/.test(stripped) && /&|AND/.test(stripped)) return 'LEGACY-MUMBAI-SURAT'
+  if (/(VIZAG|VISAKHAPATNAM)/.test(stripped) && /KAKINADA/.test(stripped) && /&|AND/.test(stripped)) {
+    return 'LEGACY-VIZAG-KAKINADA'
+  }
+
   const alias: Record<string, string> = {
     'HYDERABAD-A': 'HYDERABAD-A',
     'HYDERABAD A': 'HYDERABAD-A',
+    'HYD A': 'HYDERABAD-A',
+    'HYD-A': 'HYDERABAD-A',
+    'HYD ZONE A': 'HYDERABAD-A',
+    'HYD-ZONE-A': 'HYDERABAD-A',
+    'HYDERABAD ZONE A': 'HYDERABAD-A',
     'HYDERABAD-B': 'HYDERABAD-B',
     'HYDERABAD B': 'HYDERABAD-B',
+    'HYD B': 'HYDERABAD-B',
+    'HYD-B': 'HYDERABAD-B',
+    'HYD ZONE B': 'HYDERABAD-B',
+    'HYD-ZONE-B': 'HYDERABAD-B',
+    'HYDERABAD ZONE B': 'HYDERABAD-B',
     'HI-TECH CITY': 'HI-TECH CITY',
     'HI-TECH CITY HYDERABAD': 'HI-TECH CITY',
     'HI-TECH CITY, HYDERABAD': 'HI-TECH CITY',
     'HITECH CITY': 'HI-TECH CITY',
-    'PUDUCHERRY': 'TN-PONDICHERRY',
-    'PONDICHERRY': 'TN-PONDICHERRY',
-    'CHENNAI': 'TN-PONDICHERRY',
-    'TAMIL NADU': 'TN-PONDICHERRY',
-    'TAMILNADU': 'TN-PONDICHERRY',
-    'TAMILNADU & PONDICHERRY': 'TN-PONDICHERRY',
-    'KAKINADA': 'VIZAG-KAKINADA',
-    'VIZAG & KAKINADA': 'VIZAG-KAKINADA',
-    'VIZAG AND KAKINADA': 'VIZAG-KAKINADA',
-    'VIZAG': 'VIZAG-KAKINADA',
-    'VISAKHAPATNAM': 'VIZAG-KAKINADA',
-    'TADA': 'NELLORE-TADA',
-    'NELLORE & TADA': 'NELLORE-TADA',
-    'NELLORE AND TADA': 'NELLORE-TADA',
-    'NELLORE': 'NELLORE-TADA',
-    'BANGALORE': 'KARNATAKA',
-    'KARNATAKA': 'KARNATAKA',
-    'KOCHI': 'KERALA',
-    'KERALA': 'KERALA',
-    'MUMBAI & SURAT': 'MUMBAI-SURAT',
-    'MAHARASHTRA': 'MUMBAI-SURAT',
-    'SURAT': 'MUMBAI-SURAT',
-    'GUJARAT': 'MUMBAI-SURAT',
-    'MADHYA PRADESH': 'BHOPAL-MP',
-    'LUCKNOW': 'LUCKNOW-UP',
-    'VIJAYAWADA': 'VIJAYAWADA',
-    'TIRUPATHI & TADIPATRI': 'TIRUPATHI',
-    'TIRUPATI': 'TIRUPATHI',
-    'TIRUPATHI': 'TIRUPATHI',
-    'BHOPAL': 'BHOPAL-MP',
+    CHENNAI: 'CHENNAI',
+    'TAMIL NADU': 'CHENNAI',
+    TAMILNADU: 'CHENNAI',
+    PUDUCHERRY: 'PUDUCHERRY',
+    PONDICHERRY: 'PUDUCHERRY',
+    KAKINADA: 'KAKINADA',
+    VIZAG: 'VISAKHAPATNAM',
+    VISAKHAPATNAM: 'VISAKHAPATNAM',
+    TADA: 'TADA',
+    NELLORE: 'NELLORE',
+    BANGALORE: 'BANGALORE',
+    BENGALURU: 'BANGALORE',
+    KARNATAKA: 'BANGALORE',
+    KOCHI: 'KOCHI',
+    COCHIN: 'KOCHI',
+    KERALA: 'KOCHI',
+    MUMBAI: 'MUMBAI',
+    MAHARASHTRA: 'MUMBAI',
+    SURAT: 'SURAT',
+    GUJARAT: 'SURAT',
+    'MADHYA PRADESH': 'BHOPAL',
+    BHOPAL: 'BHOPAL',
+    'BHOPAL-MP': 'BHOPAL',
+    LUCKNOW: 'LUCKNOW',
+    'LUCKNOW-UP': 'LUCKNOW',
+    VIJAYAWADA: 'VIJAYAWADA',
+    TIRUPATI: 'TIRUPATI',
+    TIRUPATHI: 'TIRUPATI',
+    TADIPATRI: 'TADIPATRI',
+    'CHENNAI & PONDICHERRY': 'LEGACY-CHENNAI-PUDUCHERRY',
+    'CHENNAI AND PONDICHERRY': 'LEGACY-CHENNAI-PUDUCHERRY',
+    'VIZAG & KAKINADA': 'LEGACY-VIZAG-KAKINADA',
+    'NELLORE & TADA': 'LEGACY-NELLORE-TADA',
+    'MUMBAI & SURAT': 'LEGACY-MUMBAI-SURAT',
+    'TIRUPATI & TADIPATRI': 'LEGACY-TIRUPATI-TADIPATRI',
+    'TIRUPATHI & TADIPATRI': 'LEGACY-TIRUPATI-TADIPATRI',
   }
 
   return alias[stripped] || alias[compact] || alias[raw] || stripped || compact

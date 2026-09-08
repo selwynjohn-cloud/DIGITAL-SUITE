@@ -33,7 +33,19 @@ ${MIS_THEME_CSS}
 #app .mtbl th{background:#14224f;color:#c9a84c;border-bottom:2px solid #c9a84c!important;font-size:11px;text-align:center;white-space:normal;height:52px;padding:6px}
 #app .mtbl th.br,#app .mtbl td.br{text-align:left;width:240px;min-width:240px;max-width:240px;white-space:normal;overflow:visible;text-overflow:clip;word-wrap:break-word;line-height:1.3;padding:6px 10px;height:auto;max-height:none}
 #app .mtbl tbody tr:has(td.br){height:auto;min-height:44px}
-#app .mtbl th.rem,#app .mtbl td.rem{text-align:left;min-width:140px}
+#app .mtbl th.rem,#app .mtbl td.rem{
+  text-align:left;width:220px;min-width:200px;max-width:280px;
+  white-space:normal!important;overflow:visible!important;text-overflow:clip!important;
+  word-wrap:break-word;line-height:1.35;padding:8px 10px;height:auto!important;max-height:none!important;vertical-align:top
+}
+#app .mtbl tbody tr:has(td.rem){height:auto;min-height:44px}
+.remarks-panel{margin-top:16px;padding:14px 16px;border-radius:12px;border:1px solid rgba(201,168,76,.35);background:rgba(15,23,42,.55)}
+.remarks-panel h4{color:#fde68a;font-size:14px;margin-bottom:10px}
+.remarks-panel .r-item{padding:10px 0;border-bottom:1px solid #334155}
+.remarks-panel .r-item:last-child{border-bottom:none}
+.remarks-panel .r-br{font-weight:800;color:#fff;margin-bottom:4px}
+.remarks-panel .r-txt{color:#e2e8f0;font-size:13px;line-height:1.45;white-space:pre-wrap}
+.remarks-panel .r-empty{color:#94a3b8;font-size:13px}
 #app .mtbl td.c{text-align:center}
 #app .mtbl td.na{color:#94a3b8;text-align:center}
 #app .mtbl tbody tr:nth-child(even) td{background:rgba(15,23,42,.45)}
@@ -62,11 +74,15 @@ ${misPageWrap(MIS_ACTIVE, MIS_TITLE, `
     <div class="mtblwrap"><table class="mtbl">
       <thead><tr>
         <th class="br">Branch</th><th>MIS<br>Received</th><th>Sanctioned</th><th>Absent</th><th>OT</th><th>Deployed</th><th>Vacant</th>
-        <th>Collection %</th><th>Medical %</th><th>PVC %</th><th>PSARA %</th><th>Resignation</th><th>Recruitment</th><th>Complaints</th><th class="rem">Remarks</th>
+        <th>Collection %</th><th>Medical %</th><th>PVC %</th><th>PSARA %</th><th>Resignation</th><th>Recruitment</th><th>Complaints</th><th>Incidents<br>Open</th><th>Incidents<br>Closed</th><th class="rem">Remarks</th>
       </tr></thead>
       <tbody id="rows"></tbody>
       <tfoot id="foot"></tfoot>
     </table></div>
+    <div class="remarks-panel" id="remarksPanel">
+      <h4>Branch remarks (full text)</h4>
+      <div id="remarksList" class="r-empty">Load a date to see remarks written by branches.</div>
+    </div>
   </div>
 </div>
 `, ACTIONS)}
@@ -83,9 +99,7 @@ function load(){el('loadMsg').textContent='Loading… please wait';api('reports'
 
 function branchT(data,bid){var t=(data.branchTotals||{})[bid]||{san:0,dep:0,abs:0,ot:0,vac:0};t.vac=Math.max(0,(t.abs||0)-(t.ot||0));t.dep=Math.min(t.san||0,Math.max(0,(t.san||0)-t.vac));return t;}
 function hrField(s,k,legacy){var v=s[k];if(v==null||v==='')v=s[legacy];return v==null?'':v;}
-function pendingCells(){
-  return '<td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td>';
-}
+function incFor(data,bid){var m=(data.incidentByBranch||{})[bid]||{};return {open:Number(m.open)||0,closed:Number(m.closed)||0};}
 function render(data){
   DATA=data;var title=data.periodLabel||data.dateFor;
   el('title').textContent='Consolidated MIS — '+title;
@@ -94,7 +108,8 @@ function render(data){
   var isPeriod=data.period&&data.period!=='day';
   var periodDays=data.periodDays||1;
   var tb=el('rows');tb.innerHTML='';
-  var T={san:0,dep:0,abs:0,ot:0,vac:0,comp:0,res:0,rec:0},received=0;
+  var T={san:0,dep:0,abs:0,ot:0,vac:0,comp:0,res:0,rec:0,incOpen:0,incClosed:0},received=0;
+  var remarkBlocks=[];
   var branchList=(data.branches||[]).slice().sort(function(a,b){
     var ar=byBranch[a.id]?1:0,br=byBranch[b.id]?1:0;
     if(ar!==br)return br-ar;
@@ -102,38 +117,51 @@ function render(data){
   });
   branchList.forEach(function(b){
     var r=byBranch[b.id];var tr=document.createElement('tr');
+    var inc=incFor(data,b.id);
+    T.incOpen+=inc.open;T.incClosed+=inc.closed;
     if(!r){
-      tr.innerHTML='<td class="br" style="font-weight:700;color:#fff">'+h(b.name)+'</td><td class="c no">NO</td>'+pendingCells()+'<td class="rem na">Not submitted</td>';
+      tr.innerHTML='<td class="br" style="font-weight:700;color:#fff">'+h(b.name)+'</td><td class="c no">NO</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="c">'+inc.open+'</td><td class="c">'+inc.closed+'</td><td class="rem na">Not submitted</td>';
       tb.appendChild(tr);return;
     }
     received++;
     var days=pstats[b.id]?pstats[b.id].daysSubmitted:1;
     var misCell=isPeriod?('<span class="yes">'+days+'/'+periodDays+'</span>'):'<span class="yes">YES</span>';var t=branchT(data,b.id);var s=r.summary||{};
+    var rem=String(s.remarks||'').trim();
     T.san+=t.san;T.dep+=t.dep;T.abs+=t.abs;T.ot+=t.ot;T.vac+=t.vac;T.comp+=Number(s.complaints)||0;
     T.res+=Number(hrField(s,'resignation','mobileMentionedPct'))||0;
     T.rec+=Number(hrField(s,'recruitment','mobileActualPct'))||0;
     tr.innerHTML='<td class="br" style="font-weight:700;color:#fff" title="'+h(b.name)+'">'+h(b.name)+'</td><td class="c">'+misCell+'</td>'+
       '<td class="c">'+t.san+'</td><td class="c">'+t.abs+'</td><td class="c">'+t.ot+'</td><td class="c">'+t.dep+'</td><td class="c vac hl">'+t.vac+'</td>'+
       '<td class="c hl">'+h(s.collectionPct)+'</td><td class="c hl">'+h(s.medicalFitnessPct)+'</td><td class="c">'+h(s.pvcPct)+'</td><td class="c">'+h(s.psaraPct)+'</td>'+
-      '<td class="c hl">'+h(hrField(s,'resignation','mobileMentionedPct'))+'</td><td class="c hl">'+h(hrField(s,'recruitment','mobileActualPct'))+'</td><td class="c">'+h(s.complaints)+'</td><td class="rem" title="'+h(s.remarks)+'">'+h(s.remarks)+'</td>';
+      '<td class="c hl">'+h(hrField(s,'resignation','mobileMentionedPct'))+'</td><td class="c hl">'+h(hrField(s,'recruitment','mobileActualPct'))+'</td><td class="c">'+h(s.complaints)+'</td><td class="c">'+(inc.open||0)+'</td><td class="c">'+(inc.closed||0)+'</td><td class="rem">'+h(rem||'—')+'</td>';
     tb.appendChild(tr);
+    if(rem) remarkBlocks.push({name:b.name,text:rem});
   });
   var total=(data.branches||[]).length;
   T.vac=Math.max(0,T.abs-T.ot);T.dep=Math.min(T.san,Math.max(0,T.san-T.vac));
-  el('foot').innerHTML='<tr><td class="br">TOTAL ('+received+'/'+total+' submitted)</td><td class="c"></td><td class="c">'+T.san+'</td><td class="c">'+T.abs+'</td><td class="c">'+T.ot+'</td><td class="c">'+T.dep+'</td><td class="c">'+T.vac+'</td><td class="c na">—</td><td class="c na">—</td><td class="c na">—</td><td class="c na">—</td><td class="c">'+T.res+'</td><td class="c">'+T.rec+'</td><td class="c">'+T.comp+'</td><td class="rem"></td></tr>';
+  el('foot').innerHTML='<tr><td class="br">TOTAL ('+received+'/'+total+' submitted)</td><td class="c"></td><td class="c">'+T.san+'</td><td class="c">'+T.abs+'</td><td class="c">'+T.ot+'</td><td class="c">'+T.dep+'</td><td class="c">'+T.vac+'</td><td class="c na">—</td><td class="c na">—</td><td class="c na">—</td><td class="c na">—</td><td class="c">'+T.res+'</td><td class="c">'+T.rec+'</td><td class="c">'+T.comp+'</td><td class="c">'+T.incOpen+'</td><td class="c">'+T.incClosed+'</td><td class="rem"></td></tr>';
   el('kpis').innerHTML=
     '<div class="kpi pu"><b>'+received+'/'+total+'</b><span>Branches Reported</span></div>'+
     '<div class="kpi bl"><b>'+T.san+'</b><span>Total Sanctioned</span></div>'+
     '<div class="kpi rd"><b>'+T.abs+'</b><span>Total Absent</span></div>'+
     '<div class="kpi am"><b>'+T.ot+'</b><span>Total OT</span></div>'+
     '<div class="kpi gr"><b>'+T.dep+'</b><span>Total Deployed</span></div>'+
-    '<div class="kpi am"><b>'+T.vac+'</b><span>Total Vacant</span></div>';
+    '<div class="kpi am"><b>'+T.vac+'</b><span>Total Vacant</span></div>'+
+    '<div class="kpi rd"><b>'+T.incOpen+'</b><span>Incidents Open</span></div>'+
+    '<div class="kpi gr"><b>'+T.incClosed+'</b><span>Incidents Closed</span></div>';
+  var rl=el('remarksList');
+  if(rl){
+    if(!remarkBlocks.length) rl.innerHTML='<span class="r-empty">No branch wrote remarks for this period.</span>';
+    else rl.innerHTML=remarkBlocks.map(function(x){
+      return '<div class="r-item"><div class="r-br">'+h(x.name)+'</div><div class="r-txt">'+h(x.text)+'</div></div>';
+    }).join('');
+  }
 }
 
 function csv(){
   if(!DATA)return;var byBranch={};(DATA.reports||[]).forEach(function(r){byBranch[r.branchId]=r;});
-  var rows=[['Branch','MIS Received','Sanctioned','Absent','OT','Deployed','Vacant','Collection %','Medical %','PVC %','PSARA %','Resignation','Recruitment','Complaints','Remarks']];
-  (DATA.branches||[]).slice().sort(function(a,b){var ar=byBranch[a.id]?1:0,br=byBranch[b.id]?1:0;if(ar!==br)return br-ar;return a.name.localeCompare(b.name);}).forEach(function(b){var r=byBranch[b.id];if(!r){rows.push([b.name,'NO','','','','','','','','','','','','','Not submitted']);return;}var t=branchT(DATA,b.id);var s=r.summary||{};rows.push([b.name,'YES',t.san,t.abs,t.ot,t.dep,t.vac,s.collectionPct,s.medicalFitnessPct,s.pvcPct,s.psaraPct,s.resignation||s.mobileMentionedPct,s.recruitment||s.mobileActualPct,s.complaints,s.remarks]);});
+  var rows=[['Branch','MIS Received','Sanctioned','Absent','OT','Deployed','Vacant','Collection %','Medical %','PVC %','PSARA %','Resignation','Recruitment','Complaints','Incidents Open','Incidents Closed','Remarks']];
+  (DATA.branches||[]).slice().sort(function(a,b){var ar=byBranch[a.id]?1:0,br=byBranch[b.id]?1:0;if(ar!==br)return br-ar;return a.name.localeCompare(b.name);}).forEach(function(b){var r=byBranch[b.id];var inc=incFor(DATA,b.id);if(!r){rows.push([b.name,'NO','','','','','','','','','','','','',inc.open,inc.closed,'Not submitted']);return;}var t=branchT(DATA,b.id);var s=r.summary||{};rows.push([b.name,'YES',t.san,t.abs,t.ot,t.dep,t.vac,s.collectionPct,s.medicalFitnessPct,s.pvcPct,s.psaraPct,s.resignation||s.mobileMentionedPct,s.recruitment||s.mobileActualPct,s.complaints,inc.open,inc.closed,s.remarks]);});
   var csv=rows.map(function(r){return r.map(function(c){return '"'+String(c==null?'':c).replace(/"/g,'""')+'"';}).join(',');}).join('\\n');
   var blob=new Blob([csv],{type:'text/csv'});var url=URL.createObjectURL(blob);var link=document.createElement('a');link.href=url;link.download='Consolidated-MIS-'+DATA.dateFor+'.csv';link.click();
 }

@@ -1,8 +1,12 @@
 import { Resend } from 'resend'
-import { sendSuiteEmail } from '../suite-mail.js'
+import { withoutNoMailRecipients } from '../auth.js'
+import { CONTROL_EMAIL } from '../mis/branch-mail-cc.js'
+import { getHodEmailsForBranch } from '../mis/digest.js'
+import { getBranches as getMisBranches, getUsers as getMisUsers } from '../mis/store.js'
+import { sendSuiteEmail, suiteDirectorEmail } from '../suite-mail.js'
 import { fleetEmailShell } from './brand.js'
 import {
-  FLEET_BRANCHES,
+  branchesWithActiveVehicles,
   fleetNum,
   type FleetDriver,
   type FleetVehicle,
@@ -14,6 +18,11 @@ import { addEntryToStats, aggregateWeekReports, avgMileage, entryFuelType, evKmP
 export function branchEmail(branch: string): string {
   const map: Record<string, string> = {
     Hyderabad: 'hyderabad@agilegroup.co.in',
+    'Hyderabad - A': 'aashish@agilegroup.co.in',
+    'Hyderabad-A': 'aashish@agilegroup.co.in',
+    'Hyderabad - B': 'munawar.salim@agilegroup.co.in',
+    'Hyderabad-B': 'munawar.salim@agilegroup.co.in',
+    'Hi-Tech City': 'sridhar.m@agilegroup.co.in',
     Kakinada: 'kakinada@agilegroup.co.in',
     Vijayawada: 'vijayawada@agilegroup.co.in',
     Chennai: 'chennai@agilegroup.co.in',
@@ -22,6 +31,14 @@ export function branchEmail(branch: string): string {
     Nellore: 'nellore@agilegroup.co.in',
     Bangalore: 'bangalore@agilegroup.co.in',
     Gulbarga: 'gulbarga@agilegroup.co.in',
+    Tada: 'tada@agilegroup.co.in',
+    Tirupati: 'tirupati@agilegroup.co.in',
+    Tadipatri: 'tadipatri@agilegroup.co.in',
+    Puducherry: 'puducherry@agilegroup.co.in',
+    Surat: 'surat@agilegroup.co.in',
+    Bhopal: 'bhopal@agilegroup.co.in',
+    Kochi: 'cochin@agilegroup.co.in',
+    Cochin: 'cochin@agilegroup.co.in',
     'Corporate Office': 'director@agilegroup.co.in',
   }
   return map[branch] ?? 'director@agilegroup.co.in'
@@ -297,13 +314,31 @@ export async function sendWeeklyAnalysis(
   return { ok: true, to, cc: director }
 }
 
+async function reminderHodTo(branch: string): Promise<string[]> {
+  const [users, branches] = await Promise.all([getMisUsers(), getMisBranches()])
+  const want = branch.trim().toLowerCase().replace(/\s+/g, '')
+  const mis = branches.find((b) => {
+    const n = String(b.name || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '')
+    return n === want || b.id === branch || String(b.name || '').trim() === branch
+  })
+  const hods = await getHodEmailsForBranch(mis?.id || branch, users, branches)
+  return withoutNoMailRecipients(
+    [...hods, branchEmail(branch)].map((e) => e.trim().toLowerCase()).filter((e) => e.includes('@')),
+  )
+}
+
 export async function sendPendingReminder(branch: string, weekNo: string, urgent = false) {
   const apiKey = process.env.RESEND_API_KEY?.trim()
   if (!apiKey) return { ok: false, error: 'Email not configured' }
+  const to = await reminderHodTo(branch)
+  if (!to.length) return { ok: false, error: 'No HOD mailbox for this branch' }
   const resend = new Resend(apiKey)
   const from = process.env.EMAIL_FROM ?? 'Agile Fleet <noreply@agilegroup.co.in>'
-  const director = process.env.FLEET_DIRECTOR_EMAIL?.trim() || 'director@agilegroup.co.in'
-  const to = branchEmail(branch)
+  const director = suiteDirectorEmail()
+  const cc = withoutNoMailRecipients([CONTROL_EMAIL, director, 'director@agilegroup.co.in'])
   const subject = urgent
     ? `URGENT — ${weekNo} Weekly Vehicle Report NOT Received — ${branch}`
     : `Agile Fleet — ${weekNo} Weekly Vehicle Report Reminder — ${branch}`
@@ -311,16 +346,17 @@ export async function sendPendingReminder(branch: string, weekNo: string, urgent
   const result = await sendSuiteEmail(resend, {
     from,
     to,
-    bcc: director,
+    cc,
     subject,
     html: fleetEmailShell(
       urgent ? 'URGENT — Weekly Report Not Received' : 'Weekly Vehicle Report Reminder',
       `${esc(branch)} · ${esc(weekNo)}`,
-      `<p>Dear ${esc(branch)} Team,</p>
+      `<p>Dear HOD,</p>
       <p>${urgent ? '<b style="color:#C0392B">Your weekly vehicle report has NOT been received.</b> Please submit immediately.' : `This is a reminder to submit your <b>${esc(weekNo)} Weekly Vehicle Report</b>.`}</p>
       <p><b>Deadline: Every Saturday before 5:00 PM IST.</b></p>
-      <p>Submit online now:<br><a href="https://www.agilegroup-digital.co.in/fleets?portal=staff">www.agilegroup-digital.co.in/fleets</a> (Staff / HOD portal → Weekly Reports)<br>
-      Branch: <b>${esc(branch)}</b></p>`,
+      <p>Open Fleet → <b>Submit Weekly Report</b> and send the report for <b>${esc(branch)}</b>.</p>
+      <p>Submit online now:<br><a href="https://www.agilegroup-digital.co.in/fleets?portal=staff">www.agilegroup-digital.co.in/fleets</a> (HOD / Staff portal)</p>
+      <p>Director and Control are copied.</p>`,
     ),
   })
   if (result.error) return { ok: false, error: result.error.message ?? 'Send failed' }
@@ -354,11 +390,13 @@ export function buildConsolidatedDirectorReport(
 ): { subject: string; html: string } {
   const weekReports = reports.filter((r) => r.active && r.weekNo === weekNo)
   const reported = new Set(weekReports.map((r) => r.branchId))
-  const { total, byBranch } = aggregateWeekReports(reports, weekNo, FLEET_BRANCHES)
+  const reportable = branchesWithActiveVehicles(vehicles)
+  const { total, byBranch } = aggregateWeekReports(reports, weekNo, reportable)
   const renewals = collectRenewalAlerts(vehicles)
   const driverAlerts = collectDriverAlerts(drivers)
+  const pendingCount = reportable.filter((b) => !reported.has(b)).length
 
-  const cards = FLEET_BRANCHES.map((b) => {
+  const cards = reportable.map((b) => {
     const r = weekReports.find((x) => x.branchId === b)
     if (r) {
       return `<div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;padding:10px"><b style="color:#1A7A4A">✓ ${esc(b)}</b><div style="font-size:11px;color:#555;margin-top:4px">${esc(r.submittedBy)} — ${r.entries.length} vehicle(s)</div></div>`
@@ -401,8 +439,8 @@ export function buildConsolidatedDirectorReport(
     .join('')
 
   const bodyHtml = `<div style="display:flex;background:linear-gradient(135deg,#0369a1,#0ea5e9);color:#fff;text-align:center;font-size:13px;flex-wrap:wrap;border-radius:8px;overflow:hidden;margin-bottom:14px">
-      <div style="flex:1;min-width:120px;padding:12px;border-right:1px solid rgba(255,255,255,.2)"><b style="font-size:22px">${reported.size}</b><br>Branches Reported</div>
-      <div style="flex:1;min-width:120px;padding:12px;border-right:1px solid rgba(255,255,255,.2)"><b style="font-size:22px">${FLEET_BRANCHES.length - reported.size}</b><br>Pending</div>
+      <div style="flex:1;min-width:120px;padding:12px;border-right:1px solid rgba(255,255,255,.2)"><b style="font-size:22px">${reportable.filter((b) => reported.has(b)).length}</b><br>Branches Reported</div>
+      <div style="flex:1;min-width:120px;padding:12px;border-right:1px solid rgba(255,255,255,.2)"><b style="font-size:22px">${pendingCount}</b><br>Pending</div>
       <div style="flex:1;min-width:120px;padding:12px;border-right:1px solid rgba(255,255,255,.2)"><b style="font-size:22px">${vehicles.filter((v) => v.active).length}</b><br>Active Vehicles</div>
       <div style="flex:1;min-width:120px;padding:12px;border-right:1px solid rgba(255,255,255,.2)"><b style="font-size:22px">${total.km.toLocaleString('en-IN')}</b><br>Total KM</div>
       <div style="flex:1;min-width:120px;padding:12px"><b style="font-size:18px">${fmtRs(total.fuelCost + total.evCharge)}</b><br>Fuel + EV</div>

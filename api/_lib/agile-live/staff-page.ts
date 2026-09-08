@@ -1,31 +1,42 @@
 import { otpLoginHtml, otpLoginScript } from '../embedded-otp.js'
+import { SUITE_APP_FOOTER_CSS, suiteAppOpenPageFooterHtml } from '../suite-app-footer.js'
 import { SUITE_TAP_FEEDBACK_CSS, suiteTapFeedbackInitScript } from '../suite-tap-feedback.js'
 import { suitePageTitleInitScript } from '../suite-page-chrome.js'
 import { suiteMgmtBranchOptionsJs } from '../suite-mgmt-branch-select.js'
 import { LIVE_APP_ID, LIVE_APP_NAME, LIVE_JOBS_URL, LIVE_NEWS_CHANNEL, LIVE_NEWS_PAGE } from './types.js'
 import { LIVE_CHAT_ACCEPT, liveVoiceBindScript } from './media.js'
-import { LIVE_CHAT_RULE, LIVE_CHAT_RULE_MGMT } from './moderation.js'
-import { LIVE_SHELL_CSS, liveAvatarImg, liveFooterHtml, liveLogoImg, liveOpsIcon, livePersonHeadHtml } from './shell.js'
+import { liveChatExtrasScript, liveComposerInnerHtml } from './chat-ui.js'
+import { liveI18nScript, liveLangBarHtml } from './i18n.js'
+import { LIVE_SHELL_CSS, liveAvatarImg, liveDisclaimerHtml, liveFooterHtml, liveHonourBannerHtml, liveIconHeadHtml, liveLoginArrowHtml, liveOpenHeadHtml, liveOpsIcon, livePersonHeadHtml } from './shell.js'
 
 export function agileLiveStaffPage(portal: 'staff' | 'management', branchOptionsHtml: string): string {
   const isMgmt = portal === 'management'
   const login = isMgmt
     ? otpLoginHtml(LIVE_APP_NAME, 'Management — All Branches first')
     : otpLoginHtml(LIVE_APP_NAME, 'HOD / Staff — your branch only', true, branchOptionsHtml)
-  const rule = isMgmt ? LIVE_CHAT_RULE_MGMT : LIVE_CHAT_RULE
   return `<!DOCTYPE html>
 <html lang="en"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#14224f">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Agile Live">
+${liveIconHeadHtml()}
 <title>${LIVE_APP_NAME} — ${isMgmt ? 'Management' : 'Staff'}</title>
 <style>
 ${LIVE_SHELL_CSS}
+${SUITE_APP_FOOTER_CSS}
 ${SUITE_TAP_FEEDBACK_CSS}
 </style></head>
 <body>
-${login}
+<div id="liveGate" class="gate">
+  ${liveOpenHeadHtml(isMgmt ? 'Management' : 'Staff')}
+  ${liveHonourBannerHtml()}
+  ${login}
+  <div id="loginNote">${liveDisclaimerHtml()}</div>
+  ${suiteAppOpenPageFooterHtml()}
+</div>
 <div id="app" class="live-fill hidden">
   <div class="live-desk">
     <div id="side" class="live-side">
@@ -37,10 +48,13 @@ ${login}
         cardPickId: 'meCardPick',
         cardDateId: 'meCardDate',
         branchId: 'meBr',
-        extra: `<button type="button" class="live-ico" id="btnOps" title="Dashboard" aria-label="Dashboard">${liveOpsIcon()}</button>`,
+        lead: liveLoginArrowHtml(),
+        extra: `<div class="live-head-actions"><button type="button" class="live-ico" id="btnOps" title="Dashboard" aria-label="Dashboard">${liveOpsIcon()}</button></div>`,
       })}
+      ${liveLangBarHtml('langPickStaff')}
       <div id="banner" class="msg"></div>
       ${isMgmt ? '<div class="live-search"><select id="branchSel" aria-label="All Branches"></select></div>' : ''}
+      <div id="opsPhoneLists" class="live-ops-phone"></div>
       <div id="tabChats" class="live-tab">
         <div class="live-search"><input id="q" placeholder="Search" type="search"></div>
         <div class="live-list" id="people"></div>
@@ -69,15 +83,8 @@ ${login}
         ${liveAvatarImg()}
         <div class="live-chat-who"><b id="chatName">Branch group</b><span id="chatSub">Security Staff</span></div>
       </div>
-      <p class="rule">${rule}</p>
       <div class="live-chat" id="chat"></div>
-      <div class="composer">
-        <input id="chatFile" type="file" class="hidden" accept="${LIVE_CHAT_ACCEPT}">
-        <button type="button" class="btn grey" id="btnAttach">+</button>
-        <button type="button" class="btn grey voice" id="btnVoice" aria-label="Voice" title="Voice"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.9V21h2v-3.1A7 7 0 0 0 19 11h-2z"/></svg></button>
-        <input id="chatText" type="text" maxlength="400" placeholder="Type a message">
-        <button type="button" class="btn green" id="btnSend">Send</button>
-      </div>
+      ${liveComposerInnerHtml(LIVE_CHAT_ACCEPT, { textI18n: true })}
     </div>
   </div>
   <div id="ops" class="ops hidden">
@@ -98,6 +105,7 @@ ${login}
 ${suitePageTitleInitScript(LIVE_APP_NAME)}
 ${suiteMgmtBranchOptionsJs()}
 ${suiteTapFeedbackInitScript()}
+${liveI18nScript()}
 ${otpLoginScript(LIVE_APP_ID, LIVE_APP_NAME, portal)}
 var CTX={email:'',name:'',role:'${portal}',roleLabel:'${isMgmt ? 'Management' : 'Staff'}',branchId:'',branches:[],extras:[]};
 var ALL=[];
@@ -172,27 +180,24 @@ function paintPeople(){
   });
 }
 function paintThread(){
+  var rows=ALL.filter(inThread);
+  rows.forEach(function(m){ if(m.id) LAST=m.id; });
+  if(typeof liveSyncThread==='function'){
+    liveSyncThread(el('chat'), rows, function(m){return String(m.fromId||'').indexOf(CTX.email)>=0;}, function(m){
+      return (m.fromName||'')+' · '+roleOf(m);
+    });
+    return;
+  }
   var box=el('chat'); box.innerHTML='';
-  ALL.filter(inThread).forEach(function(m){
-    LAST=m.id;
+  rows.forEach(function(m){
+    if(typeof liveIsHidden==='function'&&liveIsHidden(m.id))return;
     var mine=String(m.fromId||'').indexOf(CTX.email)>=0;
     var div=document.createElement('div');
     div.className='bub '+(mine?'me':'them');
     var sm=document.createElement('small');
     sm.textContent=(m.fromName||'')+' · '+roleOf(m);
     div.appendChild(sm);
-    if(m.fileUrl&&m.fileKind==='image'){var im=document.createElement('img');im.src=m.fileUrl;im.alt=m.fileName||'photo';div.appendChild(im);}
-    else if(m.fileUrl&&m.fileKind==='audio'){var au=document.createElement('audio');au.controls=true;au.src=m.fileUrl;div.appendChild(au);}
-    else if(m.fileUrl&&m.fileKind==='video'){var vd=document.createElement('video');vd.controls=true;vd.src=m.fileUrl;div.appendChild(vd);}
-    else if(m.fileUrl){var a=document.createElement('a');a.className='file';a.href=m.fileUrl;a.target='_blank';a.rel='noopener';a.textContent=m.fileName||'Open file';div.appendChild(a);}
-    if(m.text)div.appendChild(document.createTextNode(m.text));
-    if(!mine){
-      var del=document.createElement('button');
-      del.type='button';del.className='btn grey';del.textContent='Remove';
-      del.style.marginTop='6px';del.style.minHeight='36px';
-      del.addEventListener('click',function(){api('chatDelete',{messageId:m.id}).then(function(){loadChat(true);});});
-      div.appendChild(del);
-    }
+    if(typeof livePaintBubble==='function') livePaintBubble(div,m);
     box.appendChild(div);
   });
   box.scrollTop=box.scrollHeight;
@@ -244,7 +249,8 @@ function showOps(){
     var c=res.j.counts||{};
     var rows=res.j.rows||[];
     var book=res.j.bookCount||c.book||0;
-    var html='<div class="card"><h3>Dashboard — today</h3>';
+    var html='<div id="opsPhoneListsDash" class="live-ops-phone"></div>';
+    html+='<div class="card"><h3>Dashboard — today</h3>';
     html+='<p class="muted">Duty, Late Start, Out of Post — name and ID on each row. Today only — not the full HDFC / Master Directory list ('+book+' in the book).</p>';
     html+='<div class="kpis">';
     html+='<div class="kpi"><b>'+(c.onDuty||0)+'</b><span>On duty</span></div>';
@@ -322,6 +328,7 @@ function showOps(){
     });
     loadStaffMonth();
     loadLiveAttTools();
+    loadOpsPhoneLists();
   });
 }
 function loadLiveAttTools(){
@@ -488,7 +495,9 @@ function loadStaffMonth(){
   });
 }
 function onOtpLogin(){
+  var gate=el('liveGate'); if(gate) gate.classList.add('hidden');
   el('login').classList.add('hidden');
+  var note=el('loginNote'); if(note) note.classList.add('hidden');
   el('app').classList.remove('hidden');
   api('bootstrap',{}).then(function(res){
     if(res.s!==200){banner(res.j.error||'Not authorised.',false);if(typeof otpHandleUnauthorized==='function')otpHandleUnauthorized();return;}
@@ -504,12 +513,103 @@ function onOtpLogin(){
     var sel=el('branchSel');
     if(sel){
       sel.innerHTML=suiteMgmtBranchOptionsHtml(CTX.branches,CTX.branchId||'ALL');
-      sel.addEventListener('change',function(){CTX.branchId=sel.value;LAST='';ALL=[];paintStaffHead();loadWeekRoster();if(CTX.branchId&&CTX.branchId!=='ALL')startPoll();else {banner('Pick one branch to open chat (not All Branches).',false);paintPeople();}});
+      sel.addEventListener('change',function(){CTX.branchId=sel.value;LAST='';ALL=[];paintStaffHead();loadWeekRoster();loadOpsPhoneLists();if(CTX.branchId&&CTX.branchId!=='ALL')startPoll();else {banner('Pick one branch to open chat (not All Branches).',false);paintPeople();}});
     }
     showMain(false);
+    showGroup('Chat');
     paintPeople();
     loadWeekRoster();
+    loadOpsPhoneLists();
     if(CTX.role==='staff'||(CTX.branchId&&CTX.branchId!=='ALL'))startPoll();
+    if(typeof applyLang==='function') applyLang();
+  });
+}
+function opsPhoneCall(r){
+  var mob=last10(r.mobile||'');
+  return mob.length===10?' <a class="btn green" href="tel:+91'+esc(mob)+'">Call</a>':'';
+}
+function opsPhoneLine(r, extra){
+  var mob=last10(r.mobile||'');
+  var place=r.clientSite||r.role||'';
+  var miss=mob?'':(place?' · Not on file':'Not on file');
+  return '<div class="month-row"><b>'+esc(r.name||'')+'</b>'+(mob?' · '+esc(mob):'')+opsPhoneCall(r)+'<br><span class="muted">'+esc(place)+(extra?' · '+esc(extra):'')+esc(miss)+'</span></div>';
+}
+function opsPhoneEmpty(msg){
+  return '<p class="muted">'+esc(msg||'Not on file.')+'</p>';
+}
+function opsSanLine(u){
+  if(!u.onFile) return '<div class="month-row"><b>'+esc(u.clientSite||'')+'</b><br><span class="muted">Not on file.</span></div>';
+  return '<div class="month-row"><b>'+esc(u.clientSite||'')+'</b><br><span class="muted">A '+u.sanA+' · G '+u.sanG+' · B '+u.sanB+' · C '+u.sanC+' · Total '+u.total+'</span></div>';
+}
+function paintOpsPhoneLists(box, data, err){
+  if(!box)return;
+  if(err){box.innerHTML='<div class="card"><p class="muted">'+esc(err)+'</p></div>';return;}
+  if(!data){box.innerHTML='<div class="card"><p class="muted">Pick one branch first (not All Branches).</p></div>';return;}
+  var html='<div class="live-ops-deploy">';
+  html+='<div class="card" id="opsSanctioned"><h3>Sanctioned post</h3><p class="muted">From the unit book for this branch only.</p>';
+  html+=(data.sanctioned||[]).length?data.sanctioned.map(opsSanLine).join(''):opsPhoneEmpty('No units on file for this branch.');
+  html+='</div>';
+  html+='<div class="card" id="opsShiftwise"><h3>Shiftwise deployment</h3><p class="muted">Who is deployed on each shift today (this branch’s units).</p>';
+  var shifts=data.shiftwise||[];
+  if(!shifts.length) html+=opsPhoneEmpty('No shift deployment on file for this branch.');
+  else {
+    var last='';
+    shifts.forEach(function(b){
+      if(b.clientSite!==last){html+='<p class="ops-unit">'+esc(b.clientSite||'')+'</p>';last=b.clientSite;}
+      html+='<p class="live-ops-shift">'+(b.shift==='Off'?'Off Duty':('Shift '+esc(b.shift||'')))+'</p>';
+      html+=(b.people||[]).length?b.people.map(function(r){return opsPhoneLine(r, r.rank||'');}).join(''):opsPhoneEmpty('None on this shift.');
+    });
+  }
+  html+='</div>';
+  html+='<div class="card" id="opsDaywise"><h3>Day wise deployment</h3><p class="muted">This week Sun–Sat. Duty changes every Sunday.</p>';
+  var days=data.daywise||[];
+  if(!days.length) html+=opsPhoneEmpty('No day-wise deployment on file for this week.');
+  else {
+    days.forEach(function(d){
+      var y=String(d.ymd||'').split('-');
+      var when=y.length===3?(Number(y[2])+'/'+Number(y[1])):'';
+      html+='<p class="live-ops-shift">'+esc(d.dow||'')+(when?' '+when:'')+(d.isToday?' · Today':'')+'</p>';
+      html+=(d.people||[]).length?d.people.map(function(r){return opsPhoneLine(r, r.shift||'');}).join(''):opsPhoneEmpty('None deployed this day.');
+    });
+  }
+  html+='</div></div>';
+  html+='<div class="card" id="opsUnitAtt"><h3>Unit attendance</h3><p class="muted">Who is on duty today in this branch’s units. Not a Work360 replacement.</p>';
+  html+=(data.attendance||[]).length?data.attendance.map(function(r){return opsPhoneLine(r, r.status||'');}).join(''):opsPhoneEmpty('No people at units in this branch yet.');
+  html+='</div>';
+  html+='<div class="card" id="opsVacantList"><h3>Vacant</h3><p class="muted">Vacant Post allotted today in this branch. Not the MIS vacant office report.</p>';
+  html+=(data.vacant||[]).length?data.vacant.map(function(r){return opsPhoneLine(r, r.date||'Today');}).join(''):opsPhoneEmpty('No vacant post allotted today.');
+  html+='</div>';
+  html+='<div class="card" id="opsUnitFree"><h3>Free from this unit</h3><p class="muted">People from this branch’s units who are not on duty and not allotted a vacant post today.</p>';
+  html+=(data.free||[]).length?data.free.map(function(r){return opsPhoneLine(r, r.status||'Free');}).join(''):opsPhoneEmpty('None free in this branch’s units now.');
+  html+='</div>';
+  var c=data.contacts||{};
+  html+='<div class="card live-ops-contacts" id="opsContacts"><h3>Contacts</h3><p class="muted">Separate from deployment. Call on the phone — not a chat app.</p>';
+  html+='<div class="live-ops-group"><h3>Unit Security Staff</h3>';
+  html+=(c.unitStaff||[]).length?c.unitStaff.map(function(r){return opsPhoneLine(r, r.rank||'');}).join(''):opsPhoneEmpty('Not on file.');
+  html+='</div><div class="live-ops-group"><h3>Emergency numbers</h3>';
+  html+=(c.emergency||[]).length?c.emergency.map(function(r){return opsPhoneLine(r, r.role||'');}).join(''):opsPhoneEmpty('Not on file.');
+  html+='</div><div class="live-ops-group"><h3>Operations Team</h3>';
+  html+=(c.operationsTeam||[]).length?c.operationsTeam.map(function(r){return opsPhoneLine(r, r.role||'');}).join(''):opsPhoneEmpty('Not on file.');
+  html+='</div><div class="live-ops-group"><h3>Command Centre</h3>';
+  html+=(c.commandCentre||[]).length?c.commandCentre.map(function(r){return opsPhoneLine(r, r.role||'');}).join(''):opsPhoneEmpty('Not on file.');
+  html+='</div><div class="live-ops-group"><h3>Helpdesk</h3>';
+  html+=(c.helpdesk||[]).length?c.helpdesk.map(function(r){return opsPhoneLine(r, r.role||'');}).join(''):opsPhoneEmpty('Not on file.');
+  html+='</div></div>';
+  box.innerHTML=html;
+}
+function loadOpsPhoneLists(){
+  var side=el('opsPhoneLists');
+  var dash=el('opsPhoneListsDash');
+  if(CTX.role==='management'&&(!CTX.branchId||CTX.branchId==='ALL')){
+    paintOpsPhoneLists(side, null, '');
+    paintOpsPhoneLists(dash, null, '');
+    return;
+  }
+  if(side) side.innerHTML='<div class="card"><p class="muted">Loading unit lists…</p></div>';
+  api('opsPhoneLists',{}).then(function(res){
+    var err=res.s===200?'':(res.j.error||'Could not load unit lists.');
+    paintOpsPhoneLists(side, res.s===200?res.j:null, err);
+    paintOpsPhoneLists(dash, res.s===200?res.j:null, err);
   });
 }
 function loadWeekRoster(){
@@ -545,33 +645,37 @@ function paintCal(cal){
   box.innerHTML=head+days;
 }
 function staffBranchLine(){
-  if(!CTX.branchId||CTX.branchId==='ALL') return CTX.role==='management'?'Branch: All Branches':'Branch —';
+  var br=typeof t==='function'?t('branchLine'):'Branch:';
+  if(!CTX.branchId||CTX.branchId==='ALL') return CTX.role==='management'?br+' All Branches':br+' —';
   var hit=(CTX.branches||[]).filter(function(b){return b.id===CTX.branchId;})[0];
-  return 'Branch: '+(hit&&hit.name?hit.name:CTX.branchId);
+  return br+' '+(hit&&hit.name?hit.name:CTX.branchId);
 }
 function paintStaffHead(){
-  var name=CTX.name||'Name';
-  var idLine=CTX.email?'ID / Email: '+CTX.email:'ID No.';
+  var name=CTX.name||(typeof t==='function'?t('name'):'Name');
+  var idLine=CTX.email?(typeof t==='function'?t('idNo'):'ID No.')+' / Email: '+CTX.email:(typeof t==='function'?t('idNo'):'ID No.');
   var desig=CTX.roleLabel||'Staff';
   var brLine=staffBranchLine();
   function one(who,id,des,card,pick,br){
     if(who) who.textContent=name;
     if(id) id.textContent=idLine;
     if(des) des.textContent=desig;
-    if(card){card.textContent='ID card validity: —'; card.classList.remove('hidden');}
+    if(card){card.textContent=(typeof t==='function'?t('idCardLine'):'ID card validity')+': —'; card.classList.remove('hidden');}
     if(pick) pick.classList.add('hidden');
     if(br) br.textContent=brLine;
   }
   one(el('meWho'),el('meId'),el('meDesig'),el('meCard'),el('meCardPick'),el('meBr'));
   one(el('opsWho'),el('opsId'),el('opsDesig'),el('opsCard'),el('opsCardPick'),el('opsBr'));
 }
-var GROUP={
-  Chat:[{pane:'Chats',label:'Chat'},{pane:'Calls',label:'Call & Video'}],
-  News:[{pane:'News',label:'Security News'},{pane:'Weather',label:'Weather & Traffic'}],
-  Train:[{pane:'Train',label:'Training'},{pane:'Emergency',label:'Emergency Number'},{pane:'Site',label:'Site Instructions'}],
-  Profile:[{pane:'Profile',label:'Profile & Documents'},{pane:'Links',label:'Important Links'}]
-};
+function groupMenu(){
+  return {
+    Chat:[{pane:'Chats',label:t('chat')},{pane:'Calls',label:t('callVideo')}],
+    News:[{pane:'News',label:t('news')},{pane:'Weather',label:t('weather')}],
+    Train:[{pane:'Train',label:t('train')},{pane:'Emergency',label:t('emergency')},{pane:'Site',label:t('siteNote')}],
+    Profile:[{pane:'Profile',label:t('profile')},{pane:'Links',label:t('links')}]
+  };
+}
 function showGroup(group,pane){
+  var GROUP=groupMenu();
   var items=GROUP[group]||GROUP.Chat;
   var pick=pane||items[0].pane;
   var sub=el('subFoot');
@@ -604,15 +708,14 @@ function staffNeedBranch(){
 function callRow(r){
   return '<div class="live-row"><div class="live-row-mid"><div class="live-row-top"><span class="live-num">'+esc(r.name)+'</span></div>'+
     '<div class="live-row-sub"><span class="live-sub">'+esc(r.mobile)+'</span><span class="live-role">'+esc(r.role||'')+'</span></div>'+
-    '<div class="live-split"><a class="btn green" href="tel:+91'+esc(r.mobile)+'">Call</a>'+
-    '<a class="btn navy" href="https://wa.me/91'+esc(r.mobile)+'" target="_blank" rel="noopener">Video</a></div></div></div>';
+    '<div class="live-split"><a class="btn green" href="tel:+91'+esc(r.mobile)+'">Call</a></div></div></div>';
 }
 function loadCalls(boxId){
   var box=el(boxId||'callList'); if(!box)return;
   if(staffNeedBranch()){box.innerHTML='<p class="muted">Pick one branch first.</p>';return;}
   api('callBook',{}).then(function(res){
     var rows=res.s===200?(res.j.calls||[]):[];
-    var title=boxId==='emBox'?'<div class="card"><h3>Emergency Number</h3><p class="muted">Call the OM / HOD / Control first. Video opens WhatsApp.</p></div>':'<div class="card"><h3>Call & Video</h3><p class="muted">Call the phone, or tap Video to open WhatsApp.</p></div>';
+    var title=boxId==='emBox'?'<div class="card"><h3>Emergency Number</h3><p class="muted">Call the OM / HOD / Control first. Chat stays in Agile Live.</p></div>':'<div class="card"><h3>Call & Video</h3><p class="muted">Call the phone. Chat stays in Agile Live.</p></div>';
     if(!rows.length){box.innerHTML=title+'<p class="muted">'+(res.j.error||'No numbers on this branch yet.')+'</p>';return;}
     box.innerHTML=title+rows.map(callRow).join('');
   });
@@ -674,9 +777,11 @@ function loadLinks(){
 el('btnOps').addEventListener('click',showOps);
 ['Chat','News','Train','Profile'].forEach(function(name){
   var b=el('foot'+name);
-  if(b)b.addEventListener('click',function(){showGroup(name);});
+  if(b)b.addEventListener('click',function(){
+    if(!CTX.email){ if(typeof otpMsg==='function') otpMsg('Sign in first.',false); return; }
+    showGroup(name);
+  });
 });
-showGroup('Chat');
 el('btnOpsClose').addEventListener('click',function(){el('ops').classList.add('hidden');});
 el('btnBack').addEventListener('click',function(){showMain(false);});
 el('q').addEventListener('input',paintPeople);
@@ -720,18 +825,41 @@ el('chatFile').addEventListener('change',function(){
 function sendChat(){
   var t=el('chatText').value;
   if(!t.trim()&&!PENDING)return;
+  var sentKind=typeof liveSentKind==='function'?liveSentKind(PENDING,t):'message';
   api('chatSend',{text:t,toMobile:SEL.mobile||el('toMobile').value,toName:SEL.name||el('toName').value,fileName:PENDING&&PENDING.name,fileMime:PENDING&&PENDING.mime,fileData:PENDING&&PENDING.data}).then(function(res){
+    if(typeof liveVoiceSetBtn==='function') liveVoiceSetBtn(false);
     if(res.s!==200){banner(res.j.error||'Not sent.',false);return;}
     el('chatText').value='';
     PENDING=null;
+    if(typeof liveShowSent==='function') liveShowSent(sentKind);
     if(res.j.message){ALL.push(res.j.message);LAST=res.j.message.id;paintPeople();paintThread();}
+  }).catch(function(){
+    if(typeof liveVoiceSetBtn==='function') liveVoiceSetBtn(false);
+    banner('Could not send. Try again.',false);
   });
 }
 el('btnSend').addEventListener('click',sendChat);
 el('chatText').addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();sendChat();}});
 ${liveVoiceBindScript()}
-el('btnVoice').addEventListener('click',liveVoiceToggle);
-el('btnOut').addEventListener('click',function(){if(typeof otpLogout==='function')otpLogout();});
+${liveChatExtrasScript()}
+function goLogin(){
+  if(POLL){clearInterval(POLL);POLL=null;}
+  el('app').classList.add('hidden');
+  var gate=el('liveGate'); if(gate) gate.classList.remove('hidden');
+  var note=el('loginNote'); if(note) note.classList.remove('hidden');
+  if(typeof otpLogout==='function') otpLogout();
+}
+window.liveAfterLang=function(){
+  paintStaffHead();
+  var on=['Chat','News','Train','Profile'].filter(function(g){
+    var b=el('foot'+g); return b&&b.classList.contains('on');
+  })[0]||'Chat';
+  showGroup(on);
+};
+if(typeof bindLangPick==='function') bindLangPick('langPickStaff');
+var toLogin=el('btnToLogin');
+if(toLogin) toLogin.addEventListener('click',goLogin);
+el('btnOut').addEventListener('click',goLogin);
 window.addEventListener('resize',function(){if(el('app').classList.contains('hidden'))return;showMain(!el('main').classList.contains('hidden')||WIDE);});
 (function boot(){
   try{if(typeof otpRestoreSession==='function'&&otpRestoreSession()&&OTP_SESSION){onOtpLogin();}}catch(e){}

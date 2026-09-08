@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { registerOperationalComplaint } from '../_lib/mis/complaint-inbox.js'
-import { COMPLAINT_NATURES, getBranches, misStorageOk } from '../_lib/mis/store.js'
+import { COMPLAINT_NATURES, getMisReportBranches, misStorageOk } from '../_lib/mis/store.js'
 import { sendComplaintThankYouMail } from '../_lib/mis/complaint-mail.js'
 import { BRAND, CURSOR_ATTRIBUTION, JOB_LINKS } from '../_lib/pulse/config.js'
 
@@ -19,7 +19,7 @@ const FOOTER = `<footer class="agile-ft">
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     if (req.query.branches === '1') {
-      const branches = await getBranches(true)
+      const branches = await getMisReportBranches(true)
       return res.status(200).json({ ok: true, branches: branches.map((b) => ({ id: b.id, name: b.name })) })
     }
     res.setHeader('Content-Type', 'text/html; charset=utf-8')

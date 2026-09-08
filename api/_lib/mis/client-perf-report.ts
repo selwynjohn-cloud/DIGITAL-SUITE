@@ -79,7 +79,7 @@ export function buildClientPerfReportHtml(d: ClientPerfLetterData): string {
     `</div>` +
     `<div class="cp-sec"><div class="cp-sec-h">3. Compliance &amp; Billing</div>` +
     clientPerfColourfulComplianceHtml(d) +
-    `<div style="font-size:11px;color:#94a3b8;text-align:center;margin-top:10px">All amounts in ₹ Lakhs (two decimals) · Collected = Monthly bill − Balance</div>` +
+    `<div style="font-size:11px;color:#94a3b8;text-align:center;margin-top:10px">All amounts shown in ₹ thousands (two decimals) · Collected = Monthly bill − Balance</div>` +
     `</div>` +
     `<div class="cp-foot">Thank you for your continued support. We welcome your feedback.</div>` +
     misPrintFooterBlock() +
@@ -110,7 +110,11 @@ export function clientPerfReportShareText(d: ClientPerfLetterData): string {
     `Day: ${display(d.dayVisits)} · Night: ${display(d.nightChecks)} · Training: ${display(d.training)}\n` +
     `Late Start: ${display(d.lateStart)} · Out of Post: ${display(d.outOfPost)}\n\n` +
     `*Compliance & Billing*\n` +
+    `Sanctioned strength: ${d.complianceSan || d.san || '—'} posts\n` +
+    `PVC: ${d.pvcLabel || (d.pvcPct != null ? d.pvcPct + '%' : '—')}\n` +
+    `MC (Medical): ${d.medicalLabel || (d.medicalPct != null ? d.medicalPct + '%' : '—')}\n` +
     `MW Compliant: ${clientPerfMwLabel(d)}\n` +
+    (d.accuracyNote ? `${d.accuracyNote}\n` : '') +
     `Monthly bill: ${formatInrFromLacs(d.monthlyBillLacs)}\n` +
     `Collected: ${formatInrFromLacs(d.collectedLacs)}\n` +
     `Balance: ${formatInrFromLacs(d.balanceToPayLacs)}\n\n` +

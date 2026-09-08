@@ -10,7 +10,7 @@ export default function handler(_req: VercelRequest, res: VercelResponse) {
 
 const PAGE = `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Agile Pulse — Manager Portal</title>
+<title>Security News — Agile Group</title>
 <style>
 *{box-sizing:border-box}body{margin:0;font-family:'Segoe UI',Tahoma,sans-serif;background:#eef2f7;color:#0f172a}
 .top{background:linear-gradient(135deg,#1d4ed8,#1e3a8a);color:#fff;padding:18px 16px;text-align:center;border-bottom:3px solid #c9a84c}
@@ -42,9 +42,15 @@ input[type=email]{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-r
 .btn.gold{background:#c9a84c;color:#14224f;width:100%;margin-top:12px}
 </style></head>
 <body>
-<div class="top"><h1>Agile Pulse — Manager Portal</h1><p>Update the News Bulletin content</p></div>
+<div class="top"><h1>Security News — Agile Group</h1><p>Admin Portal — to update Security news</p></div>
 
-${otpLoginHtml('Agile Pulse', 'Sign in with your @agilegroup.co.in email')}
+${otpLoginHtml(
+  'Security News',
+  'Admin Portal — Sai and Director official emails only',
+  false,
+  undefined,
+  'Only <b>sai@agilegroup.co.in</b> and <b>director@agilegroup.co.in</b> can sign in. <b>it@agilegroup.co.in</b> is no longer authorised. Other Agile emails and Gmail cannot open this portal. A 6-digit PIN is emailed — valid <strong>15 minutes</strong>. Check <strong>spam</strong> if not in inbox.',
+)}
 
 <div id="app" class="hidden">
   <div class="wrap" style="padding-bottom:0">
@@ -54,7 +60,7 @@ ${otpLoginHtml('Agile Pulse', 'Sign in with your @agilegroup.co.in email')}
     <div class="card" style="background:#eff6ff;border-color:#3b82f6">
       <div class="sec-title">📅 Daily Bulletin Schedule (India time)</div>
       <p style="font-size:14px;line-height:1.7;margin:0;color:#1e293b">
-        <b>🌅 Morning</b> — 6:00 AM &nbsp;|&nbsp; <b>☀️ Afternoon</b> — 2:00 PM &nbsp;|&nbsp; <b>🌙 Evening</b> — 6:00 PM<br>
+        <b>🌅 Morning</b> — 6:00 AM &nbsp;|&nbsp; <b>☀️ Afternoon</b> — 2:00 PM &nbsp;|&nbsp; <b>🌙 10:00 PM</b> — 10:00 PM<br>
         <b>Auto-published</b> to your WhatsApp Channel + all groups — no tap needed.<br>
         If news is delayed, system retries 30 minutes later.<br>
         <b>🏆 Quiz winner:</b> Every Sunday morning.
@@ -83,10 +89,11 @@ ${otpLoginHtml('Agile Pulse', 'Sign in with your @agilegroup.co.in email')}
 
     <div class="card">
       <div class="sec-title">4. Security Question of the Day</div>
+      <p class="hint" style="margin:0 0 10px">About 100 questions on the live list. Every month 30 questions are changed. One new question each day. The same question is not asked twice in the same month. Contest: first answer must be correct, all 7 days Sunday to Saturday. Two lucky winners from those who finish the week.</p>
       <div class="item" style="background:#f5f3ff;border-color:#ddd6fe">
-        <div style="font-weight:700;color:#5b21b6">This week (<span id="qWeek">—</span>): <span id="qCount">0</span> entries in the prize draw</div>
+        <div style="font-weight:700;color:#5b21b6">This week (<span id="qWeek">—</span>): <span id="qCount">0</span> correct days · <span id="qQualified">0</span> finished all 7 days</div>
         <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px">
-          <button class="btn btn-grey" onclick="quizLoadEntries()">👥 View participants</button>
+          <button class="btn btn-grey" onclick="quizLoadEntries()">👥 View all participants</button>
           <button class="btn btn-green" onclick="quizThankYou()">🙏 Send thank you to all</button>
           <button class="btn btn-blue" onclick="quizDraw()">🏆 Pick &amp; Publish this week's Winner</button>
         </div>
@@ -95,7 +102,7 @@ ${otpLoginHtml('Agile Pulse', 'Sign in with your @agilegroup.co.in email')}
         <div id="qWinners" style="margin-top:10px"></div>
       </div>
 
-      <div style="margin:12px 0"><button class="btn btn-green" onclick="quizGen()">✨ Generate 5 questions with AI</button>
+      <div style="margin:12px 0"><button class="btn btn-green" onclick="quizGen()">✨ Generate 20 new questions with AI</button>
         <span id="qGenMsg" style="font-size:12px;color:#64748b;margin-left:8px"></span></div>
 
       <div id="qList"></div>
@@ -123,7 +130,7 @@ ${otpLoginHtml('Agile Pulse', 'Sign in with your @agilegroup.co.in email')}
 </div>
 
 <script>
-${otpLoginScript('pulse', 'Agile Pulse', 'management')}
+${otpLoginScript('pulse', 'Security News', 'management')}
 var data={events:[],jobImages:[],guards:[]};
 
 function h(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -190,7 +197,7 @@ function renderEvents(){
       '<label>News / Event text</label><textarea oninput="upEvent('+i+',\\'text\\',this.value)">'+h(ev.text)+'</textarea>'+
       '<label>Photo</label><div class="row">'+img+'<button class="btn btn-grey" onclick="eventImg('+i+')">Upload photo</button></div>'+
       '<label>Or paste an image link (optional)</label><input type="text" value="'+a(ev.imageUrl)+'" oninput="upEvent('+i+',\\'imageUrl\\',this.value)">'+
-      '<label>Video link (optional)</label><input type="text" value="'+a(ev.videoUrl)+'" oninput="upEvent('+i+',\\'videoUrl\\',this.value)">'+
+      '<label>Video link (YouTube or Google Drive — do not upload the MP4 file here)</label><input type="text" value="'+a(ev.videoUrl)+'" oninput="upEvent('+i+',\\'videoUrl\\',this.value)" placeholder="https://youtu.be/...">'+
       '<div style="margin-top:10px"><button class="btn btn-red" onclick="delEvent('+i+')">Delete this item</button></div>'+
       '</div>';
   });
@@ -249,30 +256,57 @@ function loadQuiz(){
     quizBank=res.body.bank||[];
     el('qWeek').textContent=res.body.week||'—';
     el('qCount').textContent=res.body.entryCount||0;
+    if(el('qQualified')) el('qQualified').textContent=res.body.qualifiedCount||0;
     renderWinners(res.body.winners||[]);
     renderQuiz();
+    quizLoadEntries();
   });
+}
+function weekNumLabel(week){
+  var m=String(week||'').match(/W(\\d+)/i);
+  var n=m?m[1]:'00';
+  while(n.length<2)n='0'+n;
+  return n;
 }
 function renderWinners(ws){
   var c=el('qWinners');
-  if(!ws.length){ c.innerHTML='<div style="font-size:12px;color:#64748b">No winners published yet.</div>'; return; }
-  c.innerHTML=ws.map(function(w){
-    if(w.noWinner) return '<div style="font-size:13px;color:#64748b;font-weight:600">📋 '+h(w.weekKey)+' — No winner this week</div>';
-    return '<div style="font-size:13px;color:#5b21b6;font-weight:700">🏅 '+h(w.weekKey)+' — '+h(w.name)+'</div>';
+  var live=(ws||[]).filter(function(w){return !w.noWinner;});
+  var none=(ws||[]).filter(function(w){return w.noWinner;})[0];
+  var week=(live[0]&&live[0].weekKey)||(none&&none.weekKey)||'';
+  var heading=(live.length>1?'Winners':'Winner')+' for the Week number-'+weekNumLabel(week);
+  if(!live.length && !none){ c.innerHTML='<div style="font-size:12px;color:#64748b">No winner published this week yet.</div>'; return; }
+  if(none && !live.length){ c.innerHTML='<div style="font-size:13px;color:#64748b;font-weight:600">📋 '+h(heading)+' — No winner this week</div>'; return; }
+  var rows=live.map(function(w){
+    var wa=w.whatsapp?' — WhatsApp <b>'+h(w.whatsapp)+'</b>':'';
+    return '<div style="font-size:16px;margin-top:6px;text-align:center"><b>'+h(w.name)+'</b>'+wa+' — Week number-'+weekNumLabel(w.weekKey||week)+(w.couponCode?' — Code: <b>'+h(w.couponCode)+'</b>':'')+'</div>';
   }).join('');
+  var gift=live.length>1?'Gift coupon is sent to the winners.':'Gift coupon is sent to the winner.';
+  c.innerHTML='<div style="font-size:14px;color:#5b21b6;font-weight:800;text-align:center">🏅 '+h(heading)+'</div>'+rows+
+    '<div style="font-size:13px;color:#166534;font-weight:700;margin-top:6px;text-align:center">'+gift+'</div>';
 }
 function quizLoadEntries(){
-  var week=el('qWeek').textContent;
-  var c=el('qEntries'); c.innerHTML='<div style="font-size:12px;color:#64748b">Loading…</div>';
-  api('quiz-entries',{week:week}).then(function(res){
+  var c=el('qEntries'); c.innerHTML='<div style="font-size:12px;color:#64748b">Loading all entries…</div>';
+  api('quiz-entries',{week:'ALL'}).then(function(res){
     if(res.status!==200){ c.innerHTML='<div style="font-size:12px;color:#b91c1c">'+(res.body.error||'Could not load.')+'</div>'; return; }
     var list=res.body.entries||[];
-    if(!list.length){ c.innerHTML='<div style="font-size:12px;color:#64748b">No participants yet this week.</div>'; return; }
-    c.innerHTML='<div style="font-size:12px;font-weight:700;color:#5b21b6;margin-bottom:6px">Participants ('+list.length+' correct entries)</div>'+
-      list.map(function(e,i){
-        var d=e.date?new Date(e.date).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'';
-        return '<div style="font-size:13px;padding:6px 8px;background:#fff;border-radius:6px;border:1px solid #e9d5ff;margin-bottom:4px">'+(i+1)+'. <b>'+h(e.name)+'</b>'+(d?' · '+h(d):'')+'</div>';
-      }).join('');
+    var prog=res.body.progress||[];
+    var qual=prog.filter(function(p){return p.qualified;}).length;
+    var head=prog.length?('<div style="font-size:12px;font-weight:700;color:#5b21b6;margin:0 0 8px">This week progress — '+qual+' finished 7/7</div>'+
+      '<div style="overflow:auto;max-height:220px;border:1px solid #ddd6fe;border-radius:8px;background:#fff;margin-bottom:10px"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f5f3ff;text-align:left"><th style="padding:6px 8px">Name</th><th style="padding:6px 8px">WhatsApp</th><th style="padding:6px 8px">Days</th><th style="padding:6px 8px">Status</th></tr></thead><tbody>'+
+      prog.map(function(p){
+        var st=p.qualified?'Qualified':(p.failed?'Missed a day':(p.daysCorrect+'/7'));
+        return '<tr><td style="padding:6px 8px;border-bottom:1px solid #ede9fe"><b>'+h(p.name)+'</b></td><td style="padding:6px 8px;border-bottom:1px solid #ede9fe">'+h(p.whatsapp||'—')+'</td><td style="padding:6px 8px;border-bottom:1px solid #ede9fe">'+(p.daysCorrect||0)+'/7</td><td style="padding:6px 8px;border-bottom:1px solid #ede9fe">'+h(st)+'</td></tr>';
+      }).join('')+'</tbody></table></div>'):'';
+    if(!list.length && !prog.length){ c.innerHTML='<div style="font-size:12px;color:#64748b">No participants yet.</div>'; return; }
+    var rows=list.map(function(e,i){
+      var d=e.date?new Date(e.date).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+      return '<tr><td style="padding:6px 8px;border-bottom:1px solid #ede9fe">'+(i+1)+'</td><td style="padding:6px 8px;border-bottom:1px solid #ede9fe"><b>'+h(e.name)+'</b></td><td style="padding:6px 8px;border-bottom:1px solid #ede9fe;white-space:nowrap"><b>'+h(e.whatsapp||'—')+'</b></td><td style="padding:6px 8px;border-bottom:1px solid #ede9fe">'+h(e.week||'')+'</td><td style="padding:6px 8px;border-bottom:1px solid #ede9fe">'+h(d)+'</td></tr>';
+    }).join('');
+    c.innerHTML=head+'<div style="font-size:12px;font-weight:700;color:#5b21b6;margin-bottom:6px">All correct-day entries — name and WhatsApp ('+list.length+' entries)</div>'+
+      '<div style="overflow:auto;max-height:420px;border:1px solid #ddd6fe;border-radius:8px;background:#fff">'+
+      '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f5f3ff;text-align:left">'+
+      '<th style="padding:6px 8px">#</th><th style="padding:6px 8px">Name</th><th style="padding:6px 8px">WhatsApp</th><th style="padding:6px 8px">Week</th><th style="padding:6px 8px">Entered</th>'+
+      '</tr></thead><tbody>'+rows+'</tbody></table></div>';
   });
 }
 function quizThankYou(){
@@ -302,7 +336,7 @@ function renderQuiz(){
 }
 function quizSaveBank(cb){ api('quiz-save',{bank:quizBank}).then(function(res){ if(res.status===200){ quizBank=res.body.bank||quizBank; } if(cb) cb(res); }); }
 function quizDel(i){ if(!confirm('Delete this question?')) return; quizBank.splice(i,1); renderQuiz(); quizSaveBank(); }
-function quizGen(){ var m=el('qGenMsg'); m.textContent='Generating with AI, please wait…'; api('quiz-generate',{count:5}).then(function(res){ if(res.status===200){ quizBank=res.body.bank||[]; m.textContent='Added '+(res.body.added||0)+' new questions.'; renderQuiz(); } else { m.textContent=(res.body.error||'Could not generate.'); } }).catch(function(){ m.textContent='Network error.'; }); }
+function quizGen(){ var m=el('qGenMsg'); m.textContent='Generating with AI, please wait…'; api('quiz-generate',{count:20}).then(function(res){ if(res.status===200){ quizBank=res.body.bank||[]; m.textContent='Added '+(res.body.added||0)+' new questions.'; renderQuiz(); } else { m.textContent=(res.body.error||'Could not generate.'); } }).catch(function(){ m.textContent='Network error.'; }); }
 function nqPick(){ pickImage(function(url){ nqImageUrl=url; el('nqImgWrap').innerHTML='<img class="thumb" src="'+a(url)+'" style="width:56px;height:56px">'; }); }
 function quizAdd(){
   var q=el('nqQ').value.trim();
@@ -314,7 +348,7 @@ function quizAdd(){
   renderQuiz(); quizSaveBank();
   el('nqQ').value='';el('nqO0').value='';el('nqO1').value='';el('nqO2').value='';el('nqO3').value='';el('nqE').value='';nqImageUrl='';el('nqImgWrap').innerHTML='';
 }
-function quizDraw(){ if(!confirm('Pick and publish a winner for this week?')) return; api('quiz-draw',{}).then(function(res){ if(res.status===200){ alert('Winner: '+res.body.winner.name); loadQuiz(); } else { alert(res.body.error||'No entries yet this week.'); } }); }
+function quizDraw(){ if(!confirm("Pick and publish this week's winner(s)? Old winner details will be removed.")) return; api('quiz-draw',{}).then(function(res){ if(res.status===200){ var list=res.body.winners||(res.body.winner?[res.body.winner]:[]); var week=list[0]?list[0].weekKey:''; var heading=(list.length>1?'Winners':'Winner')+' for the Week number-'+weekNumLabel(week); var lines=list.map(function(w){return w.name+(w.whatsapp?' · '+w.whatsapp:'')+(w.couponCode?' · '+w.couponCode:'');}).join('\\n'); alert(heading+'\\n'+lines+'\\n\\n'+(list.length>1?'Gift coupon is sent to the winners.':'Gift coupon is sent to the winner.')); loadQuiz(); } else { alert(res.body.error||'No entries yet this week.'); } }); }
 
 if(otpRestoreSession())onOtpLogin({});
 </script>

@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import { getBranches } from '../_lib/mis/store.js'
-import { GUARDS_BRAND, GUARDS_CURSOR_FOOTER, GUARDS_NAVY_HDR } from '../_lib/guards/brand.js'
+import { GUARDS_BRAND, GUARDS_CURSOR_FOOTER, GUARDS_NAVY_HDR, guardsGoogleReviewUrl } from '../_lib/guards/brand.js'
+import { SUITE_TAP_FEEDBACK_CSS, suiteTapFeedbackInitScript } from '../_lib/suite-tap-feedback.js'
 import {
   getComplaints,
   getFeedback,
@@ -100,6 +101,14 @@ function fmtDate(iso: string) {
   }
 }
 
+function googleReviewBlock(shown: boolean) {
+  const url = guardsGoogleReviewUrl()
+  return `<div class="gbox${shown ? ' show' : ''}" id="googleReview">
+    <p><b>Optional.</b> If you are happy with how we handled your complaint, you may also leave a Google review. This is not compulsory.</p>
+    <a class="btn gbtn" href="${esc(url)}" target="_blank" rel="noopener">Leave a Google review (optional)</a>
+  </div>`
+}
+
 function page(info: FeedbackInfo) {
   const dateStr = fmtDate(info.registeredAt)
   const catLine = info.category
@@ -142,6 +151,11 @@ textarea:focus{outline:none;border-color:#1d4ed8;box-shadow:0 0 0 3px rgba(29,78
 .msg.ok{display:block;background:#ecfdf5;border:2px solid #22c55e;color:#166534}
 .msg.err{display:block;background:#fef2f2;border:2px solid #ef4444;color:#991b1b}
 .msg.info{display:block;background:#eff6ff;border:2px solid #1d4ed8;color:#1e40af}
+.gbox{margin-top:16px;padding:14px;border:2px dashed #c9a84c;border-radius:12px;background:#fffbeb;text-align:center;display:none}
+.gbox.show{display:block}
+.gbox p{font-size:14px;color:#334155;line-height:1.45;margin-bottom:4px}
+.gbtn{display:inline-block;width:auto;padding:12px 18px;text-decoration:none;font-size:16px}
+${SUITE_TAP_FEEDBACK_CSS}
 .ft{background:${GUARDS_NAVY_HDR};border-top:3px solid #c9a84c;padding:18px 16px 20px;text-align:center;color:#dbeafe}
 .ft .care{font-size:14px;font-weight:800;color:#fff;margin-bottom:10px;line-height:1.5}
 .ft .dept{font-size:13px;color:#cbd5e1;margin-bottom:10px}
@@ -174,7 +188,7 @@ textarea:focus{outline:none;border-color:#1d4ed8;box-shadow:0 0 0 3px rgba(29,78
     }
     ${
       info.alreadySubmitted
-        ? `<div class="msg ok" style="display:block">Thank you — feedback already submitted for this complaint.</div>`
+        ? `<div class="msg ok" style="display:block">Thank you — feedback already submitted for this complaint.</div>${googleReviewBlock(true)}`
         : info.found
           ? `<div class="rating-box">
       <div class="lbl">My rating for Agile</div>
@@ -190,7 +204,8 @@ textarea:focus{outline:none;border-color:#1d4ed8;box-shadow:0 0 0 3px rgba(29,78
     <label class="lbl">Comments (optional)</label>
     <textarea id="comment" placeholder="Tell us how we handled your complaint…"></textarea>
     <button class="btn" id="submitBtn" onclick="submitFb()">Submit feedback</button>
-    <div id="msg" class="msg"></div>`
+    <div id="msg" class="msg"></div>
+    ${googleReviewBlock(false)}`
           : ''
     }
   </div>
@@ -202,6 +217,7 @@ textarea:focus{outline:none;border-color:#1d4ed8;box-shadow:0 0 0 3px rgba(29,78
 </div>
 </div>
 <script>
+${suiteTapFeedbackInitScript()}
 var RATING=0;
 var LABELS=['','Poor','Fair','Good','Very good','Excellent'];
 document.querySelectorAll('.star').forEach(function(s){
@@ -227,6 +243,8 @@ function submitFb(){
       document.querySelectorAll('.star').forEach(function(x){x.style.pointerEvents='none';});
       if(document.getElementById('comment')) document.getElementById('comment').disabled=true;
       if(btn) btn.style.display='none';
+      var g=document.getElementById('googleReview');
+      if(g && (res.j.googleReviewUrl || RATING>=4)) g.classList.add('show');
     }).catch(function(){
       if(btn){btn.disabled=false;btn.textContent='Submit feedback';}
       showMsg('err','Network error. Try again.');

@@ -1,17 +1,30 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { GUARD_CATEGORIES } from '../_lib/guards/store.js'
+import { GUARD_CATEGORIES, dedupeGuardsBranches } from '../_lib/guards/store.js'
+import { DEFAULT_BRANCHES, getMisReportBranches } from '../_lib/mis/store.js'
 
-export default function handler(req: VercelRequest, res: VercelResponse) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   const branch = String(req.query.branch ?? '').trim()
   const name = String(req.query.name ?? '').trim()
   const idNo = String(req.query.idNo ?? '').trim()
   const mobile = String(req.query.mobile ?? '').trim()
+  let branches: { id: string; name: string }[] = []
+  try {
+    branches = dedupeGuardsBranches(await getMisReportBranches(true))
+  } catch {
+    branches = dedupeGuardsBranches(DEFAULT_BRANCHES.filter((b) => b.active !== false))
+  }
   res.setHeader('Content-Type', 'text/html; charset=utf-8')
   res.setHeader('Cache-Control', 'no-store')
-  return res.status(200).send(page(branch, name, idNo, mobile))
+  return res.status(200).send(page(branch, name, idNo, mobile, branches))
 }
 
-function page(branch: string, name = '', idNo = '', mobile = '') {
+function page(
+  branch: string,
+  name = '',
+  idNo = '',
+  mobile = '',
+  branches: { id: string; name: string }[] = [],
+) {
   const cats = Object.entries(GUARD_CATEGORIES)
     .map(([k, subs]) => {
       const opts = subs.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join('')
@@ -19,9 +32,12 @@ function page(branch: string, name = '', idNo = '', mobile = '') {
     })
     .join('')
 
+  const branchOpts = branches
+    .map((b) => `<option value="${esc(b.name)}">${esc(b.name)}</option>`)
+    .join('')
   const branchField = branch
     ? `<input type="hidden" id="branch" value="${esc(branch)}"><p style="text-align:center;color:#7f1d1d;font-weight:700;margin-bottom:12px">Branch: ${esc(branch)}</p>`
-    : `<label class="lbl">Branch / Region *</label><input class="inp" id="branch" required placeholder="Your branch">`
+    : `<label class="lbl">Your Branch *</label><select class="sel" id="branch" required><option value="">— pick your branch —</option>${branchOpts}</select>`
 
   return `<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -81,7 +97,7 @@ function submitForm(){
     complaintNote:document.getElementById('complaintNote').value.trim()
   };
   if(!payload.guardName||!payload.idNo||!payload.mobile){showMsg('Please fill Guard Name, ID and Mobile.',false);return;}
-  if(!payload.branch){showMsg('Please enter your branch.',false);return;}
+  if(!payload.branch){showMsg('Please pick your branch.',false);return;}
   showMsg('Submitting…',true);
   fetch('/api/guards/data',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
     .then(function(r){return r.json().then(function(j){return{s:r.status,j:j};});})

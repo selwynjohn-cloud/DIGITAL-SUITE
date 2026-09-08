@@ -1,5 +1,5 @@
-import { isHodUser } from '../mis/digest.js'
 import type { MisUser } from '../mis/store.js'
+import { guardsDirectoryRoleLabel, isGuardsDirectoryLeader } from './directory-staff.js'
 import {
   branchDisplayName,
   canonicalBranchStorageId,
@@ -12,6 +12,7 @@ export type HodContact = {
   name: string
   branchId: string
   branchName: string
+  roleLabel: string
 }
 
 /** HOD / RM emails for a branch — matches branch id or name (Hyderabad-B, br3, etc.). */
@@ -26,7 +27,7 @@ export function listHodContacts(
   const seen = new Set<string>()
   const out: HodContact[] = []
 
-  const add = (email: string, name: string, bid: string) => {
+  const add = (email: string, name: string, bid: string, role: string) => {
     const em = email.trim().toLowerCase()
     if (!em.includes('@') || seen.has(em)) return
     seen.add(em)
@@ -35,19 +36,31 @@ export function listHodContacts(
       name: name || email.trim(),
       branchId: bid,
       branchName,
+      roleLabel: guardsDirectoryRoleLabel(role),
     })
   }
 
   for (const u of misUsers) {
-    if (!isHodUser(u) || !u.email?.includes('@')) continue
-    if (!complaintMatchesBranch(u.branchId || '', branchId, branches)) continue
-    add(u.email, u.name || u.email, canonicalBranchStorageId(u.branchId, branches) || canonical)
+    if (!isGuardsDirectoryLeader(u) || !u.email?.includes('@')) continue
+    const ub = String(u.branchId || '').trim()
+    if (ub && !complaintMatchesBranch(ub, branchId, branches)) continue
+    add(
+      u.email,
+      u.name || u.email,
+      canonicalBranchStorageId(u.branchId, branches) || canonical,
+      u.role || 'HOD',
+    )
   }
 
   for (const u of portalUsers) {
-    if (!u.active || u.role !== 'hod' || !u.email?.includes('@')) continue
+    if (!u.active || (u.role !== 'hod' && u.role !== 'ops') || !u.email?.includes('@')) continue
     if (!complaintMatchesBranch(u.branchId, branchId, branches)) continue
-    add(u.email, u.name || u.email, canonicalBranchStorageId(u.branchId, branches) || canonical)
+    add(
+      u.email,
+      u.name || u.email,
+      canonicalBranchStorageId(u.branchId, branches) || canonical,
+      u.role === 'ops' ? 'Operations Manager' : 'HOD',
+    )
   }
 
   return out.sort((a, b) => a.name.localeCompare(b.name))

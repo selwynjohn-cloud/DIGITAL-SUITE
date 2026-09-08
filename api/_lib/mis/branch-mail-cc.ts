@@ -1,41 +1,67 @@
 /**
- * Branch-specific mail CC — Lokesh copied with Director for listed zones only.
+ * Branch / management mail CC — Director only (President left; do not copy Lokesh).
  */
 import { withoutNoMailRecipients } from '../auth.js'
 import { suiteDirectorEmail } from '../suite-mail.js'
 import type { MisBranch } from './store.js'
 
-export const LOKESH_CC_EMAIL = (
-  process.env.MIS_CONSOLIDATED_TO?.trim() || 'lokesh@agilegroup.co.in'
-).toLowerCase()
+/** President left the organisation — do not mail this address. */
+export const LOKESH_CC_EMAIL = ''
 
-/** Mumbai, Surat, Ahmedabad, Lucknow, Bhopal, New Delhi, Vizag, Kakinada, Vijayawada, Nellore, Tirupati. */
-const LOKESH_CC_PATTERNS = [
-  /\bmumbai\b/i,
-  /\bsurat\b/i,
-  /\bahmedabad\b/i,
-  /\blucknow\b/i,
-  /\bbhopal\b/i,
-  /\bnew\s*delhi\b/i,
-  /\bnewdelhi\b/i,
-  /\bdelhi\b/i,
-  /\bvisakhapatnam\b/i,
-  /\bvizag\b/i,
-  /\bkakinada\b/i,
-  /\bvijayawada\b/i,
-  /\bnellore\b/i,
-  /\btirupati\b/i,
-  /\btadipatri\b/i,
-]
+/** Hi-Tech / Telangana — CC on consolidated Daily MIS Dashboard. */
+export const SRIDHAR_M_CC_EMAIL = 'sridhar.m@agilegroup.co.in'
+
+export const MIS_IT_CC_EMAIL = 'it@agilegroup.co.in'
+
+/** Visible CC on MIS mail — always the company director inbox. */
+export const MIS_DIRECTOR_CC_EMAIL = 'director@agilegroup.co.in'
+
+/** Central Control Centre inbox — CC on Training morning report and observation chase. */
+export const CONTROL_EMAIL = 'control@agilegroup.co.in'
+
+export function misDirectorCcEmail(): string {
+  return MIS_DIRECTOR_CC_EMAIL
+}
+
+/** Gmail inbox copy for Director (BCC/CC from bulk sender often hidden in Gmail). */
+export function misSelwynGmailCopy(): string {
+  return (process.env.ADMIN_NOTIFY_EMAIL?.trim() || 'selwyn.john@gmail.com').toLowerCase()
+}
+
+function toEmailSet(to: string | string[]): Set<string> {
+  const arr = Array.isArray(to) ? to : [to]
+  return new Set(arr.map((e) => e.trim().toLowerCase()).filter((e) => e.includes('@')))
+}
+
+/**
+ * Standard management CC — Director@ (excludes addresses already in To).
+ * IT is never copied — Director-only monitoring; IT may still open apps to view.
+ */
+export function misManagementCcEmails(
+  to: string | string[],
+  opts?: {
+    includeDirector?: boolean
+    includeLokesh?: boolean
+    /** Ignored — IT must not receive suite activity copies. */
+    includeIt?: boolean
+  },
+): string[] {
+  const toSet = toEmailSet(to)
+  const cc = new Set<string>()
+  const add = (e: string) => {
+    const x = e.trim().toLowerCase()
+    if (x.includes('@') && !toSet.has(x) && x !== MIS_IT_CC_EMAIL) cc.add(x)
+  }
+  if (opts?.includeDirector !== false) add(misDirectorCcEmail())
+  return withoutNoMailRecipients([...cc])
+}
 
 export function misDirectorEmail(): string {
   return suiteDirectorEmail()
 }
 
-export function misBranchCcLokesh(branchName: string): boolean {
-  const n = String(branchName ?? '').trim()
-  if (!n) return false
-  return LOKESH_CC_PATTERNS.some((re) => re.test(n))
+export function misBranchCcLokesh(_branchName: string): boolean {
+  return false
 }
 
 export function misBranchCcLokeshById(branchId: string, branches: MisBranch[]): boolean {
@@ -43,20 +69,15 @@ export function misBranchCcLokeshById(branchId: string, branches: MisBranch[]): 
   return b ? misBranchCcLokesh(b.name) : false
 }
 
-/** Director on all branch reminders/reports; Lokesh only for listed branches. */
+/** Director@ on all branch reminders. IT not copied. */
 export function misBranchDirectorCc(
   branchName: string,
   to: string[],
   opts?: { includeDirector?: boolean },
 ): string[] {
-  const includeDirector = opts?.includeDirector !== false
-  const director = misDirectorEmail()
-  const toSet = new Set(to.map((e) => e.trim().toLowerCase()))
-  const cc = new Set<string>()
-  if (includeDirector && director.includes('@') && !toSet.has(director)) cc.add(director)
-  if (misBranchCcLokesh(branchName)) {
-    const lokesh = LOKESH_CC_EMAIL
-    if (lokesh.includes('@') && !toSet.has(lokesh)) cc.add(lokesh)
-  }
-  return withoutNoMailRecipients([...cc])
+  return misManagementCcEmails(to, {
+    includeDirector: opts?.includeDirector !== false,
+    includeLokesh: misBranchCcLokesh(branchName),
+    includeIt: false,
+  })
 }

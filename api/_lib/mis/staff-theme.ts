@@ -1,4 +1,6 @@
 /** Colourful Manus-style theme for branch / staff MIS pages (HOD daily report, guard docs). */
+import { SUITE_TAP_FEEDBACK_CSS } from '../suite-tap-feedback.js'
+
 export const MIS_STAFF_CSS = `
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',Arial,sans-serif;background:linear-gradient(160deg,#0b1220 0%,#14224f 45%,#1e3a6e 100%);color:#e2e8f0;font-size:16px;min-height:100vh}
@@ -72,4 +74,5 @@ td .vac{font-weight:800;color:#f87171}
 .modal label{color:#cbd5e1}
 .chk-row{display:flex;align-items:center;gap:10px;margin:12px 0}
 .chk-row input{width:auto}
+${SUITE_TAP_FEEDBACK_CSS}
 `
