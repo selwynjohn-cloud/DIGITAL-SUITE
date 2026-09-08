@@ -34,7 +34,7 @@ function storiesSimilar(a: string, b: string): boolean {
   if (!A.size || !B.size) return false
   let inter = 0
   for (const w of A) if (B.has(w)) inter++
-  return inter / new Set([...A, ...B]).size >= 0.55
+  return inter / new Set([...A, ...B]).size >= 0.4
 }
 
 function looksStaleByLabel(time: string): boolean {

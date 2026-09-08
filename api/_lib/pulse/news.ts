@@ -122,7 +122,37 @@ function storiesSimilar(a: string, b: string): boolean {
   let inter = 0
   for (const w of A) if (B.has(w)) inter++
   const union = new Set([...A, ...B]).size
-  return inter / union >= 0.55
+  return inter / union >= 0.4
+}
+
+const EVENT_NOISE = new Set([
+  'death', 'toll', 'rises', 'risen', 'rescued', 'rescue', 'hospitalised', 'hospitalized',
+  'hours', 'ends', 'fresh', 'casualties', 'officials', 'suspended', 'after', 'operation',
+  'latest', 'update', 'updates', 'breaking', 'probe', 'arrested', 'arrests', 'injured',
+])
+
+/** One key per real-world event so a bulletin cannot list 3 angles of the same collapse. */
+function eventClusterKey(title: string): string {
+  const t = title.toLowerCase()
+  if (
+    (t.includes('delhi') || t.includes('satya niketan')) &&
+    (t.includes('collapse') || t.includes('collapses')) &&
+    (t.includes('building') || t.includes('hostel') || t.includes('pg'))
+  ) {
+    return 'event:delhi-building-collapse'
+  }
+  if ((t.includes('manali') || t.includes('manali')) && (t.includes('tunnel') || t.includes('landslide') || t.includes('highway'))) {
+    return 'event:manali-highway-tunnel'
+  }
+  const core = significantWords(title).filter((w) => !EVENT_NOISE.has(w)).slice(0, 6).sort()
+  return core.length ? `event:${core.join('|')}` : `event:${storyFingerprint(title)}`
+}
+
+function sameEvent(a: string, b: string): boolean {
+  if (storiesSimilar(a, b)) return true
+  const ka = eventClusterKey(a)
+  const kb = eventClusterKey(b)
+  return Boolean(ka && kb && ka === kb)
 }
 
 function isFollowUp(title: string): boolean {
@@ -165,10 +195,18 @@ async function savePublishedHistory(records: PublishedRecord[]) {
 }
 
 function wasPublishedBefore(title: string, history: PublishedRecord[]): boolean {
-  if (isFollowUp(title)) return false
   const fp = storyFingerprint(title)
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
   for (const h of history) {
-    if (h.fp === fp || storiesSimilar(title, h.title)) return true
+    const hit = h.fp === fp || storiesSimilar(title, h.title) || sameEvent(title, h.title)
+    if (!hit) continue
+    if (isFollowUp(title) && sameEvent(title, h.title)) {
+      const histDay = new Date(h.at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+      if (histDay === today) return true
+      return false
+    }
+    if (isFollowUp(title)) return false
+    return true
   }
   return false
 }
@@ -192,7 +230,7 @@ function dedupeAndFilterHistory(items: NewsItem[], history: PublishedRecord[]): 
     // Near-duplicate titles from different sources in the same batch
     let dup = false
     for (const prev of out) {
-      if (storiesSimilar(it.title, prev.title)) {
+      if (sameEvent(it.title, prev.title)) {
         dup = true
         break
       }
