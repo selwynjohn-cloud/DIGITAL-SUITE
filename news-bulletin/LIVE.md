@@ -48,11 +48,11 @@ Shared / published at **7:35:59 AM IST** during the live morning slot (`inSlot: 
 | Afternoon | no | — | — | due 2:00 PM |
 | Evening | no | — | — | due 10:00 PM |
 
-**Correction (07:40+ IST):** First share packs had **3 near-duplicate Delhi building-collapse angles**. Rewritten packs keep **one** collapse lead and add distinct stories (Mumbai fake notes, Manali tunnel, Uttarakhand orange alert, bank-locker gold theft). Pulse engine also over-kept same-event follow-ups after publish — code fix: event-cluster dedupe + higher minimum story count (see Pulse PR branch).
+**Quality failure today:** First packs had **3 near-duplicate Delhi collapse angles** — unacceptable. Live page later recovered to a multi-topic Morning Edition (Expressway landslide · IMD monsoon alerts · one Delhi collapse line · Uttarakhand thunderstorm alert · Manali tunnel). Share packs rewritten to match the live page.
 
-Corrected lead: *Delhi building collapse: Rescue ends after 27 hours; death toll 7, 12 rescued*
+Current lead: *Mumbai-Pune Expressway landslide exposes Missing Link weak spot*
 
-Also in corrected packs: Mumbai fake ₹500 notes (₹11 lakh) · Manali landslide-bypass tunnel in 4 days · Uttarakhand IMD orange alert · ₹39-lakh bank-locker gold theft
+Also: Delhi-NCR monsoon retreat / IMD alerts for UP–Bihar–Odisha · Delhi collapse toll 7 / 12 at AIIMS · Uttarakhand thunderstorm alert · Manali landslide-bypass tunnel
 
 Copy-paste packs (corrected): [`SHARE-2026-09-08-morning-channel.txt`](./SHARE-2026-09-08-morning-channel.txt) (Channel) · [`SHARE-2026-09-08-morning-groups.txt`](./SHARE-2026-09-08-morning-groups.txt) (All groups)
 
