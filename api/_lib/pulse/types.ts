@@ -124,7 +124,7 @@ export type Bulletin = {
   dateLabel: string
   /** Edition label, e.g. "Morning Edition" */
   editionLabel: string
-  /** Next auto bulletin slot, e.g. "Evening Bulletin — 6:00 PM IST" */
+  /** Next auto bulletin slot, e.g. "Evening Bulletin — 10:00 PM IST" */
   nextBulletinLabel: string
   flashHeadlines: string[]
   sections: NewsSection[]

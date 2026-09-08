@@ -18,7 +18,7 @@ export const WEATHER_CACHE_MINUTES = 20
 export const PUBLISHED_HISTORY_DAYS = 7
 
 /** Minimum flash-news items before cron may offer SEND TO ALL. */
-export const MIN_NEWS_ITEMS_TO_PUBLISH = 1
+export const MIN_NEWS_ITEMS_TO_PUBLISH = 5
 
 /** Generic text — must NOT be shown when live weather alerts exist. */
 export const GENERIC_WEATHER_ALERT =

@@ -4,7 +4,7 @@ import {
   MIN_NEWS_ITEMS_TO_PUBLISH,
   PULSE_POLICY,
 } from './policy.js'
-import { storyFingerprint, totalNewsItems } from './news.js'
+import { eventClusterKey, storyFingerprint, totalNewsItems } from './news.js'
 import { redisCommand } from './store.js'
 import type { NewsSection, WeatherBlock } from './types.js'
 
@@ -17,6 +17,8 @@ export type PulseQualityReport = {
 
 const AUDIT_LOG_KEY = 'pulse:quality:log:v1'
 const MAX_LOG = 40
+/** At least this many non-empty sections before send. */
+const MIN_SECTIONS_TO_PUBLISH = 3
 
 function isFresh(publishedAt: number, now = Date.now()): boolean {
   return publishedAt > 0 && now - publishedAt <= MAX_NEWS_AGE_MS
@@ -34,7 +36,7 @@ function storiesSimilar(a: string, b: string): boolean {
   if (!A.size || !B.size) return false
   let inter = 0
   for (const w of A) if (B.has(w)) inter++
-  return inter / new Set([...A, ...B]).size >= 0.55
+  return inter / new Set([...A, ...B]).size >= 0.4
 }
 
 function looksStaleByLabel(time: string): boolean {
@@ -51,6 +53,7 @@ export function auditNewsSections(sections: NewsSection[]): PulseQualityReport {
   const violations: string[] = []
   const now = Date.now()
   const seenFp = new Set<string>()
+  const seenEvents = new Set<string>()
   const titles: string[] = []
 
   for (const s of sections) {
@@ -65,6 +68,10 @@ export function auditNewsSections(sections: NewsSection[]): PulseQualityReport {
       if (seenFp.has(fp)) {
         violations.push(`Duplicate in bulletin: "${it.title.slice(0, 60)}…"`)
       }
+      const ek = eventClusterKey(it.title)
+      if (ek && seenEvents.has(ek)) {
+        violations.push(`Same-event duplicate in bulletin: "${it.title.slice(0, 50)}…"`)
+      }
       for (const prev of titles) {
         if (storiesSimilar(it.title, prev)) {
           violations.push(`Near-duplicate in bulletin: "${it.title.slice(0, 50)}…"`)
@@ -72,6 +79,7 @@ export function auditNewsSections(sections: NewsSection[]): PulseQualityReport {
         }
       }
       seenFp.add(fp)
+      if (ek) seenEvents.add(ek)
       titles.push(it.title)
     }
   }
@@ -80,14 +88,21 @@ export function auditNewsSections(sections: NewsSection[]): PulseQualityReport {
   if (newsCount < MIN_NEWS_ITEMS_TO_PUBLISH) {
     violations.push(`Too few news items (${newsCount}; need at least ${MIN_NEWS_ITEMS_TO_PUBLISH})`)
   }
+  const filledSections = sections.filter((s) => s.items.length > 0).length
+  if (filledSections < MIN_SECTIONS_TO_PUBLISH) {
+    violations.push(
+      `Too few sections (${filledSections}; need at least ${MIN_SECTIONS_TO_PUBLISH} topic sections)`,
+    )
+  }
 
   return { ok: violations.length === 0, violations, newsCount, weatherLive: true }
 }
 
-/** Remove any item that breaks the rules — last line of defence before display. */
+/** Remove any item that breaks the rules — last line of defence before display/send. */
 export function enforceNewsSections(sections: NewsSection[]): NewsSection[] {
   const now = Date.now()
   const seenFp = new Set<string>()
+  const seenEvents = new Set<string>()
   const kept: string[] = []
 
   return sections
@@ -98,10 +113,13 @@ export function enforceNewsSections(sections: NewsSection[]): NewsSection[] {
         if (looksStaleByLabel(it.time)) return false
         const fp = storyFingerprint(it.title)
         if (seenFp.has(fp)) return false
+        const ek = eventClusterKey(it.title)
+        if (ek && seenEvents.has(ek)) return false
         for (const prev of kept) {
           if (storiesSimilar(it.title, prev)) return false
         }
         seenFp.add(fp)
+        if (ek) seenEvents.add(ek)
         kept.push(it.title)
         return true
       }),
@@ -153,32 +171,56 @@ export async function logQualityReport(edition: string, report: PulseQualityRepo
 }
 
 /** Notify Director when quality gate fails (WhatsApp + optional email line in cron). */
-export async function formatQualityAlert(edition: string, report: PulseQualityReport): string {
+export function formatQualityAlert(edition: string, report: PulseQualityReport): string {
   const lines = report.violations.slice(0, 6).map((v) => `• ${v}`).join('\n')
   return (
     `⚠️ Agile Pulse quality check — ${edition}\n` +
-    `The bulletin was NOT offered for SEND until fixed:\n${lines}\n\n` +
-    `Rules: news ≤${PULSE_POLICY.maxNewsAgeHours}h · no repeats · live weather alert.`
+    `The bulletin was NOT sent until fixed:\n${lines}\n\n` +
+    `Rules: news ≤${PULSE_POLICY.maxNewsAgeHours}h · no same-event repeats · ≥${MIN_NEWS_ITEMS_TO_PUBLISH} stories · ≥${MIN_SECTIONS_TO_PUBLISH} sections.\n` +
+    `If still blocked near slot end → Admin → Publish now.`
   )
 }
 
-/** Load news + weather, enforce rules, retry once with fresh data if needed. */
-export async function preparePulseContent(edition: string): Promise<{
+/** Load news + weather, enforce rules, prefer frozen snapshot after a successful send. */
+export async function preparePulseContent(
+  edition: string,
+  opts?: { preferSnapshot?: boolean; ignoreHistory?: boolean },
+): Promise<{
   sections: NewsSection[]
   weather: WeatherBlock
   report: PulseQualityReport
 }> {
-  const { fetchNewsSections, invalidateNewsCache } = await import('./news.js')
+  const {
+    fetchNewsSections,
+    invalidateNewsCache,
+    loadEditionSnapshot,
+  } = await import('./news.js')
   const { fetchWeather, invalidateWeatherCache } = await import('./weather.js')
 
-  let sections = enforceNewsSections(await fetchNewsSections())
+  // Only the public /pulse page should freeze to the last successful send.
+  // Publish / cron always draft fresh so a new edition is not stuck on the previous pack.
+  if (opts?.preferSnapshot === true) {
+    const snap = await loadEditionSnapshot(edition)
+    if (snap && totalNewsItems(snap) >= 3) {
+      const sections = enforceNewsSections(snap)
+      const weather = await fetchWeather()
+      const report = mergeReports(auditNewsSections(sections), auditWeatherBlock(weather))
+      return { sections, weather, report }
+    }
+  }
+
+  let sections = enforceNewsSections(
+    await fetchNewsSections({ ignoreHistory: opts?.ignoreHistory }),
+  )
   let weather = await fetchWeather()
   let report = mergeReports(auditNewsSections(sections), auditWeatherBlock(weather))
 
   if (!report.ok) {
     await invalidateNewsCache()
     await invalidateWeatherCache()
-    sections = enforceNewsSections(await fetchNewsSections({ forceFresh: true }))
+    sections = enforceNewsSections(
+      await fetchNewsSections({ forceFresh: true, ignoreHistory: true }),
+    )
     weather = await fetchWeather({ bypassCache: true })
     report = mergeReports(auditNewsSections(sections), auditWeatherBlock(weather))
   }

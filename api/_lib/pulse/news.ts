@@ -122,7 +122,40 @@ function storiesSimilar(a: string, b: string): boolean {
   let inter = 0
   for (const w of A) if (B.has(w)) inter++
   const union = new Set([...A, ...B]).size
-  return inter / union >= 0.55
+  return inter / union >= 0.4
+}
+
+const EVENT_NOISE = new Set([
+  'death', 'toll', 'rises', 'risen', 'rescued', 'rescue', 'hospitalised', 'hospitalized',
+  'hours', 'ends', 'fresh', 'casualties', 'officials', 'suspended', 'after', 'operation',
+  'latest', 'update', 'updates', 'breaking', 'probe', 'arrested', 'arrests', 'injured',
+])
+
+/** One key per real-world event so a bulletin cannot list 3 angles of the same collapse. */
+export function eventClusterKey(title: string): string {
+  const t = title.toLowerCase()
+  if (
+    (t.includes('delhi') || t.includes('satya niketan')) &&
+    (t.includes('collapse') || t.includes('collapses')) &&
+    (t.includes('building') || t.includes('hostel') || t.includes('pg'))
+  ) {
+    return 'event:delhi-building-collapse'
+  }
+  if (
+    t.includes('manali') &&
+    (t.includes('tunnel') || t.includes('landslide') || t.includes('highway'))
+  ) {
+    return 'event:manali-highway-tunnel'
+  }
+  const core = significantWords(title).filter((w) => !EVENT_NOISE.has(w)).slice(0, 6).sort()
+  return core.length ? `event:${core.join('|')}` : `event:${storyFingerprint(title)}`
+}
+
+function sameEvent(a: string, b: string): boolean {
+  if (storiesSimilar(a, b)) return true
+  const ka = eventClusterKey(a)
+  const kb = eventClusterKey(b)
+  return Boolean(ka && kb && ka === kb)
 }
 
 function isFollowUp(title: string): boolean {
@@ -165,10 +198,18 @@ async function savePublishedHistory(records: PublishedRecord[]) {
 }
 
 function wasPublishedBefore(title: string, history: PublishedRecord[]): boolean {
-  if (isFollowUp(title)) return false
   const fp = storyFingerprint(title)
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
   for (const h of history) {
-    if (h.fp === fp || storiesSimilar(title, h.title)) return true
+    const hit = h.fp === fp || storiesSimilar(title, h.title) || sameEvent(title, h.title)
+    if (!hit) continue
+    if (isFollowUp(title) && sameEvent(title, h.title)) {
+      const histDay = new Date(h.at).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+      if (histDay === today) return true
+      return false
+    }
+    if (isFollowUp(title)) return false
+    return true
   }
   return false
 }
@@ -192,7 +233,7 @@ function dedupeAndFilterHistory(items: NewsItem[], history: PublishedRecord[]): 
     // Near-duplicate titles from different sources in the same batch
     let dup = false
     for (const prev of out) {
-      if (storiesSimilar(it.title, prev.title)) {
+      if (sameEvent(it.title, prev.title)) {
         dup = true
         break
       }
@@ -416,8 +457,8 @@ async function writeNewsCache(sections: NewsSection[]) {
   await redisCommand(['SET', NEWS_CACHE_KEY, JSON.stringify({ ts: Date.now(), sections })])
 }
 
-async function buildFreshSections(): Promise<NewsSection[]> {
-  const history = await loadPublishedHistory()
+async function buildFreshSections(opts?: { ignoreHistory?: boolean }): Promise<NewsSection[]> {
+  const history = opts?.ignoreHistory ? [] : await loadPublishedHistory()
   const [ms, gn, nd] = await Promise.all([
     fromMediastackBatch(),
     fromGoogleNewsBatch(),
@@ -432,12 +473,15 @@ async function buildFreshSections(): Promise<NewsSection[]> {
  * Fetch all sections — max 18 hours old, no repeats within or across editions.
  * Final enforce step guarantees nothing stale/duplicate reaches the bulletin.
  */
-export async function fetchNewsSections(opts?: { forceFresh?: boolean }): Promise<NewsSection[]> {
+export async function fetchNewsSections(opts?: {
+  forceFresh?: boolean
+  ignoreHistory?: boolean
+}): Promise<NewsSection[]> {
   if (opts?.forceFresh) {
     await invalidateNewsCache()
   }
 
-  const cache = opts?.forceFresh ? null : await readNewsCache()
+  const cache = opts?.forceFresh || opts?.ignoreHistory ? null : await readNewsCache()
   const now = Date.now()
 
   if (cache && totalNewsItems(cache.sections) > 0 && now - cache.ts < CACHE_FRESH_MS) {
@@ -445,7 +489,7 @@ export async function fetchNewsSections(opts?: { forceFresh?: boolean }): Promis
     if (totalNewsItems(validated) > 0) return validated
   }
 
-  const fresh = await buildFreshSections()
+  const fresh = await buildFreshSections({ ignoreHistory: opts?.ignoreHistory })
   if (totalNewsItems(fresh) > 0) {
     await writeNewsCache(fresh)
     return fresh
@@ -478,4 +522,46 @@ export function flashHeadlinesFrom(sections: NewsSection[]): string[] {
     heads.push(t)
   }
   return heads
+}
+
+/** Frozen edition shown on /pulse after a successful send — stops post-publish collapse. */
+const EDITION_SNAPSHOT_KEY = 'pulse:edition:snapshot:v1'
+
+export type EditionSnapshot = {
+  date: string
+  edition: string
+  ts: number
+  sections: NewsSection[]
+}
+
+function todayIstDate(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+}
+
+export async function saveEditionSnapshot(edition: string, sections: NewsSection[]): Promise<void> {
+  const snap: EditionSnapshot = {
+    date: todayIstDate(),
+    edition,
+    ts: Date.now(),
+    sections,
+  }
+  await redisCommand(['SET', EDITION_SNAPSHOT_KEY, JSON.stringify(snap)])
+}
+
+export async function loadEditionSnapshot(edition: string): Promise<NewsSection[] | null> {
+  const d = await redisCommand(['GET', EDITION_SNAPSHOT_KEY])
+  if (!d?.result || typeof d.result !== 'string') return null
+  try {
+    const snap = JSON.parse(d.result) as EditionSnapshot
+    if (snap.date !== todayIstDate()) return null
+    if (snap.edition !== edition) return null
+    if (!Array.isArray(snap.sections) || totalNewsItems(snap.sections) < 1) return null
+    return snap.sections
+  } catch {
+    return null
+  }
+}
+
+export async function clearEditionSnapshot(): Promise<void> {
+  await redisCommand(['DEL', EDITION_SNAPSHOT_KEY])
 }
