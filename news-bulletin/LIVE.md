@@ -48,11 +48,13 @@ Shared / published at **7:35:59 AM IST** during the live morning slot (`inSlot: 
 | Afternoon | no | — | — | due 2:00 PM |
 | Evening | no | — | — | due 10:00 PM |
 
-Lead flash: *Delhi building collapse: Rescue operation ends after 27 hours, no fresh casualties*
+**Correction (07:40+ IST):** First share packs had **3 near-duplicate Delhi building-collapse angles**. Rewritten packs keep **one** collapse lead and add distinct stories (Mumbai fake notes, Manali tunnel, Uttarakhand orange alert, bank-locker gold theft). Pulse engine also over-kept same-event follow-ups after publish — code fix: event-cluster dedupe + higher minimum story count (see Pulse PR branch).
 
-Also flashing: Delhi collapse death toll 7 / 12 rescued at AIIMS · 5 MCD officials suspended (Satya Niketan) · Manali highway landslide-bypass tunnel opening in 4 days · Uttarakhand IMD orange alert (heavy to very heavy rain, 3 districts)
+Corrected lead: *Delhi building collapse: Rescue ends after 27 hours; death toll 7, 12 rescued*
 
-Copy-paste packs (newly designed): [`SHARE-2026-09-08-morning-channel.txt`](./SHARE-2026-09-08-morning-channel.txt) (Channel) · [`SHARE-2026-09-08-morning-groups.txt`](./SHARE-2026-09-08-morning-groups.txt) (All groups)
+Also in corrected packs: Mumbai fake ₹500 notes (₹11 lakh) · Manali landslide-bypass tunnel in 4 days · Uttarakhand IMD orange alert · ₹39-lakh bank-locker gold theft
+
+Copy-paste packs (corrected): [`SHARE-2026-09-08-morning-channel.txt`](./SHARE-2026-09-08-morning-channel.txt) (Channel) · [`SHARE-2026-09-08-morning-groups.txt`](./SHARE-2026-09-08-morning-groups.txt) (All groups)
 
 Full bulletin page: https://www.agilegroup-digital.co.in/pulse  
 WhatsApp channel: https://whatsapp.com/channel/0029VbCUrUAFnSz8CmYqJP1y
