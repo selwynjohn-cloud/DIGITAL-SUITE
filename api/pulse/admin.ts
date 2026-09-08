@@ -54,7 +54,7 @@ ${otpLoginHtml('Agile Pulse', 'Sign in with your @agilegroup.co.in email')}
     <div class="card" style="background:#eff6ff;border-color:#3b82f6">
       <div class="sec-title">📅 Daily Bulletin Schedule (India time)</div>
       <p style="font-size:14px;line-height:1.7;margin:0;color:#1e293b">
-        <b>🌅 Morning</b> — 6:00 AM &nbsp;|&nbsp; <b>☀️ Afternoon</b> — 2:00 PM &nbsp;|&nbsp; <b>🌙 Evening</b> — 6:00 PM<br>
+        <b>🌅 Morning</b> — 6:00 AM &nbsp;|&nbsp; <b>☀️ Afternoon</b> — 2:00 PM &nbsp;|&nbsp; <b>🌙 Evening</b> — 10:00 PM<br>
         <b>Auto-published</b> to your WhatsApp Channel + all groups — no tap needed.<br>
         If news is delayed, system retries 30 minutes later.<br>
         <b>🏆 Quiz winner:</b> Every Sunday morning.

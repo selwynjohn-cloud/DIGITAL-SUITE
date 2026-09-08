@@ -41,7 +41,8 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
   let weather: WeatherBlock = { cities: [], alertText: '' }
 
   try {
-    const prepared = await preparePulseContent(edition)
+    // Prefer the pack that was actually WhatsApp'd for this edition (stops post-send thinning).
+    const prepared = await preparePulseContent(edition, { preferSnapshot: true })
     sections = prepared.sections
     weather = prepared.weather
     ;[editorial, winners] = await Promise.all([getEditorial(), getWinners()])

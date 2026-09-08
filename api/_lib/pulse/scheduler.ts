@@ -2,7 +2,12 @@ import { Resend } from 'resend'
 import { sendSuiteEmail } from '../suite-mail.js'
 import { buildWhatsAppMessages } from './messages.js'
 import { getTodayQuestion } from './quiz.js'
-import { flashHeadlinesFrom, markStoriesPublished, totalNewsItems } from './news.js'
+import {
+  flashHeadlinesFrom,
+  markStoriesPublished,
+  saveEditionSnapshot,
+  totalNewsItems,
+} from './news.js'
 import {
   auditNewsSections,
   formatQualityAlert,
@@ -51,12 +56,13 @@ export function pulseSlot(now = istNow()): {
   const m = now.getMinutes()
   const edition = editionLabelForHour(h)
 
+  // Production slots: 6:00 AM · 2:00 PM · 10:00 PM IST (±90 min retry window).
   const morning =
     (h === 5 && m >= 30) || h === 6 || (h === 7 && m < 30)
   const afternoon =
     (h === 13 && m >= 30) || h === 14 || (h === 15 && m < 30)
   const evening =
-    (h === 17 && m >= 30) || h === 18 || (h === 19 && m < 30)
+    (h === 21 && m >= 30) || h === 22 || (h === 23 && m < 30)
 
   if (edition === 'Morning Edition' && morning) {
     return { edition, inSlot: true, isRetry: h === 7 || (h === 6 && m >= 30) }
@@ -64,8 +70,8 @@ export function pulseSlot(now = istNow()): {
   if (edition === 'Afternoon Edition' && afternoon) {
     return { edition, inSlot: true, isRetry: h === 15 || (h === 14 && m >= 30) }
   }
-  if (edition === 'Evening Edition' && evening) {
-    return { edition, inSlot: true, isRetry: h === 19 || (h === 18 && m >= 30) }
+  if (edition === '10:00 PM Edition' && evening) {
+    return { edition, inSlot: true, isRetry: h === 23 || (h === 22 && m >= 30) }
   }
   return null
 }
@@ -159,7 +165,8 @@ export async function runPulsePublish(opts: PulseRunOptions = {}): Promise<Pulse
   let sections: Awaited<ReturnType<typeof preparePulseContent>>['sections'] = []
   let qualityReport: Awaited<ReturnType<typeof preparePulseContent>>['report'] | null = null
   try {
-    const prepared = await preparePulseContent(edition)
+    // Cron/publish must draft fresh — never reuse the public-page snapshot.
+    const prepared = await preparePulseContent(edition, { preferSnapshot: false })
     sections = prepared.sections
     qualityReport = prepared.report
     await getTodayQuestion()
@@ -174,7 +181,7 @@ export async function runPulsePublish(opts: PulseRunOptions = {}): Promise<Pulse
   }
 
   const newsCount = totalNewsItems(sections)
-  const newsOk = auditNewsSections(sections).ok && newsCount > 0
+  const newsOk = (qualityReport?.ok ?? auditNewsSections(sections).ok) && newsCount > 0
   const topHeadline = flashHeadlinesFrom(sections)[0] ?? ''
   const { msg1, msg2, msg3 } = buildWhatsAppMessages({ edition, dateTime, topHeadline })
 
@@ -199,7 +206,7 @@ export async function runPulsePublish(opts: PulseRunOptions = {}): Promise<Pulse
       newsCount === 0
         ? `⚠️ ${edition} was NOT sent — no fresh news was available just now. The system will try again at the next scheduled time.`
         : qualityReport
-          ? await formatQualityAlert(edition, qualityReport)
+          ? formatQualityAlert(edition, qualityReport)
           : `⚠️ ${edition} was NOT sent — quality check failed.`
     await notifyAdmin(reason)
     return {
@@ -226,6 +233,8 @@ export async function runPulsePublish(opts: PulseRunOptions = {}): Promise<Pulse
       published = publishResult.ok
       if (published) {
         await markStoriesPublished(sections)
+        // Freeze what groups/channel saw so /pulse cannot thin into repeats later.
+        await saveEditionSnapshot(edition, sections)
       }
       await recordPublishLog({
         edition,
@@ -288,7 +297,7 @@ export async function runPulsePublish(opts: PulseRunOptions = {}): Promise<Pulse
           <h2 style="color:#1e3a8a">Agile Pulse — ${esc(edition)}</h2>
           <p>${esc(dLabel)}. ${statusLine}</p>
           <p>Open bulletin: <a href="${SHARE_URL}">${SHARE_URL}</a></p>
-          <p style="font-weight:700;color:#1d4ed8">Schedule: 6:00 AM · 2:00 PM · 6:00 PM IST (daily)</p>
+          <p style="font-weight:700;color:#1d4ed8">Schedule: 6:00 AM · 2:00 PM · 10:00 PM IST (daily)</p>
           <p style="font-weight:700;color:#1d4ed8">Post 1 — Channel:</p>
           <pre style="white-space:pre-wrap;background:#f1f5f9;padding:12px;border-radius:8px;font-family:Arial">${esc(msg1)}</pre>
           <p style="font-weight:700;color:#1d4ed8">Post 2 — Groups:</p>

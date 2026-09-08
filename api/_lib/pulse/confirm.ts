@@ -16,14 +16,15 @@ export function confirmSlot(now = istNow()): ConfirmSlot | null {
   const h = now.getHours()
   const m = now.getMinutes()
 
+  // After each slot's primary hour — one confirmation WhatsApp to Director.
   if (h === 7 && m < 30) {
     return { edition: 'Morning Edition', label: 'Morning' }
   }
-  if (h === 14 && m < 30) {
+  if (h === 15 && m < 30) {
     return { edition: 'Afternoon Edition', label: 'Afternoon' }
   }
-  if ((h === 19 && m >= 45) || (h === 20 && m < 15)) {
-    return { edition: 'Evening Edition', label: 'Evening' }
+  if (h === 23 && m < 30) {
+    return { edition: '10:00 PM Edition', label: '10:00 PM' }
   }
   return null
 }

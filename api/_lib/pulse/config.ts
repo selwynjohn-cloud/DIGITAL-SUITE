@@ -243,27 +243,27 @@ export const CARD_IMAGE_URL = 'https://www.agilegroup-digital.co.in/news-assets/
 export const CURSOR_ATTRIBUTION =
   'The News Bulletin, Security Question of the Day, and weekly winner selections are fully managed automatically by Cursor.ai, San Francisco, California, USA.'
 
-/** Daily bulletin times (India). Vercel cron fires at :30 UTC matching these slots. */
+/** Daily bulletin times (India). Vercel cron every 30 min; IST windows decide the slot. */
 export const BULLETIN_SCHEDULE = [
   { edition: 'Morning Bulletin', timeIst: '6:00 AM' },
   { edition: 'Afternoon Bulletin', timeIst: '2:00 PM' },
-  { edition: 'Evening Bulletin', timeIst: '6:00 PM' },
+  { edition: 'Evening Bulletin', timeIst: '10:00 PM' },
 ] as const
 
 export const QUIZ_WINNER_SCHEDULE = 'Every Sunday morning — winner on bulletin + WhatsApp'
 
-/** Edition name from IST hour (6am–2pm morning, 2pm–6pm afternoon, else evening). */
+/** Edition name from IST hour (6am–2pm morning, 2pm–10pm afternoon, else 10pm). */
 export function editionLabelForHour(h: number): string {
   if (h >= 6 && h < 14) return 'Morning Edition'
-  if (h >= 14 && h < 18) return 'Afternoon Edition'
-  return 'Evening Edition'
+  if (h >= 14 && h < 22) return 'Afternoon Edition'
+  return '10:00 PM Edition'
 }
 
 /** Next scheduled bulletin after current IST hour. */
 export function nextBulletinLabel(h: number): string {
   if (h < 6) return 'Morning Bulletin — 6:00 AM IST (today)'
   if (h < 14) return 'Afternoon Bulletin — 2:00 PM IST'
-  if (h < 18) return 'Evening Bulletin — 6:00 PM IST'
+  if (h < 22) return 'Evening Bulletin — 10:00 PM IST'
   return 'Morning Bulletin — 6:00 AM IST (tomorrow)'
 }
 
