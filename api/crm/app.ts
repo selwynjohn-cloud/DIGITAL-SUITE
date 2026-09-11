@@ -9,7 +9,7 @@ function crmPortal(req: VercelRequest): 'staff' | 'management' {
 function crmPage(portal: 'staff' | 'management') {
   const loginBlock =
     portal === 'staff'
-      ? hodLoginHtml('Agile CRM', 'Branch HOD / Staff — select branch and enter your branch password')
+      ? hodLoginHtml('Agile CRM', 'Branch HOD / Staff — email PIN (morning) or branch password')
       : otpLoginHtml('Agile CRM', 'Management — Director &amp; Sales team email sign in')
   return PAGE.replace('__CRM_LOGIN__', loginBlock).replace(
     '__CRM_OTP_SCRIPT__',
@@ -298,13 +298,13 @@ var PISTATUS=['Pending','Achieved'];
 var ISSUESTATUS=['Pending','Issued','Partial','Due','Not Applicable'];
 var DOCCATS=['Master Agreement','MW Notification','Tender Document','PSARA Licence','GST / PF / ESI','Client Contract','Policy / SOP','Previous Tender Data','Other'];
 var SERVICELINES=['Manned Guarding / Security','Facility Management Services','Outsourcing Services','Housekeeping','Electrical / Technical','Payroll / Manpower Supply','Other'];
-var CRMBRANCHES=['Hyderabad - A','Hyderabad - B','Hi-Tech Branch','Bangalore','Chennai & Pondicherry','Kochi','Mumbai','Surat','Bhopal','Visakhapatnam','Vijayawada','Kakinada','Nellore & Tada','Tirupati & Tadipatri','Corporate Office'];
+var CRMBRANCHES=['Hyderabad - A','Hyderabad - B','Hi-Tech Branch','Bangalore','Chennai','Puducherry','Kochi','Mumbai','Surat','Bhopal','Visakhapatnam','Vijayawada','Kakinada','Nellore','Tada','Tirupati','Tadipatri','Corporate Office'];
 var STATELIST=['Telangana','Andhra Pradesh','Karnataka','Tamil Nadu','Kerala','Maharashtra','Gujarat','Madhya Pradesh','Puducherry','Delhi','Other'];
 var STAGES=['New/RFQ','Initial Meeting','Follow-up Meeting','Site Survey','Quote Submitted','Negotiation','Awaiting Decision','Closed-Won','Closed - Lost'];
 var SOURCES=['Referral','Website','Cold Call','Tender Portal','Existing Client','Walk-in','Other'];
 var INDIAN_CITIES=['Hyderabad','Secunderabad','Bangalore','Chennai','Mumbai','Pune','Kochi','Surat','Ahmedabad','Vijayawada','Visakhapatnam','Kakinada','Nellore','Tirupati','Tadipatri','Bhopal','Delhi','Noida','Gurgaon','Kolkata','Pondicherry','Other'];
-var SECTORS=['Banking','Hospital','Manufacturing / Factory','IT / Corporate','Government / PSU','Education','Retail / Mall','Residential','Warehouse / Logistics','Other'];
-var TSTATUS=['Identified / Under Review','Bid Preparation','Check Corrigendum','Submitted','Technical Bid Opened','Evaluation Stage','Price Bid Opened','Result Awaiting','Closed-Won','Closed - Lost'];
+var SECTORS=['Banking','Hospital','Hospitality','Manufacturing / Factory','Pharmaceutical','IT / Corporate','Government / PSU','Education','University Campus','Retail / Mall','Residential','Warehouse / Logistics','Other'];
+var TSTATUS=['Identified / Under Review','Bid Preparation','Check Corrigendum','Submitted','Technical Bid Opened','Evaluation Stage','Price Bid Opened','Result Awaiting','Closed-Won','Closed - Lost','Tender cancelled'];
 var REMINDER_TYPES=['Sales Meeting','Tender Submission','Prebid Meeting','EMD Preparation','Last Date','Call','Site Survey','Follow-up'];
 var OURPOS=['L1','L2','L3','L4','Not Qualified','Did Not Bid','—'];
 var BIDRANKS=['L1','L2','L3','L4'];
@@ -398,7 +398,7 @@ function sendShareMail(){
 }
 var STCOL={'New/RFQ':'#64748b','Initial Meeting':'#3b82f6','Follow-up Meeting':'#2563eb','Site Survey':'#8b5cf6','Quote Submitted':'#a855f7',Negotiation:'#f59e0b','Awaiting Decision':'#eab308','Closed-Won':'#22c55e','Closed - Lost':'#64748b',New:'#64748b',Contacted:'#3b82f6','Quotation Sent':'#a855f7',Won:'#22c55e',Lost:'#64748b'};
 var STDOT={'New/RFQ':'#94a3b8','Initial Meeting':'#f59e0b','Follow-up Meeting':'#3b82f6','Site Survey':'#8b5cf6','Quote Submitted':'#a855f7',Negotiation:'#ef4444','Awaiting Decision':'#eab308','Closed-Won':'#22c55e','Closed - Lost':'#64748b',New:'#94a3b8',Contacted:'#f59e0b','Quotation Sent':'#a855f7',Won:'#22c55e',Lost:'#64748b'};
-var TDOT={'Identified / Under Review':'#64748b','Bid Preparation':'#3b82f6','Check Corrigendum':'#f59e0b',Submitted:'#2563eb','Technical Bid Opened':'#8b5cf6','Evaluation Stage':'#a855f7','Price Bid Opened':'#f59e0b','Result Awaiting':'#eab308','Closed-Won':'#22c55e','Closed - Lost':'#64748b'};
+var TDOT={'Identified / Under Review':'#64748b','Bid Preparation':'#3b82f6','Check Corrigendum':'#f59e0b',Submitted:'#2563eb','Technical Bid Opened':'#8b5cf6','Evaluation Stage':'#a855f7','Price Bid Opened':'#f59e0b','Result Awaiting':'#eab308','Closed-Won':'#22c55e','Closed - Lost':'#64748b','Tender cancelled':'#78716c'};
 function fmtMoney(n){var v=Number(n)||0;if(v>=100000)return '₹'+(v/100000).toFixed(1).replace(/\\.0$/,'')+'L';return '₹'+v.toLocaleString('en-IN');}
 function fmtRecordDate(iso){if(!iso)return '—';try{var d=new Date(iso);return d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e){return String(iso).slice(0,16);}}
 function mapSearchUrl(q){q=String(q||'').trim();return q?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q):'';}
@@ -481,6 +481,7 @@ function mapLeadStage(s){var m={New:'New/RFQ',Contacted:'Initial Meeting','Quota
 function mapTenderStatus(s){var m={Identified:'Identified / Under Review','In Progress':'Bid Preparation','Result Awaited':'Result Awaiting',Won:'Closed-Won',Lost:'Closed - Lost'};return m[s]||s||'Identified / Under Review';}
 function isClosedWon(v){return v==='Closed-Won'||v==='Won';}
 function isClosedLost(v){return v==='Closed - Lost'||v==='Lost';}
+function isTenderCancelled(v){return v==='Tender cancelled';}
 function leadInScope(l){if(ROLE!=='branch'||!BRANCH)return true;return (l.branch||'')===BRANCH;}
 function tenderInScope(t){if(ROLE!=='branch'||!BRANCH)return true;return (t.branch||'')===BRANCH;}
 function activityInScope(a){
@@ -527,14 +528,15 @@ function applyLogin(res){L=res.j.leads||[];T=res.j.tenders||[];A=res.j.activitie
   A.forEach(function(x){if(!x.location)x.location='';if(!x.leadId)x.leadId='';var l=findLeadForReminder(x);if(l&&!x.location)x.location=leadMapQuery(l);});
   T.forEach(function(t){t.status=mapTenderStatus(t.status);});
   ['m7','m8','m11'].forEach(function(id){el(id).style.display=(ROLE==='admin')?'':'none';});
-  ['m4','m5','m6','m10'].forEach(function(id){el(id).style.display=(ROLE==='admin'||ROLE==='coordinator')?'':'none';});
+  ['m3','m4','m5','m6'].forEach(function(id){if(el(id))el(id).style.display='';});
+  el('m10').style.display=(ROLE==='admin'||ROLE==='coordinator')?'':'none';
   el('m9').style.display='';
   var rl={admin:'Director — All Regions',coordinator:'Sales Coordinator — All India',staff:'Sales Team',branch:'Branch HOD — '+(BRANCH||'')};
   el('roleLbl').textContent=rl[ROLE]||ROLE;
   el('login').style.display='none';el('shell').style.display='block';
   if(new URLSearchParams(location.search).get('portal')==='admin'&&ROLE==='admin')tab(11);
   else tab(0);}
-function logout(){sessionStorage.removeItem('otp_crm');sessionStorage.removeItem('otp_email_crm');sessionStorage.removeItem('otp_branch_crm');otpLogout();location.href='/crm?portal='+encodeURIComponent(PORTAL||'management')+'&fresh=1';}
+function logout(){otpLogout();}
 var CUR=0;
 function tab(i){CUR=i;['m0','m1','m2','m3','m4','m5','m6','m7','m8','m9','m10','m11'].forEach(function(x,k){el(x).classList.toggle('active',k===i);});el('ttl').textContent=['Dash Board','Weekly Calendar','Sales Lead','Security Survey','Tender Lead','Tender Reader','Tender History','Contract Renewal & PI','Communication Formats','Data Repository','Root Cause Analysis (RCA)','CRM Admin'][i];el('subttl').textContent=SUBTITLES[i]||'';el('side').classList.remove('open');[dash,weeklyCalendar,salesLeads,securitySurvey,tenderLeads,tenderReader,oldTenders,contracts_pi,formats,repository,rcaPage,crmAdmin][i]();}
 
@@ -576,7 +578,7 @@ function saveTendersOnly(done){
 }
 function salesLeadsList(){return L.map(function(l,i){return {l:l,i:i};}).filter(function(x){return x.l.leadKind!=='Tender'&&(LEAD_SHOW_INACT||x.l.active!==false);});}
 function activeSalesLeads(){return L.filter(function(l){return l.leadKind!=='Tender'&&l.active!==false&&leadInScope(l)&&!isClosedWon(l.stage)&&!isClosedLost(l.stage);});}
-function activeTenderLeads(){return T.filter(function(t){return t.recordKind!=='Historical'&&t.active!==false&&tenderInScope(t)&&!isClosedWon(t.status)&&!isClosedLost(t.status);});}
+function activeTenderLeads(){return T.filter(function(t){return t.recordKind!=='Historical'&&t.active!==false&&tenderInScope(t)&&!isClosedWon(t.status)&&!isClosedLost(t.status)&&!isTenderCancelled(t.status);});}
 
 /* Dashboard */
 function daysUntil(d,from){if(!d)return 9999;var a=new Date(d+'T00:00:00'),b=new Date((from||today())+'T00:00:00');return Math.round((a-b)/86400000);}
@@ -675,7 +677,7 @@ function renderLeadEdit(l,i){
     '<div class="trow" style="margin-top:10px">'+
     '<div><label>Manpower required</label><input type="number" min="0" step="1" value="'+a(l.manpower||'0')+'" oninput="L['+i+'].manpower=this.value"></div>'+
     '<div><label>Est ₹/month</label><input type="number" min="0" value="'+(l.estValue||0)+'" oninput="L['+i+'].estValue=+this.value"></div>'+
-    selStage(i,l)+fd('Next Follow-up',"L["+i+"].nextFollowUp",l.nextFollowUp)+
+    selStage(i,l)+fd('Next Follow-up',"L["+i+"].nextFollowUp",l.nextFollowUp)+ft('Meeting time',"L["+i+"].nextFollowUpTime",l.nextFollowUpTime||'')+
     f('Assigned to (Branch staff name)',"L["+i+"].assignedTo",l.assignedTo)+
     '</div>'+
     renderOtherSiteCities(l,i)+
@@ -713,7 +715,7 @@ function salesLeads(){
   });
   el('content').innerHTML=html+intelPanel()+savebar('saveLeadsBtn');
 }
-function addSalesLead(){L.push({id:nid('ld'),leadKind:'Sales',active:true,company:'',branch:BRANCH||'',location:'',state:'',deploymentDate:'',contactName:'',phone:'',email:'',city:'',sector:'Banking',source:'Referral',webAddress:'',requirement:'Manned Guarding',manpower:'0',estValue:0,stage:'New/RFQ',nextFollowUp:today(),surveyDone:false,assignedTo:'',remarks:'',existingRate:'',presentAgency:'',changeReason:'',swot:'',moreSites:'',irritants:'',competitors:[],otherSiteCities:[],aiResearch:'',recordedBy:OTP_EMAIL||'',createdAt:new Date().toISOString()});LEAD_EDIT=L.length-1;salesLeads();}
+function addSalesLead(){L.push({id:nid('ld'),leadKind:'Sales',active:true,company:'',branch:BRANCH||'',location:'',state:'',deploymentDate:'',contactName:'',phone:'',email:'',city:'',sector:'Banking',source:'Referral',webAddress:'',requirement:'Manned Guarding',manpower:'0',estValue:0,stage:'New/RFQ',nextFollowUp:today(),nextFollowUpTime:'',surveyDone:false,assignedTo:'',remarks:'',existingRate:'',presentAgency:'',changeReason:'',swot:'',moreSites:'',irritants:'',competitors:[],otherSiteCities:[],aiResearch:'',recordedBy:OTP_EMAIL||'',createdAt:new Date().toISOString()});LEAD_EDIT=L.length-1;salesLeads();}
 var expLead=-1;
 function intelPanel(){
   if(expLead<0||!L[expLead])return '';
@@ -2057,6 +2059,7 @@ function addTender(kind){
 
 function f(lbl,path,val){return '<div><label>'+lbl+'</label><input value="'+a(val)+'" oninput="'+path+'=this.value"></div>';}
 function fd(lbl,path,val){return '<div><label>'+lbl+'</label><input type="date" value="'+a(val)+'" oninput="'+path+'=this.value"></div>';}
+function ft(lbl,path,val){return '<div><label>'+lbl+'</label><input type="time" value="'+a(val)+'" oninput="'+path+'=this.value"></div>';}
 function sel(lbl,path,val,arr){return '<div><label>'+lbl+'</label><select onchange="'+path+'=this.value">'+opt(val,arr)+'</select></div>';}
 
 /* Weekly Calendar */
@@ -2102,15 +2105,16 @@ function weeklyCalendar(){
     '<td>'+reminderLeadSelect(i,x)+'</td>'+
     '<td><select onchange="A['+i+'].type=this.value">'+opt(x.type,REMINDER_TYPES)+'</select></td>'+
     '<td><input type="date" class="'+cls+'" value="'+a(x.date)+'" oninput="A['+i+'].date=this.value"></td>'+
+    '<td><input type="time" value="'+a(x.time||'')+'" oninput="A['+i+'].time=this.value"></td>'+
     '<td><input value="'+a(x.location)+'" oninput="A['+i+'].location=this.value" placeholder="'+(lnk?'From Sales Lead - edit if needed':'Full address')+'" style="min-width:180px">'+(lnk&&!x.location?'<div style="font-size:10px;color:var(--gold2);margin-top:2px">From Sales Lead</div>':'')+'</td>'+
     '<td><input value="'+a(x.notes)+'" oninput="A['+i+'].notes=this.value" style="min-width:140px"></td>'+
     '<td>'+(mq?renderMapLinks(mq,true):'<span style="color:var(--muted);font-size:11px">Pick lead with address</span>')+'</td>'+
     '<td style="text-align:center"><input type="checkbox" '+(x.done?'checked':'')+' onchange="A['+i+'].done=this.checked;weeklyCalendar()"></td>'+
     '<td style="white-space:nowrap">'+toggleAct('A['+i+']',x.active!==false,'weeklyCalendar()')+'</td></tr>';}).join('');
-  el('content').innerHTML=h1+'<div class="tblwrap"><table><thead><tr><th>Sales Lead / Client</th><th>Type</th><th>Reminder Date</th><th>Location</th><th>Notes</th><th>Map</th><th>Done</th><th>Action</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'+savebar('saveActsBtn');
+  el('content').innerHTML=h1+'<div class="tblwrap"><table><thead><tr><th>Sales Lead / Client</th><th>Type</th><th>Reminder Date</th><th>Time</th><th>Location</th><th>Notes</th><th>Map</th><th>Done</th><th>Action</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'+savebar('saveActsBtn');
 }
 function followups(){weeklyCalendar();}
-function addAct(){A.push({id:nid('ac'),leadId:'',tenderId:'',company:'',type:'Sales Meeting',date:today(),location:'',notes:'',done:false,active:true,createdAt:new Date().toISOString()});weeklyCalendar();}
+function addAct(){A.push({id:nid('ac'),leadId:'',tenderId:'',company:'',type:'Sales Meeting',date:today(),time:'',location:'',notes:'',done:false,active:true,createdAt:new Date().toISOString()});weeklyCalendar();}
 
 /* Contracts & PI (Minimum Wage price increase) */
 function daysAdd(n){var d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}

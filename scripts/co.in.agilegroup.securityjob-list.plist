@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>co.in.agilegroup.securityjob-list</string>
+  <key>WorkingDirectory</key>
+  <string>/Users/godblessyou/agilgroup-digital</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>-lc</string>
+    <string>cd /Users/godblessyou/agilgroup-digital &amp;&amp; node scripts/save-securityjob-lists.mjs</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>7</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/Users/godblessyou/Documents/SecurityJob List/update.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/godblessyou/Documents/SecurityJob List/update.log</string>
+</dict>
+</plist>

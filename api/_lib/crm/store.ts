@@ -29,6 +29,8 @@ export type CrmLead = {
   assignedTo: string
   stage: string
   nextFollowUp: string // YYYY-MM-DD
+  /** Optional meeting time HH:MM (24h) for next follow-up. */
+  nextFollowUpTime: string
   surveyDone: boolean
   lossReason: string
   remarks: string
@@ -221,6 +223,8 @@ export type CrmActivity = {
   company: string
   type: string
   date: string // YYYY-MM-DD scheduled/reminder date
+  /** Optional meeting time HH:MM (24h). */
+  time: string
   /** Full meeting / visit address for map & directions. */
   location: string
   notes: string
@@ -294,7 +298,21 @@ export const LEAD_STAGES = [
 ]
 export const LEAD_SOURCES = ['Referral', 'Website', 'Cold Call', 'Tender Portal', 'Existing Client', 'Walk-in', 'Other']
 export const INDIAN_CITIES = ['Hyderabad', 'Secunderabad', 'Bangalore', 'Chennai', 'Mumbai', 'Pune', 'Kochi', 'Surat', 'Ahmedabad', 'Vijayawada', 'Visakhapatnam', 'Kakinada', 'Nellore', 'Tirupati', 'Tadipatri', 'Bhopal', 'Delhi', 'Noida', 'Gurgaon', 'Kolkata', 'Pondicherry', 'Other']
-export const SECTORS = ['Banking', 'Hospital', 'Manufacturing / Factory', 'IT / Corporate', 'Government / PSU', 'Education', 'Retail / Mall', 'Residential', 'Warehouse / Logistics', 'Other']
+export const SECTORS = [
+  'Banking',
+  'Hospital',
+  'Hospitality',
+  'Manufacturing / Factory',
+  'Pharmaceutical',
+  'IT / Corporate',
+  'Government / PSU',
+  'Education',
+  'University Campus',
+  'Retail / Mall',
+  'Residential',
+  'Warehouse / Logistics',
+  'Other',
+]
 export const TENDER_STATUS = [
   'Identified / Under Review',
   'Bid Preparation',
@@ -306,6 +324,7 @@ export const TENDER_STATUS = [
   'Result Awaiting',
   'Closed-Won',
   'Closed - Lost',
+  'Tender cancelled',
 ]
 export const BIDDER_RANKS = ['L1', 'L2', 'L3', 'L4']
 export const OUR_POSITIONS = ['L1', 'L2', 'L3', 'L4', 'Not Qualified', 'Did Not Bid', '—']
@@ -320,7 +339,7 @@ export const REMINDER_TYPES = [
   'Follow-up',
 ]
 export const SERVICE_LINES = ['Manned Guarding / Security', 'Facility Management Services', 'Outsourcing Services', 'Housekeeping', 'Electrical / Technical', 'Payroll / Manpower Supply', 'Other']
-export const CRM_BRANCHES = ['Hyderabad - A', 'Hyderabad - B', 'Hi-Tech Branch', 'Bangalore', 'Chennai & Pondicherry', 'Kochi', 'Mumbai', 'Surat', 'Bhopal', 'Visakhapatnam', 'Vijayawada', 'Kakinada', 'Nellore & Tada', 'Tirupati & Tadipatri', 'Corporate Office']
+export const CRM_BRANCHES = ['Hyderabad - A', 'Hyderabad - B', 'Hi-Tech Branch', 'Bangalore', 'Chennai', 'Puducherry', 'Kochi', 'Mumbai', 'Surat', 'Bhopal', 'Visakhapatnam', 'Vijayawada', 'Kakinada', 'Nellore', 'Tada', 'Tirupati', 'Tadipatri', 'Corporate Office']
 
 const LEADS_KEY = 'crm:leads'
 const TENDERS_KEY = 'crm:tenders'
@@ -395,7 +414,7 @@ export const saveClientFollowUps = (l: CrmClientFollowUp[]) => setJson(FOLLOWUPS
 export const getLostArchives = () => getJson<CrmLostArchive[]>(ARCHIVES_KEY, [])
 export const saveLostArchives = (l: CrmLostArchive[]) => setJson(ARCHIVES_KEY, l)
 export const getSecuritySurveys = () => getJson<CrmSecuritySurvey[]>(SURVEYS_KEY, [])
-export const MAX_SURVEY_PHOTOS = 10
+export const MAX_SURVEY_PHOTOS = 20
 
 export function defaultSurveyInterviews(): CrmSurveyInterview[] {
   return [
@@ -698,6 +717,7 @@ export function normalizeCrmLead(raw: Partial<CrmLead> & { id: string }): CrmLea
     assignedTo: String(raw.assignedTo ?? '').slice(0, 80),
     stage: mapLeadStage(String(raw.stage ?? 'New/RFQ').slice(0, 40)),
     nextFollowUp: String(raw.nextFollowUp ?? '').slice(0, 20),
+    nextFollowUpTime: String(raw.nextFollowUpTime ?? '').slice(0, 8),
     surveyDone: raw.surveyDone === true,
     lossReason: String(raw.lossReason ?? '').slice(0, 200),
     remarks: String(raw.remarks ?? '').slice(0, 500),

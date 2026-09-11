@@ -1,0 +1,22 @@
+{
+  "name": "Agile Live",
+  "short_name": "Agile Live",
+  "start_url": "/live",
+  "display": "standalone",
+  "background_color": "#071018",
+  "theme_color": "#14224f",
+  "icons": [
+    {
+      "src": "/agile-live-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/agile-live-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
