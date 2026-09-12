@@ -8,6 +8,14 @@
 | **Director** | ~15–20 min after each slot, check status. If miss or bad pack → Admin OTP → **Publish now** |
 | **Cursor / agents** | Status checks + code fixes only. **Never** treat a WhatsApp share pack as the blast path |
 
+## Group WhatsApp copy (Director rule)
+
+Group blasts must **not** include:
+- `https://whatsapp.com/channel/0029VbCUrUAFnSz8CmYqJP1y`
+- `https://tinyurl.com/Security-News`
+
+Keep news + jobs + website only. Channel link stays on the Channel post (`msg1`), not groups.
+
 ## Good prompts for agents
 
 - “Did Morning send? channel? groups?”

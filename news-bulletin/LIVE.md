@@ -38,7 +38,7 @@ Outside a slot window the API returns `skipped: true, reason: "outside-slot"`. U
 ## Message formats (locked)
 
 1. **WhatsApp News Channel** — short (news + Pulse only). No jobs.
-2. **All groups** — fuller (duty line + `https://tinyurl.com/Security-News` + jobs). Never long section menus.
+2. **All groups** — news + jobs + website only. **No** Channel URL and **no** `tinyurl.com/Security-News`. Never long section menus.
 
 ## 08 September 2026 — 6:00 AM Morning share
 
