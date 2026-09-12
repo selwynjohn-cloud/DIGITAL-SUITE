@@ -1,0 +1,15 @@
+{
+  "name": "digital-suite-news-bulletin",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Security Job daily news bulletin via Fast2SMS WhatsApp / SMS",
+  "main": "send.js",
+  "scripts": {
+    "send": "node send.js",
+    "list": "node send.js --list",
+    "sms": "node send.js --sms"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
