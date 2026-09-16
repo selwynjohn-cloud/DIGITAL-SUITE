@@ -127,8 +127,10 @@ export function periodicalSurveyInnerHtml(opts: PeriodicalSurveyPageOpts): strin
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
         <button type="button" class="m-btn m-btn-navy" onclick="openHdfcStateDashboard()">HDFC State Dashboard</button>
         ${opts.portal === 'mgmt' ? '<button type="button" class="m-btn m-btn-gold" onclick="refreshHdfcSsaAi()">Build / Refresh AI pack</button>' : ''}
+        ${opts.portal === 'mgmt' ? '<button type="button" class="m-btn m-btn-gold" id="hdfcPanelRemindBtn" onclick="remindHdfcBranch()">Reminder to HOD</button>' : ''}
         <button type="button" class="m-btn m-btn-grey" onclick="copyHdfcViewLink()">Copy HDFC view link</button>
       </div>
+      ${opts.portal === 'mgmt' ? '<p class="hint" id="hdfcBranchRemindHint" style="margin-top:8px">Pick one <b>Branch</b> (not All Branches), then <b>Reminder to HOD</b> — one email for that branch.</p>' : ''}
       <div id="hdfcSsaPreviewWrap" class="hidden">
         <iframe class="ssa-preview-frame" id="hdfcSsaPreview" title="HDFC SSA preview" src="about:blank"></iframe>
       </div>
@@ -596,7 +598,9 @@ function onHdfcTrackBranch(){
   SV_VIEW='list';SV_EDIT=-1;render();
 }
 function hdfcTrackBarHtml(){
-  return '<div class="ssa-track" id="hdfcTrackBar"><div><label class="m-lbl">Branch Name</label><select class="m-inp" id="hdfcTrackBranch" onchange="onHdfcTrackBranch()"></select></div><div><label class="m-lbl">Submitted</label><div class="ssa-track-count" id="hdfcTrackSubmitted">000</div></div><div><label class="m-lbl">Total HDFC</label><div class="ssa-track-count" id="hdfcTrackTotal">000</div></div></div>';
+  var bar='<div class="ssa-track" id="hdfcTrackBar"><div><label class="m-lbl">Branch Name</label><select class="m-inp" id="hdfcTrackBranch" onchange="onHdfcTrackBranch()"></select></div><div><label class="m-lbl">Submitted</label><div class="ssa-track-count" id="hdfcTrackSubmitted">000</div></div><div><label class="m-lbl">Total HDFC</label><div class="ssa-track-count" id="hdfcTrackTotal">000</div></div></div>';
+  if(!IS_MGMT)return bar;
+  return bar+'<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px"><button type="button" class="m-btn m-btn-gold" id="hdfcTrackRemindBtn" onclick="remindHdfcBranch()">Reminder to HOD</button><span class="hint" style="margin:0">One email for the branch selected in Branch Name.</span></div>';
 }
 function applySurvey(sv){
   if(!sv||!sv.id)return;
@@ -840,6 +844,7 @@ function renderEdit(si){
       if(sv.status==='Draft')html+='<p class="hint" style="color:#fca5a5;margin-top:8px">Still Draft — ask HOD to <b>Review / Edit</b> then <b>Forward for Approval</b>.</p>';
       if(sv.status==='Completed' && !sv.forwardedForApprovalAt)html+='<p class="hint" style="color:#fde68a;margin-top:8px">Submitted — waiting HOD <b>Forward for Approval</b>.</p>';
       html+='<div class="m-savebar" style="margin-top:14px;justify-content:flex-start">';
+      if(sv.status!=='Approved')html+='<button type="button" class="m-btn m-btn-gold" onclick="remindSurvey('+si+')">Reminder to HOD with suggestion</button>';
       if(sv.status==='HodApproved'||(sv.status==='Completed'&&sv.forwardedForApprovalAt))html+='<button type="button" class="m-btn m-btn-green" style="font-size:16px;padding:12px 18px" onclick="approveSurvey('+si+')">Director Approval</button>';
       if(sv.status!=='Draft')html+='<button type="button" class="m-btn m-btn-grey" onclick="reopenSurvey('+si+')">Reopen</button>';
       html+='<button type="button" class="m-btn m-btn-navy" onclick="openPhotosPreview('+si+')">Photos Preview</button>';
@@ -1071,7 +1076,10 @@ function renderList(){
       if(IS_MGMT && (sv.status==='HodApproved'||(sv.status==='Completed'&&sv.forwardedForApprovalAt))){
         out+='<button type="button" class="m-btn m-btn-green" style="font-size:15px;padding:10px 14px" onclick="approveSurvey('+i+')">Director Approval</button>';
       }
-      if(IS_MGMT && sv.status==='Draft')out+='<span class="hint" style="color:#fca5a5;align-self:center">Ask HOD to Forward for Approval first</span>';
+      if(IS_MGMT && sv.status==='Draft'){
+        out+='<button type="button" class="m-btn m-btn-gold" onclick="remindHdfcBranch(\\''+a(sv.branchId)+'\\')">Reminder to HOD</button>';
+        out+='<span class="hint" style="color:#fca5a5;align-self:center">Ask HOD to Forward for Approval first</span>';
+      }
       if(IS_MGMT && sv.status==='Completed' && !sv.forwardedForApprovalAt)out+='<span class="hint" style="color:#fde68a;align-self:center">Submitted — HOD to Forward for Approval</span>';
       if(IS_MGMT && sv.status==='Approved' && !sv.sentToClientAt)out+='<span class="hint" style="color:#86efac;align-self:center">Director approved — waiting HOD Send to client</span>';
       if(IS_MGMT)out+='<button type="button" class="m-btn m-btn-grey" onclick="deleteSurvey('+i+')">Delete</button>';
@@ -1101,6 +1109,7 @@ function renderList(){
   hHtml+='<div class="m-kgrid" id="psHdfcKpis" style="margin-top:12px"><div class="m-kpi t"><b>'+hdfcDraftCount+'</b><span>Not submitted (Draft)</span></div><div class="m-kpi o"><b>'+pad3(hdfcTotHome.done)+'</b><span>Submitted</span></div><div class="m-kpi s"><b>'+pad3(hdfcTotHome.total)+'</b><span>Total HDFC</span></div></div>';
   hHtml+='<div class="m-card" id="ssaHdfcDraftBox" style="margin-top:12px;border:2px solid #fde68a">';
   hHtml+='<h3 style="color:#fde68a;margin:0 0 10px">Incomplete — not submitted (Draft)</h3>';
+  if(IS_MGMT)hHtml+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:0 0 10px"><button type="button" class="m-btn m-btn-gold" id="hdfcDraftRemindBtn" onclick="remindHdfcBranch()">Reminder to HOD</button><span class="hint" style="margin:0">Sends one email for the selected branch.</span></div>';
   hHtml+='<p class="hint" style="margin:0 0 10px">Phone / laptop saves that are not finished (not all 15 pages), including Hyderabad-B. Tap <b>Edit</b> to finish.</p>';
   if(!hdfcDraftRows.length)hHtml+='<div style="color:#94a3b8;padding:16px;text-align:center">No incomplete HDFC for this branch.</div>';
   else hdfcDraftRows.forEach(function(x){hHtml+=card(x);});
@@ -1342,10 +1351,50 @@ function approveSurvey(si){
     applySurvey(j.survey);alert(sv.surveyKind==='hdfc'?'Director approved. HOD can now Send to client.':'Approved. HOD has been informed.');render();
   });
 }
+function hdfcRemindBranchId(fallback){
+  var track=el('hdfcTrackBranch');
+  if(track&&track.value&&track.value!=='ALL')return track.value;
+  var top=el('branchSel');
+  if(top&&top.value&&top.value!=='ALL')return top.value;
+  return String(fallback||'').trim();
+}
+function applyHdfcRemindResult(j){
+  if(j&&Array.isArray(j.surveys)){
+    j.surveys.forEach(function(sv){applySurvey(sv);});
+    return;
+  }
+  if(j&&j.survey)applySurvey(j.survey);
+}
+function remindHdfcBranch(branchId){
+  if(!IS_MGMT){alert('Only Management can send this reminder.');return;}
+  var bid=String(branchId||hdfcRemindBranchId()||'').trim();
+  if(!bid||bid==='ALL'){alert('Pick one branch, then tap Reminder to HOD.');return;}
+  var name=branchNameOf(bid)||bid;
+  var note=(el('mgmtSugNote')&&el('mgmtSugNote').value)||'';
+  if(!confirm('Send HDFC SSA reminder to the HOD team for '+name+'? One email for this branch.'))return;
+  api('periodicalSurveyRemind',{branchId:bid,surveyKind:'hdfc',mgmtSuggestionsNote:note}).then(function(res){
+    var s=res.s||res.status,j=res.j||res.body||{};
+    if(s!==200){alert(j.error||'Could not send reminder.');return;}
+    applyHdfcRemindResult(j);
+    alert('Reminder to HOD sent for '+(j.branchName||name)+'.');
+    render();
+  });
+}
 function remindSurvey(si){
   var sv=SV[si];if(!sv)return;
   if(sv.status==='Approved'){alert('Already approved.');return;}
   var note=(el('mgmtSugNote')&&el('mgmtSugNote').value)||sv.mgmtSuggestionsNote||'';
+  if(sv.surveyKind==='hdfc'){
+    if(!confirm('Send Reminder to HOD with suggestion for '+branchNameOf(sv.branchId)+' (one email for this branch)?'))return;
+    api('periodicalSurveyRemind',{branchId:sv.branchId,surveyId:sv.id,surveyKind:'hdfc',mgmtSuggestionsNote:note}).then(function(res){
+      var s=res.s||res.status,j=res.j||res.body||{};
+      if(s!==200){alert(j.error||'Could not send reminder.');return;}
+      applyHdfcRemindResult(j);
+      alert('Reminder to HOD with suggestion sent.');
+      render();
+    });
+    return;
+  }
   if(!confirm('Send Reminder to HOD with suggestion (HOD + system + Management notes)?'))return;
   api('periodicalSurveyRemind',{surveyId:sv.id,mgmtSuggestionsNote:note}).then(function(res){
     var s=res.s||res.status,j=res.j||res.body||{};
