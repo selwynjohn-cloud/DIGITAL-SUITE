@@ -51,6 +51,7 @@ const needed = [
   'api/_lib/mis/periodical-survey-ui.ts',
   'api/_lib/mis/periodical-survey-store.ts',
   'api/_lib/mis/periodical-survey-handlers.ts',
+  'api/_lib/mis/hdfc-ssa-branch-remind.ts',
   'api/_lib/mis/ssa-directory.ts',
   'api/_lib/mis/hdfc-ssa-state.ts',
   'api/_lib/mis/hdfc-ssa-dashboard.ts',
@@ -417,6 +418,18 @@ if (!admin.includes('periodicalSurveyReviewSuggestions')) {
 if (!admin.includes('handlePeriodicalSurveyApprove') || !admin.includes('handlePeriodicalSurveyRemind') || !admin.includes('handlePeriodicalSurveyReopen')) {
   fail('Management must Review / Reminder / Reopen')
 } else ok('Management review / reminder / reopen are wired')
+if (
+  !ui.includes('remindHdfcBranch') ||
+  !ui.includes('hdfcPanelRemindBtn') ||
+  !ui.includes('hdfcTrackRemindBtn') ||
+  !ui.includes('hdfcDraftRemindBtn') ||
+  !ui.includes("surveyKind:'hdfc'") ||
+  !handlers.includes('buildHdfcBranchRemindEmail') ||
+  !handlers.includes('hdfc-ssa-branch-remind') ||
+  !handlers.includes('Pick one branch, then send the reminder.')
+) {
+  fail('HDFC SSA Management must have a branch-wise Reminder to HOD (one branch per send)')
+} else ok('HDFC SSA branch-wise Reminder to HOD is on Management UI + handler')
 if (!admin.includes('periodicalSurveyDelete') || !admin.includes('handlePeriodicalSurveyDelete')) {
   fail('Management must be able to Delete test surveys')
 } else ok('Management Delete survey is wired')

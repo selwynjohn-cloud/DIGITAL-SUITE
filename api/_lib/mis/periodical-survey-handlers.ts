@@ -45,6 +45,9 @@ import {
 } from './hdfc-ssa-board-store.js'
 import { assembleHdfcSsaBoard } from './hdfc-ssa-board-risk.js'
 import { indiaBoardKpis } from './hdfc-ssa-state.js'
+import { buildHdfcBranchRemindEmail } from './hdfc-ssa-branch-remind.js'
+
+export { buildHdfcBranchRemindEmail } from './hdfc-ssa-branch-remind.js'
 
 function s(v: unknown, n = 4000): string {
   return String(v ?? '').slice(0, n)
@@ -336,6 +339,164 @@ export async function handlePeriodicalSurveySubmit(
   }
 }
 
+function ssaRemindMailHtml(text: string): string {
+  return `<div style="font-family:Arial,sans-serif;white-space:pre-wrap;font-size:14px;color:#111">${text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')}</div>`
+}
+
+function ssaRemindCc(to: string[]): string[] {
+  return [
+    ...new Set(
+      [LOKESH_CC_EMAIL, MIS_DIRECTOR_CC_EMAIL]
+        .map((e) => e.toLowerCase())
+        .filter((e) => e.includes('@') && !to.includes(e)),
+    ),
+  ]
+}
+
+function isHdfcSurveyRow(sv: MisPeriodicalSurvey): boolean {
+  return String(sv.surveyKind || '').toLowerCase() === 'hdfc'
+}
+
+function hdfcIncompleteForRemind(sv: MisPeriodicalSurvey): boolean {
+  if (!isHdfcSurveyRow(sv) || sv.active === false) return false
+  if (sv.status === 'Approved') return false
+  if (sv.status === 'Draft') return true
+  return !hdfcPagesProgress(sv).complete
+}
+
+async function sendSsaReminderEmail(opts: {
+  to: string[]
+  cc: string[]
+  subject: string
+  text: string
+}): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const apiKey = process.env.RESEND_API_KEY?.trim()
+  if (!apiKey) return { ok: false, status: 503, error: 'Email service not configured.' }
+  try {
+    const { Resend } = await import('resend')
+    const resend = new Resend(apiKey)
+    const result = await sendSuiteEmail(resend, {
+      from: pinMailFrom(),
+      to: opts.to,
+      cc: opts.cc,
+      subject: opts.subject,
+      text: opts.text,
+      html: ssaRemindMailHtml(opts.text),
+      skipDirectorCc: true,
+    })
+    if ((result as { error?: { message?: string } }).error) {
+      return {
+        ok: false,
+        status: 502,
+        error:
+          (result as { error?: { message?: string } }).error?.message || 'Could not send reminder.',
+      }
+    }
+    return { ok: true }
+  } catch (err) {
+    console.error('[periodicalSurveyRemind]', err)
+    return { ok: false, status: 502, error: 'Could not send reminder.' }
+  }
+}
+
+async function handleHdfcBranchSurveyRemind(
+  body: Record<string, unknown>,
+  actorEmail: string,
+) {
+  const surveys = await getPeriodicalSurveys()
+  let branchId = s(body.branchId, 80)
+  const surveyId = s(body.surveyId, 40)
+  if ((!branchId || branchId === 'ALL') && surveyId) {
+    const fromRow = surveys.find((x) => x.id === surveyId)
+    branchId = fromRow?.branchId || ''
+  }
+  if (!branchId || branchId === 'ALL') {
+    return { status: 400, json: { error: 'Pick one branch, then send the reminder.' } }
+  }
+  const branches = await getBranches(true)
+  const branch = branches.find((b) => b.id === branchId && b.active !== false)
+  if (!branch) return { status: 404, json: { error: 'Branch not found.' } }
+
+  const hdfc = surveys.filter(
+    (sv) => isHdfcSurveyRow(sv) && sv.active !== false && sv.branchId === branchId,
+  )
+  const incomplete = hdfc.filter(hdfcIncompleteForRemind)
+  const waitingForward = hdfc.filter(
+    (sv) => sv.status === 'Completed' && !sv.forwardedForApprovalAt,
+  )
+  const submittedKeys = new Set<string>()
+  for (const sv of hdfc) {
+    if (sv.status === 'Draft' || !hdfcPagesProgress(sv).complete) continue
+    const key =
+      String(sv.clientId || '') ||
+      `${String(sv.company || '').toUpperCase()}|${String(sv.locationName || '').toUpperCase()}`
+    if (key) submittedKeys.add(key)
+  }
+  const clients = await getClients(branchId, { skipRepair: true })
+  const hdfcSites = (clients || []).filter(
+    (c) => c.active !== false && /hdfc/i.test(`${c.name || ''} ${c.location || ''}`),
+  )
+  const totalSites = hdfcSites.length || submittedKeys.size
+  const note = s(body.mgmtSuggestionsNote ?? body.note, 4000)
+  if (note && surveyId) {
+    const idx = surveys.findIndex((x) => x.id === surveyId)
+    if (idx >= 0) {
+      surveys[idx] = { ...surveys[idx], mgmtSuggestionsNote: note, updatedAt: new Date().toISOString() }
+    }
+  }
+
+  const hodTo = await branchHodEmails(branchId)
+  const surveyors = incomplete.map((sv) => (sv.surveyorEmail || '').trim().toLowerCase())
+  const to = [...new Set([...surveyors, ...hodTo].filter((e) => e.includes('@')))]
+  if (!to.length) to.push(MIS_DIRECTOR_CC_EMAIL.toLowerCase())
+  const cc = ssaRemindCc(to)
+  const mail = buildHdfcBranchRemindEmail({
+    branchName: branch.name,
+    submitted: submittedKeys.size,
+    totalSites,
+    incomplete: incomplete.map((sv) => ({
+      company: sv.company || '',
+      location: sv.locationName || sv.address || '',
+      status: sv.status === 'Draft' ? 'Draft' : sv.status,
+      pages: hdfcPagesProgress(sv).label,
+      surveyedBy: sv.surveyedBy || sv.submittedBy || '',
+    })),
+    waitingForward: waitingForward.length,
+    note,
+    actorEmail,
+  })
+  const sent = await sendSsaReminderEmail({ to, cc, subject: mail.subject, text: mail.text })
+  if (!sent.ok) return { status: sent.status, json: { error: sent.error } }
+
+  const now = new Date().toISOString()
+  const stampedIds = new Set(incomplete.map((sv) => sv.id))
+  for (let i = 0; i < surveys.length; i++) {
+    const row = surveys[i]
+    if (!stampedIds.has(row.id)) continue
+    surveys[i] = {
+      ...row,
+      lastReminderAt: now,
+      reminderCount: (row.reminderCount || 0) + 1,
+      updatedAt: now,
+    }
+  }
+  if (stampedIds.size) await savePeriodicalSurveys(surveys)
+  return {
+    status: 200,
+    json: {
+      ok: true,
+      branchId,
+      branchName: branch.name,
+      pendingCount: incomplete.length,
+      to,
+      cc,
+      surveys: surveys.filter((x) => x.branchId === branchId && isHdfcSurveyRow(x)),
+    },
+  }
+}
+
 export async function handlePeriodicalSurveyRemind(
   body: Record<string, unknown>,
   actorEmail: string,
@@ -344,6 +505,11 @@ export async function handlePeriodicalSurveyRemind(
     return { status: 503, json: { error: 'Storage not connected.' } }
   }
   const surveyId = s(body.surveyId, 40)
+  const surveyKind = s(body.surveyKind, 20).toLowerCase()
+  const branchIdIn = s(body.branchId, 80)
+  if (surveyKind === 'hdfc' || (branchIdIn && !surveyId)) {
+    return handleHdfcBranchSurveyRemind(body, actorEmail)
+  }
   const surveys = await getPeriodicalSurveys()
   let sv = surveyId ? surveys.find((x) => x.id === surveyId) : null
   if (!sv) return { status: 404, json: { error: 'Survey not found.' } }
@@ -359,13 +525,7 @@ export async function handlePeriodicalSurveyRemind(
   const surveyor = (sv.surveyorEmail || '').trim().toLowerCase()
   const to = [...new Set([surveyor, ...hodTo].filter((e) => e.includes('@')))]
   if (!to.length) to.push(MIS_DIRECTOR_CC_EMAIL.toLowerCase())
-  const cc = [
-    ...new Set(
-      [LOKESH_CC_EMAIL, MIS_DIRECTOR_CC_EMAIL]
-        .map((e) => e.toLowerCase())
-        .filter((e) => e.includes('@') && !to.includes(e)),
-    ),
-  ]
+  const cc = ssaRemindCc(to)
   const branchName =
     (await getBranches(true)).find((b) => b.id === sv.branchId)?.name || sv.branchId || '—'
   const actionLine =
@@ -401,44 +561,24 @@ export async function handlePeriodicalSurveyRemind(
     `Regards,`,
     `Agile MIS — Site Security Assessment (SSA)`,
   ].join('\n')
-  const apiKey = process.env.RESEND_API_KEY?.trim()
-  if (!apiKey) return { status: 503, json: { error: 'Email service not configured.' } }
-  try {
-    const { Resend } = await import('resend')
-    const resend = new Resend(apiKey)
-    const result = await sendSuiteEmail(resend, {
-      from: pinMailFrom(),
-      to,
-      cc,
-      subject: `[Reminder with suggestion] Site Security Assessment (SSA) — ${sv.company || 'Site'}`,
-      text,
-      html: `<div style="font-family:Arial,sans-serif;white-space:pre-wrap;font-size:14px;color:#111">${text.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</div>`,
-      skipDirectorCc: true,
-    })
-    if ((result as { error?: { message?: string } }).error) {
-      return {
-        status: 502,
-        json: {
-          error:
-            (result as { error?: { message?: string } }).error?.message || 'Could not send reminder.',
-        },
-      }
-    }
-    const now = new Date().toISOString()
-    const next = {
-      ...sv,
-      lastReminderAt: now,
-      reminderCount: (sv.reminderCount || 0) + 1,
-      updatedAt: now,
-    }
-    const idx = surveys.findIndex((x) => x.id === sv!.id)
-    if (idx >= 0) surveys[idx] = next
-    await savePeriodicalSurveys(surveys)
-    return { status: 200, json: { ok: true, survey: next, to, cc } }
-  } catch (err) {
-    console.error('[periodicalSurveyRemind]', err)
-    return { status: 502, json: { error: 'Could not send reminder.' } }
+  const sent = await sendSsaReminderEmail({
+    to,
+    cc,
+    subject: `[Reminder with suggestion] Site Security Assessment (SSA) — ${sv.company || 'Site'}`,
+    text,
+  })
+  if (!sent.ok) return { status: sent.status, json: { error: sent.error } }
+  const now = new Date().toISOString()
+  const next = {
+    ...sv,
+    lastReminderAt: now,
+    reminderCount: (sv.reminderCount || 0) + 1,
+    updatedAt: now,
   }
+  const idx = surveys.findIndex((x) => x.id === sv!.id)
+  if (idx >= 0) surveys[idx] = next
+  await savePeriodicalSurveys(surveys)
+  return { status: 200, json: { ok: true, survey: next, to, cc } }
 }
 
 export async function handlePeriodicalSurveyReopen(
