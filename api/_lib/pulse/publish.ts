@@ -1,4 +1,4 @@
-import { clearPending, waListGroups, waSendText, whatsappConfigured } from './whatsapp.js'
+import { clearPending, waListGroups, waNewsReady, waSendText, whatsappConfigured } from './whatsapp.js'
 import { redisCommand } from './store.js'
 
 export type PublishResult = {
@@ -146,6 +146,15 @@ export async function publishGroupMessages(msg2: string): Promise<{
   if (!whatsappConfigured()) {
     return { groupsSent: 0, tried: 0, usedLiveList: false, error: 'WhatsApp gateway not configured (WHAPI_TOKEN)' }
   }
+  const news = await waNewsReady()
+  if (!news.ready) {
+    return {
+      groupsSent: 0,
+      tried: 0,
+      usedLiveList: false,
+      error: `WhatsApp not linked (${news.status}). Connect 7093066626 on Whapi.`,
+    }
+  }
   const saved = envGroupIds()
   const live = await liveGroupIds()
   const groups = [...new Set([...saved, ...live])]
@@ -162,6 +171,16 @@ export async function publishGroupMessages(msg2: string): Promise<{
 export async function publishEditionMessages(msg1: string, msg2: string): Promise<PublishResult> {
   if (!whatsappConfigured()) {
     return { ok: false, channelSent: false, groupsSent: 0, error: 'WhatsApp gateway not configured (WHAPI_TOKEN)' }
+  }
+
+  const news = await waNewsReady()
+  if (!news.ready) {
+    return {
+      ok: false,
+      channelSent: false,
+      groupsSent: 0,
+      error: `WhatsApp not linked (${news.status}). Connect 7093066626 on Whapi.`,
+    }
   }
 
   const channel = process.env.WHAPI_CHANNEL_ID?.trim()

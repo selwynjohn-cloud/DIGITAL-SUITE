@@ -4,11 +4,17 @@ import { redisCommand } from './store.js'
  * Whapi.cloud gateway — lets the robot post into WhatsApp Channels and Groups
  * (which the official API cannot do).
  *
- * Two computer lines (buffer):
- * - primary  WHAPI_TOKEN        → news phone 9441009091
- * - spare    WHAPI_TOKEN_6626   → 7893692345 or 7093066626
- * Pairing the spare must never log out 9091.
+ * News / group blast phone (from 15 Oct 2026): +91 7093066626
+ * - primary  WHAPI_TOKEN        → Pulse channel (link 7093066626 here)
+ * - spare    WHAPI_TOKEN_6626   → optional second Whapi channel for 6626
+ *
+ * If the spare token is not set, pair 7093066626 on the primary channel.
+ * Do not wait on a dead 9441009091 session — that hangs the group blast.
  */
+
+/** Pulse news WhatsApp — groups + Channel send from this linked device. */
+export const NEWS_WA_DIGITS = '917093066626'
+export const NEWS_WA_LAST4 = '6626'
 
 const BASE = 'https://gate.whapi.cloud'
 
@@ -59,10 +65,16 @@ async function waFetchWithBuffer(
   init?: RequestInit,
   timeoutMs = 20000,
 ): Promise<{ ok: boolean; status: number; data: any } | null> {
-  const first = await waFetch(path, init, timeoutMs, 'primary')
+  const ready = await waNewsReady()
+  if (!ready.ready) {
+    return { ok: false, status: 0, data: { skipped: true, reason: 'not-linked', status: ready.status } }
+  }
+  const preferred: WaChannel = ready.channel
+  const first = await waFetch(path, init, timeoutMs, preferred)
   if (first?.ok) return first
-  if (!tokenFor('buffer')) return first
-  const second = await waFetch(path, init, timeoutMs, 'buffer')
+  const other: WaChannel = preferred === 'buffer' ? 'primary' : 'buffer'
+  if (!tokenFor(other)) return first
+  const second = await waFetch(path, init, Math.min(timeoutMs, 8000), other)
   if (second?.ok) return second
   return first ?? second
 }
@@ -245,6 +257,48 @@ export async function waBothLinkStatus() {
   return { primary, buffer, bufferConfigured }
 }
 
+export type NewsLink = {
+  ready: boolean
+  linked: boolean
+  phoneLast4: string
+  status: string
+  channel: WaChannel
+}
+
+let newsReadyCache: { at: number; value: NewsLink } | null = null
+const NEWS_READY_TTL_MS = 20_000
+
+/** Prefer 7093066626 when linked; otherwise any live Whapi session. */
+export async function waNewsReady(): Promise<NewsLink> {
+  if (newsReadyCache && Date.now() - newsReadyCache.at < NEWS_READY_TTL_MS) {
+    return newsReadyCache.value
+  }
+  const both = await waBothLinkStatus()
+  const pick = (row: { linked: boolean; phoneLast4: string; status: string; channel: WaChannel }): NewsLink => ({
+    ready: row.linked,
+    linked: row.linked,
+    phoneLast4: row.phoneLast4,
+    status: row.status,
+    channel: row.channel,
+  })
+  let value: NewsLink
+  if (both.buffer.linked && both.buffer.phoneLast4 === NEWS_WA_LAST4) value = pick(both.buffer)
+  else if (both.primary.linked && both.primary.phoneLast4 === NEWS_WA_LAST4) value = pick(both.primary)
+  else if (both.buffer.linked) value = pick(both.buffer)
+  else if (both.primary.linked) value = pick(both.primary)
+  else {
+    value = {
+      ready: false,
+      linked: false,
+      phoneLast4: '',
+      status: both.primary.status || 'QR',
+      channel: 'primary',
+    }
+  }
+  newsReadyCache = { at: Date.now(), value }
+  return value
+}
+
 function loginErrorMessage(data: unknown): string {
   if (!data || typeof data !== 'object') return ''
   const o = data as Record<string, unknown>
@@ -261,22 +315,22 @@ export async function waLogout(channel: WaChannel = 'primary') {
 function connectFailReason(http: number, data: unknown, last4 = ''): string {
   const api = loginErrorMessage(data)
   if (http === 500 || /internal error/i.test(api)) {
-    return 'WhatsApp is not ready yet. Wait 30 seconds, then tap Connect 9441009091 once more.'
+    return 'WhatsApp is not ready yet. Wait 30 seconds, then connect 7093066626 once more.'
   }
   if (http === 406) {
     return 'This WhatsApp line is set as a phone connection, so it cannot show a computer code.'
   }
   if (http === 409) {
-    return last4 && last4 !== '9091'
-      ? `WhatsApp is still connected to the number ending ${last4}. That is not 9441009091.`
+    return last4 && last4 !== NEWS_WA_LAST4
+      ? `WhatsApp is still connected to the number ending ${last4}. That is not 7093066626.`
       : 'WhatsApp is already connected.'
   }
-  if (http === 422) return 'WhatsApp could not make the code. Tap Connect 9441009091 once more.'
-  if (http === 0 || !http) return 'WhatsApp is not ready yet. Wait 30 seconds, then tap Connect 9441009091 once more.'
+  if (http === 422) return 'WhatsApp could not make the code. Connect 7093066626 once more.'
+  if (http === 0 || !http) return 'WhatsApp is not ready yet. Wait 30 seconds, then connect 7093066626 once more.'
   if (/internal error/i.test(api)) {
-    return 'WhatsApp is not ready yet. Wait 30 seconds, then tap Connect 9441009091 once more.'
+    return 'WhatsApp is not ready yet. Wait 30 seconds, then connect 7093066626 once more.'
   }
-  return api || 'WhatsApp did not give a connect code. Tap Connect 9441009091 once more.'
+  return api || 'WhatsApp did not give a connect code. Connect 7093066626 once more.'
 }
 
 function pickPairingCode(data: unknown): string {
@@ -329,21 +383,15 @@ function loginResult(
   }
 }
 
-/** Pairing code — 9091 uses the news line; 6626 uses the spare line only (never logs out 9091). */
-export async function waPairingCode(phone = '919441009091') {
+/** Pairing code — 7093066626 is the news line. Spare token is optional. */
+export async function waPairingCode(phone = NEWS_WA_DIGITS) {
   const digits = String(phone).replace(/\D/g, '')
   const wantLast4 = digits.slice(-4)
-  const channel: WaChannel = wantLast4 === '6626' || wantLast4 === '2345' ? 'buffer' : 'primary'
-  if (channel === 'buffer' && !tokenFor('buffer')) {
-    return {
-      ok: false,
-      alreadyAuthenticated: false,
-      phoneLast4: wantLast4,
-      code: '',
-      http: 503,
-      error:
-        'Spare WhatsApp line is not set yet. Add WHAPI_TOKEN_6626 on the server. The news phone (9091) was not disconnected.',
-    }
+  // 6626 / 2345 use the spare Whapi channel only when that token exists.
+  // Production has no WHAPI_TOKEN_6626 — pair 7093066626 on the live Pulse channel.
+  let channel: WaChannel = 'primary'
+  if ((wantLast4 === NEWS_WA_LAST4 || wantLast4 === '2345') && tokenFor('buffer')) {
+    channel = 'buffer'
   }
   const link = await waLinkStatus(channel)
   if (link.linked && link.phoneLast4 === wantLast4) {
@@ -371,15 +419,15 @@ export async function waPairingCode(phone = '919441009091') {
   return loginResult(login, wantLast4, link.phoneLast4)
 }
 
-/** Pairing code so Director can link 9441009091. */
+/** Pairing code / QR so Director can link 7093066626 on the Pulse Whapi channel. */
 export async function waLoginQr() {
   try {
-    const pair = await waPairingCode('919441009091')
+    const pair = await waPairingCode(NEWS_WA_DIGITS)
     if (pair.alreadyAuthenticated || pair.code) {
       return {
         ok: Boolean(pair.alreadyAuthenticated || pair.code),
         alreadyAuthenticated: pair.alreadyAuthenticated,
-        phoneLast4: pair.phoneLast4,
+        phoneLast4: pair.phoneLast4 || NEWS_WA_LAST4,
         qrDataUrl: '',
         qrImageUrl: '',
         code: pair.code,
@@ -389,55 +437,53 @@ export async function waLoginQr() {
         error: pair.error,
       }
     }
-    if (pair.http === 500 || pair.http === 422 || pair.http === 0) {
-      const login = await waFetch('/users/login?wakeup=true&size=400', { method: 'GET' }, 20000)
-      const data = (login?.data && typeof login.data === 'object' ? login.data : {}) as Record<string, unknown>
-      if (login?.status === 409) {
-        const last4 = pickPhoneLast4(data) || pair.phoneLast4
-        return {
-          ok: last4 === '9091',
-          alreadyAuthenticated: last4 === '9091',
-          phoneLast4: last4,
-          qrDataUrl: '',
-          qrImageUrl: '',
-          code: '',
-          expire: null,
-          source: 'auth',
-          http: 409,
-          error: last4 === '9091' ? undefined : connectFailReason(409, data, last4),
-        }
+    const login = await waFetch('/users/login?wakeup=true&size=400', { method: 'GET' }, 20000)
+    const data = (login?.data && typeof login.data === 'object' ? login.data : {}) as Record<string, unknown>
+    if (login?.status === 409) {
+      const last4 = pickPhoneLast4(data) || pair.phoneLast4
+      return {
+        ok: last4 === NEWS_WA_LAST4,
+        alreadyAuthenticated: last4 === NEWS_WA_LAST4,
+        phoneLast4: last4,
+        qrDataUrl: '',
+        qrImageUrl: '',
+        code: '',
+        expire: null,
+        source: 'auth',
+        http: 409,
+        error: last4 === NEWS_WA_LAST4 ? undefined : connectFailReason(409, data, last4),
       }
-      let qr = String(data.qr || data.base64 || data.image || data.qr_code || '')
-      if (qr && !qr.startsWith('data:') && !qr.startsWith('http') && qr.length > 40) {
-        qr = `data:image/png;base64,${qr}`
-      }
-      const code = pickPairingCode(data)
-      if (code || qr.startsWith('data:') || qr.startsWith('http')) {
-        return {
-          ok: true,
-          alreadyAuthenticated: false,
-          phoneLast4: pair.phoneLast4,
-          qrDataUrl: qr.startsWith('data:') || qr.startsWith('http') ? qr : '',
-          qrImageUrl: qr.startsWith('data:') || qr.startsWith('http') ? qr : '',
-          code,
-          expire: typeof data.expire === 'number' ? data.expire : null,
-          source: code ? 'code' : 'image',
-          http: login?.status ?? 0,
-          error: undefined,
-        }
+    }
+    let qr = String(data.qr || data.base64 || data.image || data.qr_code || '')
+    if (qr && !qr.startsWith('data:') && !qr.startsWith('http') && qr.length > 40) {
+      qr = `data:image/png;base64,${qr}`
+    }
+    const code = pickPairingCode(data)
+    if (code || qr.startsWith('data:') || qr.startsWith('http')) {
+      return {
+        ok: true,
+        alreadyAuthenticated: false,
+        phoneLast4: NEWS_WA_LAST4,
+        qrDataUrl: qr.startsWith('data:') || qr.startsWith('http') ? qr : '',
+        qrImageUrl: qr.startsWith('data:') || qr.startsWith('http') ? qr : '',
+        code,
+        expire: typeof data.expire === 'number' ? data.expire : null,
+        source: code ? 'code' : 'image',
+        http: login?.status ?? 0,
+        error: undefined,
       }
     }
     return {
       ok: false,
       alreadyAuthenticated: false,
-      phoneLast4: pair.phoneLast4,
+      phoneLast4: pair.phoneLast4 || NEWS_WA_LAST4,
       qrDataUrl: '',
       qrImageUrl: '',
       code: '',
       expire: null,
       source: 'none',
       http: pair.http,
-      error: pair.error || 'WhatsApp is not ready yet. Wait 30 seconds, then tap Connect 9441009091 once more.',
+      error: pair.error || 'WhatsApp is not ready yet. Wait 30 seconds, then connect 7093066626 once more.',
     }
   } catch {
     return {
@@ -450,7 +496,7 @@ export async function waLoginQr() {
       expire: null,
       source: 'none',
       http: 0,
-      error: 'WhatsApp is not ready yet. Wait 30 seconds, then tap Connect 9441009091 once more.',
+      error: 'WhatsApp is not ready yet. Wait 30 seconds, then connect 7093066626 once more.',
     }
   }
 }
