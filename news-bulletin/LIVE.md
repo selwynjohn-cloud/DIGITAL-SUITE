@@ -40,11 +40,13 @@ Outside a slot window the API returns `skipped: true, reason: "outside-slot"`. U
 
 **Fast2SMS:** retired. Do not use for Security News. Production is Pulse Channel + groups + email only.
 
+**Personal WhatsApp check number:** `+91 7093066626` (replaced `9441009091` on 15 Oct 2026). Pulse does not 1:1-send this number. Follow the Channel on that phone and/or add it to a blast group via Pulse Admin.
+
 ## 15 October 2026 — 6:00 AM Morning (WhatsApp blast failed)
 
 Checked / rescue-published at **~9:42–9:44 AM IST** during the live morning retry slot (`inSlot: true`, `isRetry: true`). Live Pulse page shows **Morning Edition** for **15 October 2026 (Thursday)** with a full feed (`newsCount: 24`).
 
-`GET /api/pulse/cron` and `POST ?edition=morning` both returned `published: false`, `groupsSent: 0`, `channelSent: false`, **`emailed: true`**. Status stayed `sent: false`. **Email went; WhatsApp Channel + groups did not.** Fast2SMS 1:1 to `9441009091` was **not** used (retired / not working).
+`GET /api/pulse/cron` and `POST ?edition=morning` both returned `published: false`, `groupsSent: 0`, `channelSent: false`, **`emailed: true`**. Status stayed `sent: false`. **Email went; WhatsApp Channel + groups did not.** Fast2SMS 1:1 was **not** used (retired). Personal check number is now **`+91 7093066626`** (was `9441009091`).
 
 | Edition | Sent | Channel | Groups | Email | At (IST) |
 |---------|------|---------|--------|-------|----------|

@@ -1,6 +1,12 @@
 # Activate AGILE GROUP Security News Bulletin
 
-**Do not use Fast2SMS.** It is unreliable (1:1 session window, template-only fallback, no Channel/groups blast). Treat `send.js` / `Code.gs` in this folder as **retired**. Number `9441009091` is only a leftover Fast2SMS `BULLETIN_TO` — it is **not** how production Security News is shared.
+**Do not use Fast2SMS.** It is unreliable (1:1 session window, template-only fallback, no Channel/groups blast). Treat `send.js` / `Code.gs` in this folder as **retired**.
+
+**Personal WhatsApp check number (from 15 Oct 2026):** `+91 7093066626` (replaces `9441009091`). Production Pulse still does **not** 1:1-blast this number. To receive Security News on **7093066626**:
+
+1. On that phone, **Follow** the Channel: https://whatsapp.com/channel/0029VbCUrUAFnSz8CmYqJP1y
+2. Add **7093066626** to at least one of the Pulse blast groups (Pulse Admin OTP — group list is not public)
+3. Do **not** expect Fast2SMS to deliver to this number
 
 **Production:** Pulse Command Centre — WhatsApp **Channel + groups + email**. See [`LIVE.md`](./LIVE.md).
 
@@ -8,11 +14,11 @@
 - Channel: https://whatsapp.com/channel/0029VbCUrUAFnSz8CmYqJP1y
 - Force send: **Pulse Admin** OTP `@agilegroup.co.in` → **Publish now**
 
-If WhatsApp Channel/groups fail (`published: false`, `groupsSent: 0`) while `emailed: true`, paste the locked SHARE packs by hand. Do not retry Fast2SMS.
+If WhatsApp Channel/groups fail (`published: false`, `groupsSent: 0`) while `emailed: true`, paste the locked SHARE packs by hand to **7093066626**. Do not retry Fast2SMS.
 
 ## Historical Fast2SMS notes (do not run)
 
-The steps below are kept only as a record of the old 1:1 path to `9441009091`. They are **not** the live share method.
+The steps below are kept only as a record of the old 1:1 path. Default `BULLETIN_TO` is now `7093066626` (was `9441009091`). They are **not** the live share method.
 
 ## Fastest path — Google Apps Script
 
@@ -23,7 +29,7 @@ The steps below are kept only as a record of the old 1:1 path to `9441009091`. T
 | Property | Value |
 |----------|-------|
 | `FAST2SMS_API_KEY` | from [Fast2SMS Dev API](https://www.fast2sms.com/dashboard/dev-api) |
-| `BULLETIN_TO` | `9441009091` |
+| `BULLETIN_TO` | `7093066626` |
 | `BULLETIN_CHANNEL` | `whatsapp` |
 | `BULLETIN_FLASH_HEADLINE` | optional lead under 🔴 |
 | `FAST2SMS_PHONE_NUMBER_ID` | optional (auto) |

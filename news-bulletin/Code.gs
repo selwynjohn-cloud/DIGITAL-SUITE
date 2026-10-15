@@ -8,13 +8,13 @@
  * 2. Paste this entire file into Code.gs (replace the stub)
  * 3. Project Settings → Script properties → Add:
  *      FAST2SMS_API_KEY          = <from https://www.fast2sms.com/dashboard/dev-api>
- *      BULLETIN_TO               = 9441009091
+ *      BULLETIN_TO               = 7093066626
  *      FAST2SMS_PHONE_NUMBER_ID  = (optional — auto-resolved if blank)
  *      FAST2SMS_MESSAGE_ID       = (optional — template fallback only)
  *      BULLETIN_CHANNEL          = whatsapp   (or "sms" / "auto")
  *      BULLETIN_FLASH_HEADLINE   = (optional lead story line under 🔴)
  * 4. Run → activateNewsBulletin  (authorize when prompted)
- * 5. Check Executions log + WhatsApp (9441009091)
+ * 5. Check Executions log + WhatsApp (7093066626)
  *
  * Delivery order for whatsapp/auto:
  *   1) WhatsApp session text (full AGILE copy — needs 24h window)
@@ -22,7 +22,7 @@
  *   3) Quick SMS if channel=auto|sms
  */
 
-var DEFAULT_BULLETIN_TO = '9441009091';
+var DEFAULT_BULLETIN_TO = '7093066626';
 var FAST2SMS_BASE = 'https://www.fast2sms.com';
 var DEFAULT_FLASH =
   'eight killed in bus collision and fire on Delhi-Mumbai Expressway in Rajasthan';

@@ -21,7 +21,7 @@ const { buildAgileSecurityBulletin } = require('./bulletin');
 loadEnv(path.join(__dirname, '.env'));
 
 const API_KEY = process.env.FAST2SMS_API_KEY || '';
-const BULLETIN_TO = normalizePhone(process.env.BULLETIN_TO || '9441009091');
+const BULLETIN_TO = normalizePhone(process.env.BULLETIN_TO || '7093066626');
 const CHANNEL = (process.env.BULLETIN_CHANNEL || 'whatsapp').toLowerCase();
 const BASE = 'https://www.fast2sms.com';
 
