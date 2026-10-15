@@ -1,8 +1,18 @@
 # Activate AGILE GROUP Security News Bulletin
 
-**Production (preferred):** the live Command Centre already auto-publishes three daily editions — see [`LIVE.md`](./LIVE.md).
+**Do not use Fast2SMS.** It is unreliable (1:1 session window, template-only fallback, no Channel/groups blast). Treat `send.js` / `Code.gs` in this folder as **retired**. Number `9441009091` is only a leftover Fast2SMS `BULLETIN_TO` — it is **not** how production Security News is shared.
 
-**Legacy / backup in this folder:** Google Apps Script + Fast2SMS sender for the official **SECURITY NEWS – AGILE GROUP** WhatsApp copy.
+**Production:** Pulse Command Centre — WhatsApp **Channel + groups + email**. See [`LIVE.md`](./LIVE.md).
+
+- Page: https://www.agilegroup-digital.co.in/pulse
+- Channel: https://whatsapp.com/channel/0029VbCUrUAFnSz8CmYqJP1y
+- Force send: **Pulse Admin** OTP `@agilegroup.co.in` → **Publish now**
+
+If WhatsApp Channel/groups fail (`published: false`, `groupsSent: 0`) while `emailed: true`, paste the locked SHARE packs by hand. Do not retry Fast2SMS.
+
+## Historical Fast2SMS notes (do not run)
+
+The steps below are kept only as a record of the old 1:1 path to `9441009091`. They are **not** the live share method.
 
 ## Fastest path — Google Apps Script
 

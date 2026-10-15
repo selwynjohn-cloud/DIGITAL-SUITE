@@ -38,6 +38,34 @@ Outside a slot window the API returns `skipped: true, reason: "outside-slot"`. U
 1. **WhatsApp News Channel** — short (news + Pulse only). No jobs.
 2. **All groups** — fuller (duty line + `https://tinyurl.com/Security-News` + jobs). Never long section menus.
 
+**Fast2SMS:** retired. Do not use for Security News. Production is Pulse Channel + groups + email only.
+
+## 15 October 2026 — 6:00 AM Morning (WhatsApp blast failed)
+
+Checked / rescue-published at **~9:42–9:44 AM IST** during the live morning retry slot (`inSlot: true`, `isRetry: true`). Live Pulse page shows **Morning Edition** for **15 October 2026 (Thursday)** with a full feed (`newsCount: 24`).
+
+`GET /api/pulse/cron` and `POST ?edition=morning` both returned `published: false`, `groupsSent: 0`, `channelSent: false`, **`emailed: true`**. Status stayed `sent: false`. **Email went; WhatsApp Channel + groups did not.** Fast2SMS 1:1 to `9441009091` was **not** used (retired / not working).
+
+| Edition | Sent | Channel | Groups | Email | At (IST) |
+|---------|------|---------|--------|-------|----------|
+| Morning | page yes / **WA no** | no | 0 | yes | page live · **manual paste required** |
+| Afternoon | no | — | — | — | due 2:00 PM |
+| Evening | no | — | — | — | due 10:00 PM |
+
+Lead flash: *Jammu and Kashmir: National Highway closed after landslide in Uri*
+
+Also flashing: DGCA MOBIKINS power-bank flight ban · Punjab bandh (Mansa murder) · Delhi restaurant fire / toddler thrown to safety · Air India diversion after hijack/bomb-threat alert · IMD rain / orange–red alerts · Delhi Court bail in Sagar Dhankhar murder case
+
+Copy-paste packs: [`SHARE-2026-10-15-morning-channel.txt`](./SHARE-2026-10-15-morning-channel.txt) (Channel) · [`SHARE-2026-10-15-morning-groups.txt`](./SHARE-2026-10-15-morning-groups.txt) (All groups)
+
+Full bulletin page: https://www.agilegroup-digital.co.in/pulse  
+WhatsApp channel: https://whatsapp.com/channel/0029VbCUrUAFnSz8CmYqJP1y
+
+**Security Question of the Day (sq53):** A perimeter light is fused on a dark stretch of wall. You should:  
+A) Ignore it till the monthly meeting · B) Log it, report it the same shift, and increase patrols on that stretch · C) Switch off all lights to match · D) Stand only at the well-lit gate
+
+**Next edition:** Afternoon Bulletin — **2:00 PM IST**
+
 ## 07 September 2026 — 2:00 PM Afternoon rescue
 
 Afternoon was **not sent** in the 2:00 PM slot (`sent: false`, `currentSlot: null` at **8:18 PM IST**). Morning had gone at **9:25:44 AM** (Channel + 39 groups). Live Pulse page already showed **Afternoon Edition** for **07 September 2026 (Monday)** with a full feed (`newsCount: 20`).
