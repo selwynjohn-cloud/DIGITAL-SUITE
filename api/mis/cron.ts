@@ -261,9 +261,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         },
         message: link.linked
           ? both.buffer.linked
-            ? 'News line (9091) and spare line (6626) are both linked.'
-            : 'News line is linked. Spare line (6626) is not linked yet.'
-          : 'Whapi API is reachable, but WhatsApp is not linked. Scan QR (job=wa-qr) to reconnect.',
+            ? 'News line (7093066626) and spare Whapi channel are both linked.'
+            : `News WhatsApp is linked (…${link.phoneLast4 || '6626'}). Spare WHAPI_TOKEN_6626 is not set.`
+          : 'Whapi API is reachable, but WhatsApp is not linked. Scan the QR with 7093066626 (job=wa-qr) to reconnect.',
       })
     }
     if (job === 'wa-login-probe') {
@@ -635,7 +635,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(503).json({ ok: false, job, error: 'WHAPI_TOKEN is not set on the server.' })
       }
       const pairPhone =
-        job === 'wa-pair-6626' ? '917093066626' : job === 'wa-pair-2345' ? '917893692345' : '919441009091'
+        job === 'wa-pair-2345' ? '917893692345' : '917093066626'
       const statusBefore = await waLinkStatus()
       const pair = await waPairingCode(pairPhone)
       if (pair.alreadyAuthenticated) {
@@ -711,7 +711,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           message: 'WhatsApp channel is already linked. Try job=wa-test next.',
         })
       }
-      if (!qr.ok || !qr.qrDataUrl) {
+      if (!qr.ok || (!qr.qrDataUrl && !qr.code)) {
         return res.status(502).json({
           ok: false,
           job,
@@ -725,18 +725,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       let emailError = ''
       const apiKey = process.env.RESEND_API_KEY?.trim()
       const emailTo = suiteDirectorEmail()
+      const pairHtml = qr.code
+        ? `<p>Your WhatsApp <b>pairing code</b> for Security News is:</p>
+              <p style="font-size:28px;font-weight:800;letter-spacing:0.12em;color:#14224f">${qr.code}</p>
+              <p><b>On phone 7093066626:</b> WhatsApp → <b>Linked devices</b> → <b>Link a device</b> → <b>Link with phone number instead</b> → type this code.</p>`
+        : `<p>The news-bulletin WhatsApp link needs a quick re-scan.</p>
+              <p><b>On phone <u>7093066626</u>:</b> WhatsApp → <b>Linked devices</b> → <b>Link a device</b> → scan this QR:</p>
+              <p style="text-align:center"><img src="${qr.qrImageUrl || qr.qrDataUrl}" alt="WhatsApp QR" width="280" height="280" style="border:4px solid #14224f;border-radius:12px"/></p>`
       if (apiKey && emailTo.includes('@')) {
         try {
           const resend = new Resend(apiKey)
           const mail = await sendSuiteEmail(resend, {
             from: pinMailFrom(),
             to: emailTo,
-            subject: 'Agile WhatsApp QR — scan to reconnect news bulletin',
+            subject: qr.code
+              ? 'Agile WhatsApp pairing code — enter on 7093066626 now'
+              : 'Agile WhatsApp QR — scan with 7093066626 to reconnect news bulletin',
             html: `<p>Dear Sir,</p>
-              <p>The news-bulletin WhatsApp link needs a quick re-scan (same as before).</p>
-              <p><b>On your phone:</b> WhatsApp → <b>Linked devices</b> → <b>Link a device</b> → scan this QR:</p>
-              <p style="text-align:center"><img src="${qr.qrImageUrl || qr.qrDataUrl}" alt="WhatsApp QR" width="280" height="280" style="border:4px solid #14224f;border-radius:12px"/></p>
-              <p style="color:#64748b;font-size:13px">Number ending …${qr.phoneLast4 || ''}. Source: ${qr.source || 'image'}. Scan within about 1 minute, then reply <b>done</b> in chat.</p>`,
+              ${pairHtml}
+              <p style="color:#64748b;font-size:13px">Use <b>7093066626</b> only (not 9441009091). Source: ${qr.source || 'image'}. Do this within about 1 minute, then reply <b>done</b> in chat.</p>`,
             skipDirectorCc: true,
           })
           emailed = !mail.error
@@ -749,12 +756,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(emailed ? 200 : 502).json({
         ok: emailed,
         job,
-        phoneLast4: qr.phoneLast4,
+        phoneLast4: qr.phoneLast4 || '6626',
         emailed,
         emailError: emailError || undefined,
         expire: qr.expire ?? null,
+        hasCode: Boolean(qr.code),
         message: emailed
-          ? 'QR emailed to Director. Please scan it now in WhatsApp → Linked devices.'
+          ? qr.code
+            ? 'Pairing code emailed. Enter it on 7093066626 → Linked devices → Link with phone number instead.'
+            : 'QR emailed to Director. Scan it now with 7093066626 → WhatsApp → Linked devices.'
           : emailError || 'Could not email QR',
       })
     }
