@@ -40,6 +40,23 @@ Outside a slot window the API returns `skipped: true, reason: "outside-slot"`. U
 1. **WhatsApp News Channel** — short (news + Pulse only). No jobs.
 2. **All groups** — news + jobs + website only. **No** Channel URL and **no** `tinyurl.com/Security-News`. Never long section menus.
 
+## 06 November 2026 — 6:00 AM Morning film
+
+Machine auto-sent at **6:00:53 AM IST** (`channelSent: true`, `groupsSent: 4`). Director-curated film + short packs prepared during morning retry window (~7:46 AM IST).
+
+| Edition | Sent | Channel | Groups | At (IST) |
+|---------|------|---------|--------|----------|
+| Morning | yes | yes | 4 | **6:00:53 AM** |
+| Afternoon | no | — | — | due 2:00 PM |
+| Evening | no | — | — | due 10:00 PM |
+
+Lead: *Giridih bank heist — ₹3–4 crore gold + ₹10 lakh cash; CCTV DVR stolen*
+
+Also: Karol Bagh Puri Plaza blaze (22 tenders) · Bhagirathi highway plunge (4 dead, 2 missing) · Cyclone Murasu fishermen · IMD rain/squall alerts · Faridabad M 2.9 boom · city desk (Hyderabad / Mumbai / Bengaluru / Chennai / Bihar)
+
+Full film: [`NEWS-FILM-2026-11-06-morning.md`](./NEWS-FILM-2026-11-06-morning.md)  
+WhatsApp packs: [`SHARE-2026-11-06-morning-channel.txt`](./SHARE-2026-11-06-morning-channel.txt) · [`SHARE-2026-11-06-morning-groups.txt`](./SHARE-2026-11-06-morning-groups.txt)
+
 ## 08 September 2026 — 6:00 AM Morning share
 
 Shared / published at **7:35:59 AM IST** during the live morning slot (`inSlot: true`, rescue retry). Live Pulse page shows **Morning Edition** for **08 September 2026 (Tuesday)**. Cron status: `sent: true`, `channelSent: true`, `groupsSent: 38`.
