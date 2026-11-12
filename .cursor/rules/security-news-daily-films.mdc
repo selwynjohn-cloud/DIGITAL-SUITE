@@ -1,0 +1,38 @@
+---
+description: Every Security News film gets its own folder, a Short, and the running cheetah
+alwaysApply: true
+---
+
+# Daily Security News films
+
+Two films each day. He asks for the morning film, and later for the evening film. Do not make one film stand in for both.
+
+- Morning film: the morning news.
+- Evening film: the latest news. Do not repeat the morning film.
+- Every film shows and speaks the date like this: `30-10-2026 Morning News` or `30-10-2026 Evening News`. Day, month, year, then Morning News or Evening News. It sits on the top line beside Agile Group, and it is the first words of the flash line. The first story says it once. Do this every day.
+- On the reader’s first picture, the gold line under SECURITY NEWS says Your Daily Security News. A special bulletin says Special Bulletin there instead. Do not put “Your daily security briefing” back.
+- Change the reader on every film. The order is Ms Saleena, Ms Priya, Ms Nalini, Ms Reshma, then Ms Saleena again. Her own opening and her own closing are used together. Do not keep the same reader for the next film. The 6.33 AM film on 30 October 2026 was Ms Reshma, so the next film is Ms Saleena.
+- One clear film only, with only that edition's fresh news (no older news mixed in). Each news gets its own folder on the Desktop (Director, 4 Nov 2026). The folder and the film are named date first, then time, like `4 Nov-6.00 am` (`_film_name` in `server.py`). Inside that same folder put the film, the wide thumbnail, the Short film, the Short thumbnail, and a text file named `YouTube words.txt` (title, description, and one comma-separated tagline). Do not also copy it into NEWS or DAILY NEWS.
+- This file is for YouTube. Keep it sharp (`_yt_video` in `show.py`: medium, crf 14). Do not go back to a thin picture. Do not upload it unless he says so.
+- The wide thumbnail is 1280 by 720. Do not put the missing guard's pictures on the wide thumbnail or the Short thumbnail. His pictures stay on the film card. The Short is a vertical film under 60 seconds. On the Short, the picture sits high. Under the picture, write: Please follow up our news channel for detailed news and more flash news. www.agilegroup.co.in. The Short logo is the running cheetah film, large enough to see in full, centred near the top, cropped and keyed the same way as the long film. Loop it only for the length of that card. Do not use an endless loop. Under the logo, the heading is the story she is reading, then the next news. Job openings sits with Register Now. On each long-film story, the card shows that story’s headline only, and she reads the story that belongs to it. Do not print the whole story on the card. The picture on the card matches that story. The Short thumbnail shows the same logo, with no black square behind it. The news matter is written in a large font so it can be read on a phone, and lined up in the centre. The picture is smaller than the words, centred, and not stretched. The follow line sits under the picture with a clear gap, so nothing covers the words. The title in the text file starts with the date like 30-10-2026 Morning News. Do not upload either film unless he says so.
+- Do not make a small WhatsApp copy of the film. He does not share the film that way.
+- Use only the news he saved, including pictures he chose or asked to have made. Do not fill the film from the public bulletin on your own.
+- Do not put the morning or evening film on the website unless he asks.
+- Every Security News film shows and speaks this line once, and no other disclaimer: Always follow Government Guidelines. Do not show or speak the Agile control-room number 9248707070.
+- Job vacancies do not name the cities. The job heading is JOIN AGILE FAMILY. Under it: Build your Career with us. Opening in Multiple cities for. Then: 1. Hospital & Health Care services. 2. Facility Management. 3. Security Services. Under the QR: Scan the QR and submit your Expression of Interest. The crest has no black square behind it.
+- From 12 November 2026 every morning film and every evening film uses this order. Use only news from the last 18 hours. Earthquakes use National Centre for Seismology figures from the past 24 hours. If a section has nothing in that time, skip it. Do not fill it with older news.
+  1. Positive and Pride of India news: inventions, scientific breakthroughs, awards, global recognition, economic growth, and public milestones.
+  2. Major accidents, attacks, fires and deaths.
+  3. Bank and ATM thefts, robberies and financial fraud.
+  4. Floods, weather and IMD rain alerts.
+  5. Strikes, protests and public order.
+  6. Major arrests and law enforcement operations.
+  7. Earthquakes.
+  8. Sports highlights. This sits before the gold rate.
+  9. Gold and silver rates, today's market update. Hyderabad shop rates. The shop price is more after making charges and tax.
+  10. Operational takeaways for Agile Group security teams.
+  Then speak “Always follow Government Guidelines” once. Then the hiring card once, inside the news. Then the daily thought. Then the reader thanks. Her closing is the end of the film. Do not add a second thank-you slide after she has thanked.
+- From 4 November 2026 every morning film, evening film, and Short must show the Register Now QR (`https://www.securityjob.co.in/#register`). The QR must be large enough to scan on a phone. On the Short the QR is the high picture; the follow line sits under it: Please follow up our news channel for detailed news and more flash news. www.agilegroup.co.in. Do not cover the words. Do not point the QR at an outsourcing letter. Do not put Tanish on the film, the Short, or the thumbnails. Do not speak 9248707070.
+- From 7 November 2026 the old Register QR slide is off the long film. Hiring is shown once, inside the news, before the reader thanks (`show.hiring_register_card`, `assets/register-qr-agile.png`): Agile Security Force Private Limited, Now hiring, Security Services, Facility Management, Healthcare & Hospitality, Register Now. Large type for a phone. No dark bar behind those three lines. The Agile crest sits inside the code. The running cheetah stays at the top left. The film reads this card. Do not also play the older Join Agile Family card in the same film. Do not place a thank-you slide after the reader. Her closing is the only thank-you. On the 7 Nov 2026 morning film only, after the guards’ slide the film says “Please follow us for Deepavali fire safety guidelines.” Then Ms Saleena thanks. The words on the guards’ slide line up with the picture.
+- The 7 Nov 2026 morning news shows the Festival Safety Alert poster, then the guards’ slide. The guards’ slide keeps a picture of a guard at the gate. Do not paste the poster onto that slide. Do not speak 9248707070. Do not put the poster on later news films unless he asks again.
+- After the operational takeaways and the guidelines line, show the hiring card, then the daily thought. The heading is exactly: AGILE SENTINEL- DAILY SECURITY BRIEFING AND MOTIVATION. The day of the film date picks the line from `thoughts.py` (the 28th is day 28). The short thought is on the left. The shift takeaway is written where the picture would be, and the card stays up long enough to read it. Do not put a photo on that card.

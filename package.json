@@ -30,6 +30,7 @@
     "check:independent-branches": "node scripts/check-independent-branches.mjs",
     "check:daily-reports": "node scripts/check-daily-reports.mjs",
     "check:bulletin": "node scripts/check-bulletin.mjs",
+    "check:security-news-film": "node scripts/check-security-news-film.mjs",
     "check:left-company": "node scripts/check-left-company.mjs",
     "check:suite-admin": "node scripts/check-suite-admin-sai.mjs",
     "check:ops-menu": "node scripts/check-ops-menu.mjs",

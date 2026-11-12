@@ -1,0 +1,135 @@
+{
+  "date": "2026-11-12",
+  "opening": "Namaskar. Good morning. Welcome to the morning Agile Group News.",
+  "closing": "Thank you for watching Agile Group Security News.",
+  "reader": "saleena",
+  "dayPart": "morning",
+  "barLabel": "NEWS",
+  "missingGuard": false,
+  "readers": [
+    {
+      "id": "saleena",
+      "name": "Ms Saleena",
+      "openFile": "assets/readers/saleena-open.mp4",
+      "closeFile": "assets/readers/saleena-close.mp4"
+    },
+    {
+      "id": "priya",
+      "name": "Ms Priya",
+      "openFile": "assets/readers/priya-open.mp4",
+      "closeFile": "assets/readers/priya-close.mp4"
+    },
+    {
+      "id": "nalini",
+      "name": "Ms Nalini",
+      "openFile": "assets/readers/nalini-open.mp4",
+      "closeFile": "assets/readers/nalini-close.mp4"
+    },
+    {
+      "id": "reshma",
+      "name": "Ms Reshma",
+      "openFile": "assets/readers/reshma-open.mp4",
+      "closeFile": "assets/readers/reshma-close.mp4"
+    }
+  ],
+  "flash": [
+    {
+      "id": "m12-good",
+      "title": "Cabinet extends help for new businesses",
+      "script": "12-11-2026 Morning News. Here is a good start to the day. The Union Cabinet has extended the Stand-Up India scheme for five more years, until March 2031. It will help another 2.5 lakh women, and entrepreneurs from the Scheduled Castes and Scheduled Tribes, with loans to start a new business. The Cabinet has also kept the small-loan guarantee going, so that about 12.6 lakh crore rupees in Mudra loans can be given over five years. Farmers will get fertiliser support of about 62,370 crore rupees for this rabi season. Navi Mumbai has been named India's cleanest city in this year's survey, with Surat and Vijayawada next. Direct tax collections are up about 12 percent so far this year.",
+      "media": "uploads/m12-sunrise.jpg",
+      "mediaType": "image",
+      "kicker": "Daily News"
+    },
+    {
+      "id": "m12-bus",
+      "title": "Electric bus burns in Delhi, no one hurt",
+      "script": "A Delhi city electric bus caught fire near the Shastri Park underpass overnight. There were no passengers on board. The driver stopped and called the fire service. Two fire engines came. The bus was burnt out. No one was hurt. The cause is still being checked. If a vehicle starts to smoke, stop and get everyone out.",
+      "media": "uploads/m12-bus.jpg",
+      "mediaType": "image",
+      "kicker": "Daily News"
+    },
+    {
+      "id": "m12-kulgam",
+      "title": "Three soldiers hurt at a Kulgam checkpost",
+      "script": "On Wednesday afternoon, two men on a motorcycle opened fire at a security checkpost in Kulgam, Jammu and Kashmir. Three soldiers were hurt. One of them is serious. The attackers fled. The search is still on. At a gate or a checkpoint, a vehicle that comes in close and does not stop is a warning. Call at once.",
+      "media": "uploads/m12-check.jpg",
+      "mediaType": "image",
+      "kicker": "Daily News"
+    },
+    {
+      "id": "m12-atm",
+      "title": "Muzaffarpur ATM had no guard",
+      "script": "On the Muzaffarpur bank ATM attempt, police have now filed two cases. The men came in a white Scorpio with a Jharkhand number. They broke the outside camera and sprayed the one inside. They worked for about 13 minutes. There was no guard at that ATM. The cash is safe. They fired at the police and fled. Raids are on in four areas. An ATM with no guard, and a camera that goes dark, is a break-in. Call at once.",
+      "media": "uploads/m11-atm.jpg",
+      "mediaType": "image",
+      "kicker": "Daily News"
+    },
+    {
+      "id": "m12-air",
+      "title": "Rain in the hills, Delhi air very poor",
+      "script": "This morning's weather. Heavy rain, thunder, and hail are likely today in Jammu and Kashmir, with strong wind. Isolated rain and thunder are likely over Tamil Nadu, Puducherry, and Kerala. The Andaman Islands may have heavy rain and strong wind. Boats should stay in harbour. Delhi has no rain today, with shallow fog this morning. The air is very poor again. The city reading is 319. At ITO it is 389. Near IIT Delhi it is about 413, which is severe. The poor-air curbs stay on.",
+      "media": "uploads/e8-smog.jpg",
+      "mediaType": "image",
+      "kicker": "Weather Report"
+    },
+    {
+      "id": "m12-strike",
+      "title": "Auto and taxi strike in Kerala today",
+      "script": "Auto and taxi drivers across Kerala are on a one-day strike from midnight today until midnight tomorrow. They want the fares revised. Marches are planned at the district headquarters. Expect gatherings, and fewer autos and taxis on the road. Guards at offices and bus stands should watch the gates.",
+      "media": "uploads/m12-autos.jpg",
+      "mediaType": "image",
+      "kicker": "Daily News"
+    },
+    {
+      "id": "m12-quake",
+      "title": "A small tremor in Shimla, no damage",
+      "script": "The quake centre recorded a magnitude 3.9 tremor in Shimla district last night, at about 9:50. It was 10 kilometres deep. People felt it in Jubbal and Rohru. No one was hurt, and no damage was reported.",
+      "media": "uploads/m5-quake.jpg",
+      "mediaType": "image",
+      "kicker": "Daily News"
+    },
+    {
+      "id": "m12-sport",
+      "title": "India win in Dhaka, and lead in New Zealand",
+      "script": "In sport. India beat the Maldives one nil in Dhaka, and go through to the SAFF Championship semi-final. Suhail Ahmad Bhat scored from the penalty spot. India play Bhutan on the 14th. India also lead the one-day series against New Zealand by two matches to nil. The third match was washed out by rain, so New Zealand cannot catch them. Treesa Jolly and Gayatri Gopichand won their doubles match in Japan, 21-17, 21-14. And Chennai is set to host the Asian Athletics Championships in 2029, once the state government gives its formal word.",
+      "media": "uploads/m12-goal.jpg",
+      "mediaType": "image",
+      "kicker": "Daily News"
+    },
+    {
+      "id": "m12-gold",
+      "title": "Gold and silver are lower in Hyderabad",
+      "script": "This morning, in Hyderabad, 24 carat gold is about 1,42,000 rupees for 10 grams, and 22 carat is about 1,30,200 rupees. That is lower than yesterday. Silver is about 2,00,000 rupees a kilo, a little lower than yesterday. The shop price is more after making charges and tax, and the rate differs by city.",
+      "media": "uploads/m7-gold.jpg",
+      "mediaType": "image",
+      "kicker": "Gold Rate"
+    },
+    {
+      "id": "m12-teams",
+      "title": "Orders for our security teams today",
+      "script": "For our teams today. If a bank camera goes dark, or an ATM has no guard, treat it as a break-in and call at once. If a vehicle starts to smoke, stop and get everyone out. In Kerala, autos and taxis are off the road today. Watch the gates, and expect marches at the district offices. Heavy rain and hail are likely in Jammu and Kashmir. In the Andaman Islands, boats should stay in harbour. Delhi's air is very poor.",
+      "media": "uploads/m5-gate.jpg",
+      "mediaType": "image",
+      "kicker": "Daily News"
+    },
+    {
+      "id": "m12-guide",
+      "title": "Always follow Government Guidelines",
+      "script": "Always follow Government Guidelines today.",
+      "media": "uploads/ai-guidelines.jpg",
+      "mediaType": "image",
+      "kicker": "Daily News"
+    }
+  ],
+  "agile": [],
+  "jobs": {
+    "script": "",
+    "cities": [],
+    "site": "www.securityjob.co.in",
+    "media": "",
+    "mediaType": ""
+  },
+  "flashScroll": "Cabinet extends help for new businesses. India win in Dhaka, and lead in New Zealand. Electric bus burns in Delhi, no one hurt.",
+  "weatherScroll": "Heavy rain likely in Jammu and Kashmir. Delhi air is very poor."
+}
