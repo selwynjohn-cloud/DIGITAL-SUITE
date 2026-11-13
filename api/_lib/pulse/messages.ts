@@ -1,4 +1,4 @@
-import { BULLETIN_URL, CHANNEL_URL, JOB_LINKS, SHARE_URL } from './config.js'
+import { BULLETIN_URL, JOB_LINKS } from './config.js'
 
 /** Kept for thank-you / winner cards. Bulletin Channel + group posts are text only. */
 export const CHANNEL_LOGO_URL = 'https://www.agilegroup-digital.co.in/agile-logo-wa-header.png'
@@ -8,7 +8,7 @@ export const CHANNEL_COMPANY_LINE = 'Agile Security Force Private Limited.'
 /**
  * Short WhatsApp posts — must fit on one phone screen (no “Read more” / second page).
  *   msg1 = Channel (company + news + Pulse only) — no logo image
- *   msg2 = Groups (company + news + direct Channel URL + jobs + website) — never the Pulse URL
+ *   msg2 = Groups (company + news + jobs + website) — no Channel URL, no tinyurl/Security-News
  *   msg3 = approval prompt
  * Do not put the old section menu, awareness essays, or Cursor attribution here.
  */
@@ -36,10 +36,10 @@ export function buildWhatsAppMessages(opts: {
     `${news}\n` +
     `👉 Full bulletin: ${BULLETIN_URL}.`
 
+  // Director rule: group blasts must not include Channel or tinyurl.com/Security-News links.
   const msg2 =
     `${head}\n` +
     `${news}\n` +
-    `🔔 Follow our Security News Channel, test your security skills, and win rewards!\n${CHANNEL_URL}\n${SHARE_URL}\n` +
     `\nFor immediate Job Vacancies - ${JOB_LINKS.registerLabel}\n` +
     `our full range of services - www.agilegroup.co.in`
 
