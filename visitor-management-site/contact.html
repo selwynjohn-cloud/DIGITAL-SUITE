@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Contact — eGate</title>
+    <meta
+      name="description"
+      content="Contact eGate for early access to gate and visitor management."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <div class="sky" aria-hidden="true"></div>
+
+    <header class="top">
+      <a class="logo" href="index.html">eGate</a>
+      <nav>
+        <a href="index.html#how">How it works</a>
+        <a href="index.html#features">Features</a>
+        <a href="contact.html" aria-current="page">Contact</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero contact-hero">
+        <p class="logo-hero">eGate</p>
+        <h1>Early access</h1>
+        <p class="lede">
+          Tell us about your reception desk, society, or campus — we’ll reach
+          out when your trial is ready.
+        </p>
+      </section>
+
+      <section class="block">
+        <form class="form" name="egate-contact" method="POST">
+          <label>
+            Name
+            <input type="text" name="name" required autocomplete="name" />
+          </label>
+          <label>
+            Email
+            <input type="email" name="email" required autocomplete="email" />
+          </label>
+          <label>
+            Organisation / place
+            <input type="text" name="place" autocomplete="organization" />
+          </label>
+          <label>
+            Message
+            <textarea name="message" rows="5" required></textarea>
+          </label>
+          <button class="btn solid" type="submit">Send</button>
+        </form>
+        <p class="direct">
+          Or email
+          <a href="mailto:selwyn.john@gmail.com">selwyn.john@gmail.com</a>
+        </p>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <p>© <span id="year"></span> eGate · John Selwyn</p>
+      <p><a href="index.html">Home</a></p>
+    </footer>
+
+    <script src="js/main.js"></script>
+  </body>
+</html>
